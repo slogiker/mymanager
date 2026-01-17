@@ -1,0 +1,63 @@
+<%- include('partials/header') %>
+
+    <main>
+        <section>
+            <h2 class="section-title">
+                <i class="fa-solid fa-user"></i> Profile
+            </h2>
+
+            <div class="profile-card">
+                <div class="profile-header">
+                    <div class="profile-avatar">
+                        <i class="fa-solid fa-user-circle"></i>
+                    </div>
+                    <div class="profile-info">
+                        <h1>
+                            <%= user.username %>
+                        </h1>
+                        <p class="profile-role">
+                            <% if (user.role==='admin' ) { %>
+                                <i class="fa-solid fa-shield-halved"></i> Administrator
+                                <% } else { %>
+                                    <i class="fa-solid fa-user"></i> User
+                                    <% } %>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="profile-details">
+                    <div class="detail-group">
+                        <label><i class="fa-solid fa-envelope"></i> Email</label>
+                        <p>
+                            <%= user.email || 'Not set' %>
+                        </p>
+                    </div>
+
+                    <div class="detail-group">
+                        <label><i class="fa-solid fa-calendar"></i> Member Since</label>
+                        <p>
+                            <%= user.createdAt || 'N/A' %>
+                        </p>
+                    </div>
+
+                    <div class="detail-group">
+                        <label><i class="fa-solid fa-key"></i> Role</label>
+                        <p>
+                            <%= user.role || 'user' %>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="profile-actions">
+                    <a href="/" class="btn btn-primary">
+                        <i class="fa-solid fa-home"></i> Back to Dashboard
+                    </a>
+                    <a href="/logout" class="btn btn-outline">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <%- include('partials/footer') %>
