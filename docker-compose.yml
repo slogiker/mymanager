@@ -1,12 +1,15 @@
-version: '3.8'
-
 services:
   dashboard:
     build: .
-    ports:
-      - "8085:3000"
+    # NO ports: line anymore
     volumes:
       - /app/node_modules
     environment:
       - NODE_ENV=development
     restart: always
+    networks:
+      - npm-host-bridge
+
+networks:
+  npm-host-bridge:
+    external: true
