@@ -4,16 +4,10 @@ const User = require('../models/User');
 
 // Login page
 router.get('/login', (req, res) => {
-<<<<<<< HEAD
-    // If already logged in, go to dashboard
     if (req.session.user) {
         return res.redirect('/');
     }
     res.render('login', { title: 'Login / Sign Up', loginMode: 'login' });
-=======
-    if (req.session.user) return res.redirect('/');
-    res.render('login', { title: 'Login', error: undefined });
->>>>>>> 8258cb30f30f29f7ddb2ca83519dc37f46870751
 });
 
 // Display signup form
@@ -81,7 +75,6 @@ router.post('/signup', async (req, res) => {
 // Handle login
 router.post('/login', async (req, res) => {
     const { username, password } = req.body;
-<<<<<<< HEAD
 
     if (!username || !password) {
         return res.render('login', {
@@ -91,8 +84,6 @@ router.post('/login', async (req, res) => {
         });
     }
 
-=======
->>>>>>> 8258cb30f30f29f7ddb2ca83519dc37f46870751
     try {
         const user = await User.login(username, password);
         if (user) {
@@ -106,22 +97,21 @@ router.post('/login', async (req, res) => {
         });
     } catch (err) {
         console.error(err);
-<<<<<<< HEAD
         res.render('login', {
             title: 'Login / Sign Up',
             loginMode: 'login',
             error: 'An error occurred'
         });
-=======
-        res.render('login', { title: 'Login', error: 'An error occurred during login' });
     }
 });
 
+// Display register page
 router.get('/register', (req, res) => {
     if (req.session.user) return res.redirect('/');
     res.render('register', { title: 'Register', error: undefined });
 });
 
+// Handle registration
 router.post('/register', async (req, res) => {
     const { username, email, password } = req.body;
     try {
@@ -130,7 +120,6 @@ router.post('/register', async (req, res) => {
         res.redirect('/');
     } catch (err) {
         res.render('register', { title: 'Register', error: err.message });
->>>>>>> 8258cb30f30f29f7ddb2ca83519dc37f46870751
     }
 });
 
