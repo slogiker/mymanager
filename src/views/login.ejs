@@ -11,12 +11,35 @@
             </div>
         <% } %>
 
+<<<<<<< HEAD
         <% if (typeof loginMode !== 'undefined' && loginMode === 'signup') { %>
             <!-- SIGNUP FORM -->
             <form action="/signup" method="POST">
                 <div class="form-group">
                     <label for="name">Full Name</label>
                     <input type="text" id="name" name="name" required autofocus>
+=======
+                <form action="/login" method="POST">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" required autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div style="position: relative;">
+                            <input type="password" id="password" name="password" required>
+                            <i class="fa-solid fa-eye" id="togglePassword"
+                                style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-secondary);"></i>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Authenticate</button>
+                </form>
+
+                <div
+                    style="text-align: center; margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <a href="/register" style="color: var(--accent-color); font-size: 0.95rem;">Create an Account</a>
+                    <a href="/" style="color: var(--text-secondary); font-size: 0.9rem;">Back to Dashboard</a>
+>>>>>>> 8258cb30f30f29f7ddb2ca83519dc37f46870751
                 </div>
                 <div class="form-group">
                     <label for="username">Username</label>
@@ -68,6 +91,19 @@
                 <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
             </a>
         </div>
+    </div>
+
+    <script>
+        const togglePassword = document.getElementById('togglePassword');
+        const password = document.getElementById('password');
+
+        togglePassword.addEventListener('click', function (e) {
+            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+            password.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+    </script>
     </div>
 
     <%- include('partials/footer') %>
