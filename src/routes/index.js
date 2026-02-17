@@ -3,6 +3,11 @@ const router = express.Router();
 const dataManager = require('../models/DataManager');
 
 router.get('/', (req, res) => {
+    // Check if user is logged in via maintenance login
+    if (!req.session.isAdmin) {
+        return res.redirect('/maintenance');
+    }
+
     const user = req.session.user;
     const services = dataManager.getServices(user);
     const projects = dataManager.getProjects();

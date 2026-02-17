@@ -136,8 +136,38 @@ router.post('/register', async (req, res) => {
 
 // Logout
 router.get('/logout', (req, res) => {
+    req.session.isAdmin = false;
+    req.session.user = null;
     req.session.destroy();
-    res.redirect('/');
+    res.redirect('/maintenance');
+});
+
+// Maintenance Mode - Simple Admin Login
+router.get('/maintenance', (req, res) => {
+    if (req.session.isAdmin) {
+        return res.redirect('/');
+    }
+    res.render('maintenance', { error: undefined });
+});
+
+router.post('/maintenance-login', (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.render('maintenance', {
+            error: 'Username and password are required'
+        });
+    }
+
+    // Check credentials against env variables
+    if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
+        req.session.isAdmin = true;
+        return res.redirect('/');
+    }
+
+    res.render('maintenance', {
+        error: 'Invalid username or password'
+    });
 });
 
 module.exports = router;
