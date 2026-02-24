@@ -1,0 +1,185 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased;
+    background-image:
+      radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 cursor-pointer border-0 text-sm;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20;
+  }
+
+  .btn-outline {
+    @apply border border-slate-600 hover:bg-slate-800 hover:border-slate-500 text-slate-300;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-500 text-white;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-slate-800/70 rounded-xl p-6 border border-slate-700/50 backdrop-blur-sm transition-all duration-300 hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5;
+  }
+
+  /* Form Inputs */
+  .input-field {
+    @apply w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-colors;
+  }
+
+  /* Badge */
+  .badge {
+    @apply text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider;
+  }
+
+  /* Sortable */
+  .sortable-ghost {
+    @apply opacity-40 border-2 border-dashed border-blue-500;
+  }
+
+  .sortable-drag {
+    @apply opacity-90 scale-[1.02] shadow-2xl z-50;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    @apply hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 items-center justify-center;
+  }
+
+  .modal-overlay.active {
+    @apply flex;
+  }
+
+  .modal {
+    @apply bg-slate-900 border border-slate-700 rounded-2xl p-8 w-[90%] max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl;
+    @apply transition-all duration-300 opacity-0 scale-95;
+  }
+
+  .modal-overlay.active .modal {
+    @apply opacity-100 scale-100;
+  }
+
+  /* Prose for README content */
+  .readme-content h1 {
+    @apply text-2xl font-bold text-white mt-6 mb-3;
+  }
+
+  .readme-content h2 {
+    @apply text-xl font-bold text-white mt-5 mb-2;
+  }
+
+  .readme-content h3 {
+    @apply text-lg font-semibold text-slate-200 mt-4 mb-2;
+  }
+
+  .readme-content p {
+    @apply text-slate-400 mb-3 leading-relaxed;
+  }
+
+  .readme-content a {
+    @apply text-blue-400 hover:underline;
+  }
+
+  .readme-content code {
+    @apply bg-slate-800 text-blue-300 px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+
+  .readme-content ul,
+  .readme-content ol {
+    @apply ml-6 mb-3 space-y-1 text-slate-400;
+  }
+
+  .readme-content li {
+    @apply list-disc;
+  }
+
+  .readme-content img {
+    @apply max-w-full rounded-lg my-4;
+  }
+
+  /* Header Navigation */
+  .header-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 2rem;
+    padding: 1rem 5%;
+    box-sizing: border-box;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .header-nav .brand {
+    font-weight: 700;
+    font-size: 1.25rem;
+    letter-spacing: -0.025em;
+    color: #f1f5f9;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .header-nav .brand-icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #38bdf8, #8b5cf6);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.8rem;
+  }
+
+  .header-nav .links {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+  }
+
+  .header-nav a {
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+
+  .header-nav a:hover,
+  .header-nav a.active {
+    color: #e2e8f0;
+  }
+
+  .btn-outline-sm {
+    padding: 0.4rem 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.5);
+    transition: all 0.2s;
+  }
+
+  .btn-outline-sm:hover {
+    background: rgba(51, 65, 85, 0.5);
+    border-color: rgba(148, 163, 184, 0.5);
+  }
+}

@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="MyManager - slogiker">
+    <meta name="keywords" content="MyManager, slogiker">
+    <meta name="author" content="slogiker">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyManager - slogiker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: #020617;
+            /* slate-950 */
+            color: #f8fafc;
+            /* slate-50 */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image:
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        /* Container */
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 2rem 5%;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .btn-outline-sm:hover {
+            background: rgba(51, 65, 85, 0.5);
+            border-color: rgba(148, 163, 184, 0.5);
+        }
+
+        /* Hero Section */
+        .hero {
+            margin-bottom: 4rem;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            margin: 0 0 1rem;
+            line-height: 1.1;
+            background: linear-gradient(to right, #ffffff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.15rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 0 0 1.5rem;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .social-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(51, 65, 85, 0.6);
+            color: #cbd5e1;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .social-btn:hover {
+            transform: translateY(-2px);
+            background: rgba(51, 65, 85, 0.8);
+            color: #fff;
+            border-color: rgba(100, 116, 139, 0.8);
+        }
+
+        /* Section Headings */
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin: 0 0 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-title i {
+            color: #64748b;
+        }
+
+        .section {
+            margin-bottom: 5rem;
+        }
+
+        /* Applications Grid */
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .app-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 12px;
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .app-card:hover {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: rgba(56, 189, 248, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .app-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .app-icon.minecraft {
+            background: rgba(34, 197, 94, 0.1);
+            color: #4ade80;
+        }
+
+        .app-icon.folders {
+            background: rgba(56, 189, 248, 0.1);
+            color: #7dd3fc;
+        }
+
+        .app-icon.nas {
+            background: rgba(168, 85, 247, 0.1);
+            color: #c084fc;
+        }
+
+        .app-info h3 {
+            margin: 0 0 0.25rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        .app-info p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+
+        /* Repositories Grid */
+        .repos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1rem;
+        }
+
+        .repo-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: inherit;
+            height: 100%;
+        }
+
+        .repo-card:hover {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: rgba(148, 163, 184, 0.4);
+        }
+
+        .repo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .repo-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #60a5fa;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .repo-title i {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .repo-desc {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin: 0 0 1.5rem;
+            flex-grow: 1;
+        }
+
+        .repo-meta {
+            display: flex;
+            gap: 1.25rem;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .repo-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        /* Shared Clipboard */
+        .clipboard-container {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(51, 65, 85, 0.6);
+            border-radius: 12px;
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+        }
+
+        .clipboard-header {
+            background: rgba(15, 23, 42, 0.6);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .clipboard-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .clipboard-content {
+            padding: 0;
+        }
+
+        .clipboard-textarea {
+            width: 100%;
+            height: 200px;
+            background: transparent;
+            border: none;
+            padding: 1.5rem;
+            color: #f1f5f9;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            resize: vertical;
+            outline: none;
+            box-sizing: border-box;
+            transition: background 0.2s;
+        }
+
+        .clipboard-textarea:focus {
+            background: rgba(15, 23, 42, 0.2);
+        }
+
+        .clipboard-textarea::placeholder {
+            color: #475569;
+        }
+
+        .clipboard-footer {
+            padding: 0.75rem 1.5rem;
+            background: rgba(15, 23, 42, 0.4);
+            border-top: 1px solid rgba(51, 65, 85, 0.6);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .save-status {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .save-status.saved {
+            color: #10b981;
+        }
+
+        /* Portfolio */
+        .portfolio-section {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 12px;
+            padding: 2rem;
+        }
+
+        .readme-content {
+            color: #94a3b8;
+            line-height: 1.8;
+            font-size: 0.95rem;
+        }
+
+        .readme-content a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+
+        .readme-content a:hover {
+            text-decoration: underline;
+        }
+
+        .readme-content h1,
+        .readme-content h2,
+        .readme-content h3 {
+            color: #f1f5f9;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .readme-content code {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            color: #93c5fd;
+        }
+
+        .readme-content ul {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding-left: 0;
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .readme-content li {
+            list-style: none;
+            background: rgba(51, 65, 85, 0.4);
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(71, 85, 105, 0.5);
+            margin-bottom: 0;
+            color: #cbd5e1;
+        }
+
+        .readme-content img {
+            display: inline-block !important;
+            vertical-align: middle;
+            max-width: 100%;
+            border-radius: 4px;
+            margin: 0.25rem 0.25rem 0.25rem 0 !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Group images into flex containers to guarantee horizontal wrapping */
+        .readme-content p:has(img) {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1.5rem 1rem;
+            }
+
+            .hero h1 {
+                font-size: 2.25rem;
+            }
+
+            .repos-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Footer */
+        .site-footer {
+            padding: 3rem 0;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.9rem;
+            border-top: 1px solid rgba(51, 65, 85, 0.4);
+            margin-top: auto;
+            width: 100%;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <%- include('partials/navbar', { activePage: 'about' }) %>
+
+        <div class="container">
+
+            <!-- Hero / About -->
+            <section id="about" class="hero">
+                <h1>Hi, I'm Daniel.</h1>
+                <p>
+                    I am a developer, homelab enthusiast, and amateur radio operator.
+                    Constantly building tools, managing systems, and exploring new technologies.
+                    Welcome to my personal corner of the web.
+                </p>
+                <div class="social-links">
+                    <a href="https://github.com/slogiker" target="_blank" class="social-btn" title="GitHub"><i
+                            class="fa-brands fa-github"></i></a>
+                    <a href="https://www.qrz.com/db/S54DP" target="_blank" class="social-btn" title="Amateur Radio"><i
+                            class="fa-solid fa-tower-broadcast"></i></a>
+                    <a href="mailto:plibersek.daniel@gmail.com" class="social-btn" title="Email"><i
+                            class="fa-solid fa-envelope"></i></a>
+                </div>
+            </section>
+
+            <!-- Applications Grid -->
+            <section id="apps" class="section">
+                <h2 class="section-title"><i class="fa-solid fa-server"></i> Applications</h2>
+                <div class="apps-grid">
+                    <a href="https://github.com/slogiker/MC-BOT" target="_blank" class="app-card">
+                        <div class="app-icon" style="background: rgba(34, 197, 94, 0.1); color: #4ade80;"><i
+                                class="fa-brands fa-discord"></i></div>
+                        <div class="app-info">
+                            <h3>MC-BOT</h3>
+                            <p>Discord integration</p>
+                        </div>
+                    </a>
+                    <a href="https://github.com/slogiker/RGB-led-controller-flutter" target="_blank" class="app-card">
+                        <div class="app-icon" style="background: rgba(56, 189, 248, 0.1); color: #7dd3fc;"><i
+                                class="fa-solid fa-lightbulb"></i></div>
+                        <div class="app-info">
+                            <h3>RGB LED Controller</h3>
+                            <p>Flutter mobile app</p>
+                        </div>
+                    </a>
+                    <a href="https://github.com/slogiker/mod-updator-python" target="_blank" class="app-card">
+                        <div class="app-icon" style="background: rgba(234, 179, 8, 0.1); color: #facc15;"><i
+                                class="fa-brands fa-python"></i></div>
+                        <div class="app-info">
+                            <h3>Mod Updator</h3>
+                            <p>Python automation utility</p>
+                        </div>
+                    </a>
+                    <a href="https://github.com/slogiker/mymanager" target="_blank" class="app-card">
+                        <div class="app-icon" style="background: rgba(168, 85, 247, 0.1); color: #c084fc;"><i
+                                class="fa-solid fa-layer-group"></i></div>
+                        <div class="app-info">
+                            <h3>MyManager</h3>
+                            <p>Personal infrastructure portal</p>
+                        </div>
+                    </a>
+                </div>
+            </section>
+
+            <!-- Projects Section -->
+            <section id="projects" class="section">
+                <h2 class="section-title"><i class="fa-regular fa-folder-open"></i> Projects</h2>
+                <div class="repos-grid">
+                    <a href="https://vesolje.scptuj.si/index.php/cansat/" target="_blank" class="repo-card">
+                        <div class="repo-header">
+                            <h3 class="repo-title"><i class="fa-solid fa-rocket"></i> CanSat</h3>
+                        </div>
+                        <p class="repo-desc">
+                            Official Cansat project space showcasing engineering and telemetry data.
+                        </p>
+                        <div class="repo-meta">
+                            <span><i class="fa-solid fa-globe" style="color: #60a5fa;"></i> Web Application</span>
+                        </div>
+                    </a>
+                    <div class="repo-card"
+                        style="display: flex; align-items: center; justify-content: center; text-align: center; border-style: dashed; opacity: 0.7;">
+                        <div>
+                            <i class="fa-solid fa-hourglass-half"
+                                style="font-size: 2rem; color: #64748b; margin-bottom: 1rem; display: block;"></i>
+                            <h3 style="color: #94a3b8; font-size: 1.1rem; margin: 0;">More coming in the future...</h3>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Portfolio README -->
+            <section id="portfolio" class="section">
+                <h2 class="section-title"><i class="fa-regular fa-id-card"></i> Portfolio</h2>
+                <div class="portfolio-section">
+                    <div id="portfolioContainer" class="readme-content">
+                        <div style="display:flex; align-items:center; gap:0.5rem; color:#64748b;">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Loading portfolio...
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- Global Footer -->
+        <footer
+            class="text-center py-8 text-slate-500 text-sm mt-auto w-full border-t border-slate-800 bg-slate-900/50 backdrop-blur-sm">
+            <p>&copy; 2026 Daniel Pliberšek (slogiker). Built with Express, Tailwind concept & PostgreSQL.</p>
+        </footer>
+
+        <!-- Scripts -->
+        <script>
+
+
+            // --- Portfolio Renderer ---
+            function parseMarkdown(text) {
+                return text
+                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/`(.*?)`/g, '<code>$1</code>')
+                    .replace(/^\- (.*$)/gim, '<li>$1</li>')
+                    .replace(/\n\n/g, '</p><p>')
+                    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+                    .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1">')
+                    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+            }
+
+            async function loadPortfolio() {
+                const container = document.getElementById('portfolioContainer');
+                try {
+                    const response = await fetch('https://api.github.com/repos/slogiker/slogiker/readme');
+                    if (response.ok) {
+                        const data = await response.json();
+                        const content = atob(data.content);
+                        container.innerHTML = parseMarkdown(content);
+                    } else {
+                        container.innerHTML = '<p>Could not load portfolio content.</p>';
+                    }
+                } catch (error) {
+                    console.error('Portfolio fetch error:', error);
+                    container.innerHTML = '<p>Failed to load portfolio.</p>';
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', loadPortfolio);
+        </script>
+</body>
+
+</html>

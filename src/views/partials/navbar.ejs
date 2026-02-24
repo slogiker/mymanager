@@ -1,0 +1,26 @@
+<!-- Global Transparent Navbar -->
+<header class="header-nav">
+    <a href="/" class="brand">
+        <div class="brand-icon"><i class="fa-solid fa-code"></i></div>
+        MyManager
+    </a>
+    <div class="links">
+        <a href="/#about"
+            class="<%= typeof activePage !== 'undefined' && activePage === 'about' ? 'active' : '' %>">About</a>
+        <a href="/#apps"
+            class="<%= typeof activePage !== 'undefined' && activePage === 'apps' ? 'active' : '' %>">Apps</a>
+        <a href="/#projects"
+            class="<%= typeof activePage !== 'undefined' && activePage === 'projects' ? 'active' : '' %>">Projects</a>
+        <a href="/#portfolio"
+            class="<%= typeof activePage !== 'undefined' && activePage === 'portfolio' ? 'active' : '' %>">Portfolio</a>
+        <% if (typeof user !=='undefined' && user) { %>
+            <a href="<%= user.role === 'owner' || user.role === 'admin' ? '/owner' : '/user' %>"
+                class="btn-outline-sm">Dashboard</a>
+            <a href="/logout" class="text-slate-400 hover:text-red-400 text-sm ml-2" title="Sign Out">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </a>
+            <% } else { %>
+                <a href="/login" class="btn-outline-sm">Login</a>
+                <% } %>
+    </div>
+</header>

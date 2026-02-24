@@ -1,63 +1,79 @@
 <%- include('partials/header') %>
 
-    <main>
-        <section>
-            <h2 class="section-title">
-                <i class="fa-solid fa-user"></i> Profile
-            </h2>
+    <div class="max-w-4xl mx-auto">
+        <h2 class="text-2xl font-bold text-white mb-8 flex items-center gap-3">
+            <i class="fa-solid fa-user-circle text-blue-500"></i>
+            Profile Settings
+        </h2>
 
-            <div class="profile-card">
-                <div class="profile-header">
-                    <div class="profile-avatar">
-                        <i class="fa-solid fa-user-circle"></i>
+        <div class="card p-8">
+            <div class="flex flex-col md:flex-row items-center md:items-start gap-8">
+                <!-- Avatar -->
+                <div class="flex-shrink-0">
+                    <div
+                        class="w-28 h-28 rounded-2xl bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center text-4xl font-bold text-white shadow-xl shadow-blue-500/20">
+                        <%= user.username.charAt(0).toUpperCase() %>
                     </div>
-                    <div class="profile-info">
-                        <h1>
-                            <%= user.username %>
+                </div>
+
+                <!-- Info -->
+                <div class="flex-1 w-full space-y-6">
+                    <div>
+                        <h1 class="text-3xl font-bold text-white mb-2">
+                            <%= user.name || user.username %>
                         </h1>
-                        <p class="profile-role">
-                            <% if (user.role==='admin' ) { %>
-                                <i class="fa-solid fa-shield-halved"></i> Administrator
-                                <% } else { %>
-                                    <i class="fa-solid fa-user"></i> User
-                                    <% } %>
-                        </p>
-                    </div>
-                </div>
-
-                <div class="profile-details">
-                    <div class="detail-group">
-                        <label><i class="fa-solid fa-envelope"></i> Email</label>
-                        <p>
-                            <%= user.email || 'Not set' %>
-                        </p>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span
+                                class="px-3 py-1 bg-blue-900/40 text-blue-300 rounded-lg text-xs font-bold uppercase border border-blue-500/20">
+                                <i class="fa-solid fa-shield-halved mr-1"></i>
+                                <%= user.role || 'user' %>
+                            </span>
+                        </div>
                     </div>
 
-                    <div class="detail-group">
-                        <label><i class="fa-solid fa-calendar"></i> Member Since</label>
-                        <p>
-                            <%= user.createdAt || 'N/A' %>
-                        </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                            <label
+                                class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Username</label>
+                            <p class="text-slate-200 font-mono text-sm">
+                                <%= user.username %>
+                            </p>
+                        </div>
+                        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                            <label
+                                class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Email</label>
+                            <p class="text-slate-200 text-sm">
+                                <%= user.email %>
+                            </p>
+                        </div>
+                        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Full
+                                Name</label>
+                            <p class="text-slate-200 text-sm">
+                                <%= user.name || '—' %>
+                            </p>
+                        </div>
+                        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                            <label
+                                class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Role</label>
+                            <p class="text-slate-200 text-sm capitalize">
+                                <%= user.role || 'user' %>
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="detail-group">
-                        <label><i class="fa-solid fa-key"></i> Role</label>
-                        <p>
-                            <%= user.role || 'user' %>
-                        </p>
+                    <div class="flex flex-wrap gap-3 pt-4 border-t border-slate-700/50">
+                        <a href="/" class="btn btn-primary">
+                            <i class="fa-solid fa-house"></i> Back to Dashboard
+                        </a>
+                        <a href="/logout"
+                            class="btn btn-outline hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30">
+                            <i class="fa-solid fa-right-from-bracket"></i> Sign out
+                        </a>
                     </div>
-                </div>
-
-                <div class="profile-actions">
-                    <a href="/" class="btn btn-primary">
-                        <i class="fa-solid fa-home"></i> Back to Dashboard
-                    </a>
-                    <a href="/logout" class="btn btn-outline">
-                        <i class="fa-solid fa-right-from-bracket"></i> Logout
-                    </a>
                 </div>
             </div>
-        </section>
-    </main>
+        </div>
+    </div>
 
     <%- include('partials/footer') %>

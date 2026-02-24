@@ -1,0 +1,94 @@
+[
+    {
+        "id": 1,
+        "title": "Router",
+        "url": "http://router.home.arpa",
+        "description": "Network Router",
+        "icon": "fa-network-wired",
+        "category": "Network",
+        "isPrivate": true,
+        "VPN": true
+    },
+    {
+        "id": 2,
+        "title": "Minecraft Dashboard",
+        "url": "#",
+        "description": "MC Server Management",
+        "icon": "fa-cube",
+        "category": "Gaming",
+        "isPrivate": false,
+        "VPN": true
+    },
+    {
+        "id": 3,
+        "title": "Folders",
+        "url": "#",
+        "comment": "TODO: create link to files.slogiker.si",
+        "description": "File Browser",
+        "icon": "fa-folder-open",
+        "category": "System",
+        "isPrivate": false,
+        "VPN": false
+    },
+    {
+        "id": 4,
+        "title": "Pi-hole",
+        "url": "http://pihole.home.arpa",
+        "description": "Network-wide Ad Blocking",
+        "icon": "fa-shield-halved",
+        "category": "Network",
+        "isPrivate": true,
+        "VPN": true
+    },
+    {
+        "id": 5,
+        "title": "pgAdmin",
+        "url": "#",
+        "comment": "TODO: download pgadmin as docker and connect this shit",
+        "description": "PostgreSQL Management",
+        "icon": "fa-database",
+        "category": "Dev",
+        "isPrivate": true,
+        "VPN": false
+    },
+    {
+        "id": 6,
+        "title": "NAS",
+        "url": "#",
+        "description": "Network Attached Storage",
+        "icon": "fa-server",
+        "category": "System",
+        "isPrivate": false,
+        "VPN": false
+    },
+    {
+        "id": 7,
+        "title": "LED Controller",
+        "url": "#",
+        "description": "Custom LED Control",
+        "icon": "fa-lightbulb",
+        "category": "IOT",
+        "isPrivate": false,
+        "VPN": false
+    },
+    {
+        "id": 8,
+        "title": "NGINX Proxy Manager",
+        "url": "http://nginx.home.arpa",
+        "description": "NGINX Proxy Manager",
+        "icon": "fa-shield-halved",
+        "category": "Network",
+        "isPrivate": true,
+        "VPN": true
+    },
+    {
+        "id": 9,
+        "title": "Portainer",
+        "url": "#",
+        "description": "Docker Management",
+        "icon": "fa-docker",
+        "category": "Dev",
+        "isPrivate": true,
+        "VPN": true
+    }
+]

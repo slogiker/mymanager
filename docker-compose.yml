@@ -1,14 +1,21 @@
 services:
   dashboard:
     build: .
-    # NO ports: line anymore
+    ports:
+      - "3005:3000"
     volumes:
+      - ./:/app
       - /app/node_modules
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
     restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - npm-host-bridge
+      npm-host-bridge:
+        ipv4_address: 172.18.0.2
 
 networks:
   npm-host-bridge:

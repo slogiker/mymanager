@@ -1,27 +1,15 @@
-const crypto = require('crypto');
-const { Pool } = require('pg');
-require('dotenv').config();
+const bcrypt = require('bcrypt');
 
-// Database connection pool
-const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
-});
+const db = require('../config/database');
 
-// Hash password using SHA256
-function hashPassword(password) {
-    return crypto.createHash('sha256').update(password).digest('hex');
-}
+
 
 class User {
     // Register a new user
     static async register(name, username, email, password) {
         try {
             // Check if user already exists
-            const existingUser = await pool.query(
+            const existingUser = await db.query(
                 'SELECT * FROM users WHERE username = $1 OR email = $2',
                 [username, email]
             );
@@ -30,22 +18,23 @@ class User {
                 return { error: 'Username or email already exists' };
             }
 
-            // Hash password
-            const hashedPassword = hashPassword(password);
+            // Hash password with bcrypt
+            const hashedPassword = await bcrypt.hash(password, 10);
 
             // Create user
-            const result = await pool.query(
-                'INSERT INTO users (name, username, email, password, role, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id, name, username, email, role',
+            // Default role is 'user', handled by DB default
+            const result = await db.query(
+                'INSERT INTO users (ime, username, email, password_hash, role, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id, ime, username, email, role',
                 [name, username, email, hashedPassword, 'user']
             );
 
             return {
                 id: result.rows[0].id,
-                name: result.rows[0].name,
+                name: result.rows[0].ime,
                 username: result.rows[0].username,
                 email: result.rows[0].email,
                 role: result.rows[0].role,
-                permissions: ['view_services']
+                isAdmin: result.rows[0].role === 'admin' || result.rows[0].role === 'owner'
             };
         } catch (err) {
             console.error('Registration error:', err);
@@ -56,11 +45,9 @@ class User {
     // Login user
     static async login(username, password) {
         try {
-            const hashedPassword = hashPassword(password);
-
-            const result = await pool.query(
-                'SELECT id, name, username, email, role FROM users WHERE username = $1 AND password = $2',
-                [username, hashedPassword]
+            const result = await db.query(
+                'SELECT id, ime, username, email, role, password_hash FROM users WHERE username = $1',
+                [username]
             );
 
             if (result.rows.length === 0) {
@@ -68,13 +55,19 @@ class User {
             }
 
             const user = result.rows[0];
+            const passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+            if (!passwordMatch) {
+                return null;
+            }
+
             return {
                 id: user.id,
-                name: user.name,
+                name: user.ime,
                 username: user.username,
                 email: user.email,
                 role: user.role,
-                permissions: user.role === 'admin' ? ['manage_services', 'view_hidden'] : ['view_services']
+                isAdmin: user.role === 'admin' || user.role === 'owner'
             };
         } catch (err) {
             console.error('Login error:', err);
@@ -85,8 +78,8 @@ class User {
     // Get user by ID
     static async getById(id) {
         try {
-            const result = await pool.query(
-                'SELECT id, name, username, email, role, created_at FROM users WHERE id = $1',
+            const result = await db.query(
+                'SELECT id, ime, username, email, role FROM users WHERE id = $1',
                 [id]
             );
 
@@ -97,11 +90,11 @@ class User {
             const user = result.rows[0];
             return {
                 id: user.id,
-                name: user.name,
+                name: user.ime,
                 username: user.username,
                 email: user.email,
                 role: user.role,
-                created_at: user.created_at
+                isAdmin: user.role === 'admin' || user.role === 'owner'
             };
         } catch (err) {
             console.error('Get user error:', err);
