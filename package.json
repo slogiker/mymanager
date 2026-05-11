@@ -1,34 +1,13 @@
 {
-  "name": "dashboard-manager",
-  "version": "1.0.0",
-  "description": "Central dashboard and portfolio manager",
-  "main": "server.js",
+  "name": "mymanager",
+  "private": true,
+  "workspaces": ["app/client", "app/server"],
   "scripts": {
-    "start": "node server.js",
-    "dev": "concurrently \"npm run watch:css\" \"nodemon server.js\"",
-    "build:css": "tailwindcss -i ./src/public/css/input.css -o ./src/public/css/style.css --minify",
-    "watch:css": "tailwindcss -i ./src/public/css/input.css -o ./src/public/css/style.css --watch"
-  },
-  "dependencies": {
-    "bcrypt": "^5.1.1",
-    "body-parser": "^1.20.2",
-    "concurrently": "^9.2.1",
-    "connect-flash": "^0.1.1",
-    "cookie-parser": "^1.4.6",
-    "dotenv": "^17.2.3",
-    "ejs": "^3.1.9",
-    "express": "^4.18.2",
-    "express-session": "^1.17.3",
-    "pg": "^8.11.3",
-    "socket.io": "^4.8.3",
-    "ssh2": "^1.17.0",
-    "systeminformation": "^5.31.1",
-    "xterm": "^5.3.0"
+    "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",
+    "build": "npm run build --workspace=client",
+    "start": "npm run start --workspace=server"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.24",
-    "nodemon": "^3.0.1",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.0"
+    "concurrently": "^9.2.1"
   }
 }

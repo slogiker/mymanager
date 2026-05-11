@@ -2,14 +2,18 @@ services:
   dashboard:
     build: .
     ports:
-      - "3005:3000"
+      - "31847:7293"
     volumes:
-      - ./:/app
-      - /app/node_modules
-    env_file:
-      - .env
+      - ./app/server/data:/mymanager/app/server/data
+      - ./app/server/uploads:/mymanager/app/server/uploads
     environment:
       - NODE_ENV=production
+      - PORT=7293
+      - JWT_SECRET=${JWT_SECRET:-REMOVED-in-production}
+      - SSH_HOST=${SSH_HOST:-ssh.slogiker.si}
+      - SSH_PORT=${SSH_PORT:-2222}
+      - SSH_USERNAME=${SSH_USERNAME:-slogiker}
+      - OWNER_PASSWORD=${OWNER_PASSWORD:-}
     restart: always
     extra_hosts:
       - "host.docker.internal:host-gateway"

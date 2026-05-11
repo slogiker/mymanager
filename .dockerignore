@@ -1,0 +1,10 @@
+node_modules
+client/node_modules
+server/node_modules
+server/data
+server/uploads
+.env
+.git
+*.md
+cookies.txt
+test-si.js
