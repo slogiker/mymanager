@@ -23,8 +23,4 @@ services:
 
 networks:
   npm-host-bridge:
-    name: npm-host-bridge
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.18.0.0/24
+    external: true
