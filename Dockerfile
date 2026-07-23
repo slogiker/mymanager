@@ -17,7 +17,7 @@ RUN npm install
 COPY . .
 
 # Build React client
-RUN npm run build --workspace=client
+RUN npm run build --workspace=mymanager-client
 
 EXPOSE 3000
 

@@ -28,19 +28,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm animate-slide-up">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+      {/* Background Orbs */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse-slow" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse-slow" style={{ animationDelay: '1s' }} />
+
+      <div className="w-full max-w-sm animate-slide-up relative z-10">
         <div className="text-center mb-8">
           <div className="inline-flex w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-slate-700/50 items-center justify-center mb-4">
             <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-100">Welcome back</h1>
-          <p className="text-slate-500 text-sm mt-1">Sign in to continue</p>
+          <h1 className="text-3xl font-extrabold text-slate-100 tracking-tight">Welcome back</h1>
+          <p className="text-slate-400 text-sm mt-2">Sign in to continue to your dashboard</p>
         </div>
 
-        <div className="card p-6">
+        <div className="card p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1.5">Username</label>

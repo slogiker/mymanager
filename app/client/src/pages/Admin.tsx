@@ -94,28 +94,89 @@ function DayChart({ data, days }: DayChartProps) {
       <div className="card p-5 mb-4 text-center text-slate-500 text-sm">No data for this period</div>
     );
   }
+
   const maxViews = Math.max(...data.map(d => d.views), 1);
+  const width = 600;
+  const height = 150;
+  const paddingX = 30;
+  const paddingY = 15;
+
+  const pointsViews = data.map((d, i) => {
+    const x = paddingX + (i / (data.length - 1 || 1)) * (width - paddingX * 2);
+    const y = height - paddingY - (d.views / maxViews) * (height - paddingY * 2);
+    return `${x},${y}`;
+  });
+
+  const pointsVisitors = data.map((d, i) => {
+    const x = paddingX + (i / (data.length - 1 || 1)) * (width - paddingX * 2);
+    const y = height - paddingY - (d.visitors / maxViews) * (height - paddingY * 2);
+    return `${x},${y}`;
+  });
+
+  const viewsPath = pointsViews.join(' ');
+  const visitorsPath = pointsVisitors.join(' ');
+  const viewsArea = `${paddingX},${height - paddingY} ${viewsPath} ${width - paddingX},${height - paddingY}`;
+  const visitorsArea = `${paddingX},${height - paddingY} ${visitorsPath} ${width - paddingX},${height - paddingY}`;
+
   return (
-    <div className="card p-5 mb-4">
+    <div className="card p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-semibold text-slate-200">Pageviews</span>
-        <span className="text-xs text-slate-500">last {days} days</span>
+        <div>
+          <h3 className="text-sm font-semibold text-slate-200">Traffic Overview</h3>
+          <p className="text-xs text-slate-500">Pageviews and unique visitors over the last {days} days</p>
+        </div>
+        <div className="flex items-center gap-4 text-xs font-semibold">
+          <span className="flex items-center gap-1.5 text-blue-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500/80" />
+            Views
+          </span>
+          <span className="flex items-center gap-1.5 text-cyan-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400/80" />
+            Visitors
+          </span>
+        </div>
       </div>
-      <div className="flex items-end gap-0.5 h-28">
-        {data.map((d, i) => (
-          <div key={i} className="flex flex-col items-center flex-1 min-w-0" title={`${d.date}: ${d.views} views, ${d.visitors} visitors`}>
-            <div className="w-full flex flex-col justify-end rounded-t-sm overflow-hidden bg-slate-700/30" style={{ height: '100px' }}>
-              <div className="w-full bg-blue-500/50 transition-all" style={{ height: `${(d.views / maxViews) * 100}%` }}>
-                <div className="w-full bg-cyan-400/70" style={{ height: `${d.visitors > 0 ? Math.min((d.visitors / d.views) * 100, 100) : 0}%` }} />
-              </div>
-            </div>
-            <span className="text-[9px] text-slate-600 mt-1 truncate w-full text-center">{d.date?.slice(5)}</span>
-          </div>
-        ))}
+
+      <div className="relative w-full overflow-hidden">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full overflow-visible" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="viewsGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="visitorsGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          <line x1={paddingX} y1={paddingY} x2={width - paddingX} y2={paddingY} stroke="rgba(148, 163, 184, 0.04)" />
+          <line x1={paddingX} y1={height / 2} x2={width - paddingX} y2={height / 2} stroke="rgba(148, 163, 184, 0.04)" />
+          <line x1={paddingX} y1={height - paddingY} x2={width - paddingX} y2={height - paddingY} stroke="rgba(148, 163, 184, 0.08)" />
+
+          {/* Shaded Areas */}
+          <polygon points={viewsArea} fill="url(#viewsGrad)" />
+          <polygon points={visitorsArea} fill="url(#visitorsGrad)" />
+
+          {/* Line Strokes */}
+          <polyline points={viewsPath} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points={visitorsPath} fill="none" stroke="#22d3ee" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Value markers */}
+          {data.length <= 15 && pointsViews.map((pt, idx) => {
+            const [x, y] = pt.split(',');
+            return (
+              <circle key={idx} cx={x} cy={y} r="3" className="fill-blue-500 stroke-slate-900 stroke-2" />
+            );
+          })}
+        </svg>
       </div>
-      <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm bg-blue-500/50 inline-block" />Views</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm bg-cyan-400/70 inline-block" />Visitors</span>
+
+      <div className="flex justify-between text-[9px] text-slate-500 mt-2 font-mono px-2">
+        <span>{data[0]?.date?.slice(5)}</span>
+        <span>{data[Math.floor(data.length / 2)]?.date?.slice(5)}</span>
+        <span>{data[data.length - 1]?.date?.slice(5)}</span>
       </div>
     </div>
   );
@@ -802,7 +863,6 @@ function BreakdownTable({ title, rows }: BreakdownTableProps) {
 function AnalyticsTab() {
   const [days, setDays] = useState<number>(30);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [recent, setRecent] = useState<AnalyticsVisit[]>([]);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -810,12 +870,8 @@ function AnalyticsTab() {
     setLoading(true);
     setError('');
     try {
-      const [s, r] = await Promise.all([
-        api.get<AnalyticsSummary>(`/analytics/summary?days=${days}`),
-        api.get<AnalyticsVisit[]>('/analytics/recent'),
-      ]);
+      const s = await api.get<AnalyticsSummary>(`/analytics/summary?days=${days}`);
       setSummary(s);
-      setRecent(Array.isArray(r) ? r : []);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   };
@@ -849,36 +905,10 @@ function AnalyticsTab() {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
         <BreakdownTable title="Top pages" rows={toRows(summary?.topPages, 'path')} />
         <BreakdownTable title="By country" rows={toRows(summary?.byCountry, 'country')} />
-        <BreakdownTable title="By device" rows={toRows(summary?.byDevice, 'device_type')} />
-        <BreakdownTable title="By browser" rows={toRows(summary?.byBrowser, 'browser')} />
-        <BreakdownTable title="By OS" rows={toRows(summary?.byOs, 'os')} />
-        <BreakdownTable title="Top referrers" rows={toRows(summary?.topReferrers, 'referrer')} />
-      </div>
-      <div className="card overflow-x-auto">
-        <h3 className="px-4 pt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Recent visits</h3>
-        <table className="mt-2 min-w-full text-left text-sm">
-          <thead className="bg-slate-800/60 text-xs uppercase tracking-wide text-slate-400">
-            <tr>
-              <th className="px-4 py-2">Path</th>
-              <th className="px-4 py-2">Country</th>
-              <th className="px-4 py-2">Browser</th>
-              <th className="px-4 py-2">Device</th>
-              <th className="px-4 py-2">When</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-700">
-            {recent.map((v, i) => (
-              <tr key={v.id ?? i} className="text-slate-200">
-                <td className="px-4 py-1.5 font-mono text-xs">{v.path}</td>
-                <td className="px-4 py-1.5 text-slate-300">{v.country || '—'}</td>
-                <td className="px-4 py-1.5 text-slate-300">{v.browser || '—'}</td>
-                <td className="px-4 py-1.5 text-slate-300">{v.device_type || '—'}</td>
-                <td className="px-4 py-1.5 text-slate-400 text-xs">{fmtDate(v.created_at)}</td>
-              </tr>
-            ))}
-            {recent.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No visits.</td></tr>}
-          </tbody>
-        </table>
+        <BreakdownTable title="By device & OS" rows={[
+          ...toRows(summary?.byDevice, 'device_type'),
+          ...toRows(summary?.byOs, 'os')
+        ].slice(0, 5)} />
       </div>
       </>)}
     </div>

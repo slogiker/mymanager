@@ -4,13 +4,14 @@
 
 @layer base {
   * {
-    @apply border-slate-700/50;
+    @apply border-slate-800/80;
   }
   body {
-    @apply bg-[#020617] text-slate-50 font-sans min-h-screen antialiased;
-    background-image:
-      radial-gradient(at 0% 0%, rgba(56,189,248,0.08) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(139,92,246,0.08) 0px, transparent 50%);
+    @apply bg-[#020617] text-slate-50 font-sans min-h-screen antialiased selection:bg-cyan-500/30 selection:text-cyan-50;
+    background-image: 
+      linear-gradient(to right, rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
     background-attachment: fixed;
   }
   ::-webkit-scrollbar { width: 6px; }
@@ -21,29 +22,29 @@
 
 @layer components {
   .card {
-    @apply bg-slate-800/70 rounded-xl border border-slate-700/50 backdrop-blur-sm;
+    @apply bg-slate-900/40 rounded-2xl border border-slate-800/80 backdrop-blur-xl shadow-lg transition-all duration-300 ease-out;
   }
   .card-hover {
-    @apply transition-all duration-200 hover:border-cyan-500/30 hover:shadow-lg hover:shadow-cyan-500/5;
+    @apply hover:-translate-y-2 hover:border-cyan-500/30 hover:shadow-[0_15px_30px_-5px_rgba(6,182,212,0.15)] hover:bg-slate-800/30;
   }
   .btn {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-3 px-8 py-3.5 rounded-full text-base font-bold tracking-wide transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95;
   }
   .btn-primary {
-    @apply btn bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/20;
+    @apply btn bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 hover:from-blue-400 hover:via-indigo-400 hover:to-purple-400 text-white shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] hover:shadow-[0_0_60px_-10px_rgba(99,102,241,0.7)] border-none;
   }
   .btn-outline {
-    @apply btn border border-slate-600 hover:bg-slate-800 text-slate-300 hover:text-white;
+    @apply btn border-2 border-slate-600/50 hover:border-slate-400 bg-slate-900/50 hover:bg-slate-800/80 text-slate-200 hover:text-white backdrop-blur-md;
   }
   .btn-danger {
-    @apply btn bg-red-600 hover:bg-red-500 text-white;
+    @apply btn bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-lg shadow-red-500/20 hover:shadow-red-500/30 border border-red-500/30;
   }
   .input-field {
-    @apply w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500
-           focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-colors;
+    @apply w-full px-4 py-3 bg-slate-900/60 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500
+           focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all duration-300 backdrop-blur-sm;
   }
   .gradient-text {
-    @apply bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent;
   }
   .section-title {
     @apply text-2xl font-bold text-slate-100;

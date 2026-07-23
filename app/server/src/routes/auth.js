@@ -13,6 +13,18 @@ const COOKIE_OPTS = {
   maxAge: 30 * 24 * 60 * 60 * 1000,
 };
 
+// LOGIN BUG — do not fix until explicitly instructed.
+// Three likely causes investigated but left intact:
+// 1. authLimiter (rateLimit.js): 20 attempts / 15 min per IP. After a few wrong tries the
+//    endpoint returns 429; if api.ts doesn't surface the JSON body the UI just shows "Login failed".
+// 2. OTP never seen: owner account seeds with must_change_password=1 and a random one-time
+//    password printed once to the server console. If that line was missed, credentials are
+//    unknown without direct SQLite access (e.g. `sqlite3 data/mymanager.db "SELECT * FROM users"`).
+// 3. must_change_password missing from JWT payload: the token payload (line below) only includes
+//    { id, username, name, role }. After login, setUser(data.user) stores this stripped object.
+//    Login.tsx:12 checks !user.must_change_password which is undefined → falsy, bypassing the
+//    /change-password redirect on the client even when the DB flag is 1. Then /auth/me returns
+//    the real flag and causes a re-render loop on protected pages.
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });

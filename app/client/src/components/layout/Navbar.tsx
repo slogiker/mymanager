@@ -7,17 +7,18 @@ interface NavLink {
   href: string;
 }
 
-const NAV_LINKS: NavLink[] = [
-  { label: 'About', href: '/#hero' },
-  { label: 'Projects', href: '/#projects' },
-  { label: 'Skills', href: '/#skills' },
-  { label: 'Contact', href: '/#contact' },
+const NAV_LINKS = [
+  { label: 'About', href: '/#hero', id: 'hero' },
+  { label: 'Apps', href: '/#apps', id: 'apps' },
+  { label: 'Skills', href: '/#skills', id: 'skills' },
+  { label: 'Contact', href: '/#contact', id: 'contact' },
 ];
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
+  const [activeSection, setActiveSection] = useState<string>('hero');
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -26,6 +27,31 @@ export default function Navbar() {
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    if (location.pathname !== '/') return;
+
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 240; // offset for top sticky bar
+      const sections = ['hero', 'apps', 'skills', 'contact'];
+      
+      for (const section of sections) {
+        const element = document.getElementById(section);
+        if (element) {
+          const top = element.offsetTop;
+          const height = element.offsetHeight;
+          if (scrollPosition >= top && scrollPosition < top + height) {
+            setActiveSection(section);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Trigger initially
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [location.pathname]);
 
   function handleNav(href: string): void {
     setMenuOpen(false);
@@ -43,37 +69,38 @@ export default function Navbar() {
   }
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[#020617]/90 backdrop-blur-md border-b border-slate-800/80 shadow-lg' : 'bg-transparent'}`}>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-        <button onClick={() => handleNav('/')} className="text-lg font-bold gradient-text hover:opacity-80 transition-opacity">
+    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${scrolled ? 'bg-[#020617]/90 backdrop-blur-xl border-slate-800/80 shadow-lg' : 'bg-transparent border-transparent'}`}>
+      <div className="w-full px-8 md:px-16 lg:px-24 flex items-center justify-between h-20">
+        <button onClick={() => handleNav('/')} className="text-2xl font-black tracking-tight gradient-text hover:opacity-80 transition-opacity">
           slogiker
         </button>
 
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden md:flex items-center gap-10">
           {NAV_LINKS.map(link => (
             <button key={link.label} onClick={() => handleNav(link.href)}
-              className="text-sm text-slate-400 hover:text-white transition-colors">
+              className={`relative py-1 text-[16px] font-bold transition-all duration-300 ${activeSection === link.id && location.pathname === '/' ? 'text-cyan-400' : 'text-slate-400 hover:text-cyan-400'}`}>
               {link.label}
+              {activeSection === link.id && location.pathname === '/' && (
+                <span className="absolute -bottom-1.5 left-0 right-0 h-0.5 bg-cyan-400 rounded-full animate-fade-in" />
+              )}
             </button>
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-6">
           {user ? (
             <>
               {user.role === 'owner' && (
                 <>
-                  <Link to="/dashboard" className="text-sm text-slate-400 hover:text-white transition-colors">Dashboard</Link>
-                  <Link to="/admin" className="text-sm text-slate-400 hover:text-white transition-colors">Admin</Link>
-                  <Link to="/terminal" className="text-sm text-slate-400 hover:text-white transition-colors">Terminal</Link>
+                  <Link to="/dashboard" className="text-sm font-semibold text-slate-450 hover:text-white transition-colors">Dashboard</Link>
+                  <Link to="/terminal" className="text-sm font-semibold text-slate-450 hover:text-white transition-colors">Terminal</Link>
                 </>
               )}
-              <Link to="/clipboard" className="text-sm text-slate-400 hover:text-white transition-colors">Clipboard</Link>
-              <Link to="/files" className="text-sm text-slate-400 hover:text-white transition-colors">Files</Link>
-              <button onClick={handleLogout} className="btn-outline text-xs py-1.5">Sign out</button>
+              <Link to="/files" className="text-sm font-semibold text-slate-455 hover:text-white transition-colors">Files</Link>
+              <button onClick={handleLogout} className="btn-outline text-sm py-2 px-4">Sign out</button>
             </>
           ) : (
-            <Link to="/login" className="btn-primary text-xs py-1.5 px-3">Sign in</Link>
+            <Link to="/login" className="btn-primary text-sm py-2 px-5">Sign in</Link>
           )}
         </div>
 
@@ -86,7 +113,7 @@ export default function Navbar() {
       </div>
 
       {menuOpen && (
-        <div className="md:hidden bg-[#020617]/95 backdrop-blur-md border-b border-slate-800 px-4 pb-4 space-y-2">
+        <div className="md:hidden bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-6 py-4 rounded-b-2xl space-y-2">
           {NAV_LINKS.map(link => (
             <button key={link.label} onClick={() => handleNav(link.href)}
               className="block w-full text-left py-2 text-slate-400 hover:text-white transition-colors">
@@ -98,11 +125,9 @@ export default function Navbar() {
               {user.role === 'owner' && (
                 <>
                   <Link to="/dashboard" onClick={() => setMenuOpen(false)} className="block py-2 text-slate-400 hover:text-white">Dashboard</Link>
-                  <Link to="/admin" onClick={() => setMenuOpen(false)} className="block py-2 text-slate-400 hover:text-white">Admin</Link>
                   <Link to="/terminal" onClick={() => setMenuOpen(false)} className="block py-2 text-slate-400 hover:text-white">Terminal</Link>
                 </>
               )}
-              <Link to="/clipboard" onClick={() => setMenuOpen(false)} className="block py-2 text-slate-400 hover:text-white">Clipboard</Link>
               <Link to="/files" onClick={() => setMenuOpen(false)} className="block py-2 text-slate-400 hover:text-white">Files</Link>
               <button onClick={handleLogout} className="block w-full text-left py-2 text-red-400 hover:text-red-300">Sign out</button>
             </>

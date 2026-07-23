@@ -1,7 +1,7 @@
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import Hero from '../components/portfolio/Hero';
-import ProjectsGrid from '../components/portfolio/ProjectsGrid';
+import ApplicationsGrid from '../components/portfolio/ApplicationsGrid';
 import SkillsSection from '../components/portfolio/SkillsSection';
 import ContactForm from '../components/portfolio/ContactForm';
 
@@ -11,7 +11,7 @@ export default function PortfolioPage() {
       <Navbar />
       <main>
         <Hero />
-        <ProjectsGrid />
+        <ApplicationsGrid />
         <SkillsSection />
         <ContactForm />
       </main>
@@ -19,3 +19,4 @@ export default function PortfolioPage() {
     </div>
   );
 }
+

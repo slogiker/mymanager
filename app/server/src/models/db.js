@@ -1,7 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcrypt');
-const { randomBytes } = require('crypto');
+const { randomBytes, randomUUID } = require('crypto');
 const fs = require('fs');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../data/mymanager.db');
@@ -122,6 +122,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT UNIQUE,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     session_id TEXT,
     folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL,
@@ -130,7 +131,9 @@ db.exec(`
     file_path TEXT NOT NULL,
     mime_type TEXT,
     size INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
+    access_level TEXT DEFAULT 'private',
+    created_at TEXT DEFAULT (datetime('now')),
+    deleted_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS analytics (
@@ -176,6 +179,34 @@ if (!filesCols.includes('folder_id')) {
 }
 
 db.exec("CREATE INDEX IF NOT EXISTS idx_files_folder ON files(folder_id)");
+
+// Migrate: add parent_id to folders if missing
+const folderCols = db.prepare("PRAGMA table_info(folders)").all().map(c => c.name);
+if (!folderCols.includes('parent_id')) {
+  db.exec('ALTER TABLE folders ADD COLUMN parent_id TEXT REFERENCES folders(id) ON DELETE CASCADE');
+}
+db.exec("CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent_id)");
+
+// Migrate: add pinned to files if missing
+if (!filesCols.includes('pinned')) {
+  db.exec('ALTER TABLE files ADD COLUMN pinned INTEGER DEFAULT 0');
+}
+
+// Migrate: add uuid, access_level, and deleted_at to files for new storage architecture
+if (!filesCols.includes('uuid')) {
+  db.exec('ALTER TABLE files ADD COLUMN uuid TEXT');
+  // Backfill UUIDs for existing files
+  db.prepare('SELECT id FROM files WHERE uuid IS NULL').all().forEach(row => {
+    db.prepare('UPDATE files SET uuid = ? WHERE id = ?').run(randomUUID(), row.id);
+  });
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_files_uuid ON files(uuid)');
+}
+if (!filesCols.includes('access_level')) {
+  db.exec("ALTER TABLE files ADD COLUMN access_level TEXT DEFAULT 'private'");
+}
+if (!filesCols.includes('deleted_at')) {
+  db.exec('ALTER TABLE files ADD COLUMN deleted_at TEXT');
+}
 
 function seed() {
   const profileCount = db.prepare('SELECT COUNT(*) as c FROM profile').get();

@@ -46,7 +46,13 @@ router.get('/', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.json([]);
 
-  const { folder_id } = req.query;
+  const { folder_id, pinned } = req.query;
+
+  if (pinned === '1') {
+    return res.json(
+      db.prepare(`SELECT * FROM files WHERE ${filter.col} = ? AND pinned = 1 ORDER BY original_name ASC`).all(filter.val)
+    );
+  }
   // folder_id=null → root (IS NULL), folder_id=<uuid> → specific folder
   let rows;
   if (folder_id === 'null' || folder_id === '') {
@@ -98,6 +104,81 @@ router.post('/', uploadLimiter, optionalAuth, (req, res) => {
 
     res.status(201).json(db.prepare('SELECT * FROM files WHERE id = ?').get(result.lastInsertRowid));
   });
+});
+
+// Create a new empty text file
+router.post('/create', uploadLimiter, optionalAuth, (req, res) => {
+  const sessionId = ensureSession(req, res);
+  const { name, folder_id } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
+
+  const ext = path.extname(name.trim());
+  const stored = `${uuidv4()}${ext}`;
+  const fullPath = path.join(filesDir, stored);
+  fs.writeFileSync(fullPath, '', 'utf8');
+
+  const mime = ext === '.md' ? 'text/markdown'
+    : ext === '.json' ? 'application/json'
+    : ext === '.html' ? 'text/html'
+    : ext === '.css' ? 'text/css'
+    : ext === '.js' || ext === '.mjs' ? 'text/javascript'
+    : ext === '.ts' || ext === '.tsx' ? 'text/typescript'
+    : ext === '.py' ? 'text/x-python'
+    : ext === '.sh' ? 'text/x-sh'
+    : 'text/plain';
+
+  const result = db.prepare(`
+    INSERT INTO files (user_id, session_id, folder_id, original_name, stored_name, file_path, mime_type, size)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+  `).run(req.user?.id ?? null, req.user ? null : sessionId, folder_id || null, name.trim(), stored, `/uploads/files/${stored}`, mime);
+
+  res.status(201).json(db.prepare('SELECT * FROM files WHERE id = ?').get(result.lastInsertRowid));
+});
+
+// Read text file content
+router.get('/:id/content', optionalAuth, (req, res) => {
+  const filter = getOwnerFilter(req);
+  if (!filter) return res.status(401).json({ error: 'Not authenticated' });
+
+  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  const fullPath = path.join(__dirname, '../../uploads/files', file.stored_name);
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File not on disk' });
+
+  const content = fs.readFileSync(fullPath, 'utf8');
+  res.json({ content });
+});
+
+// Write text file content
+router.put('/:id/content', optionalAuth, (req, res) => {
+  const filter = getOwnerFilter(req);
+  if (!filter) return res.status(401).json({ error: 'Not authenticated' });
+
+  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  const { content } = req.body;
+  if (content === undefined) return res.status(400).json({ error: 'content required' });
+
+  const fullPath = path.join(__dirname, '../../uploads/files', file.stored_name);
+  fs.writeFileSync(fullPath, content, 'utf8');
+  const size = Buffer.byteLength(content, 'utf8');
+  db.prepare('UPDATE files SET size = ? WHERE id = ?').run(size, file.id);
+
+  res.json({ message: 'Saved', size });
+});
+
+// Toggle pin
+router.patch('/:id/pin', optionalAuth, (req, res) => {
+  const filter = getOwnerFilter(req);
+  if (!filter) return res.status(401).json({ error: 'Not authenticated' });
+
+  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  db.prepare('UPDATE files SET pinned = ? WHERE id = ?').run(file.pinned ? 0 : 1, file.id);
+  res.json(db.prepare('SELECT * FROM files WHERE id = ?').get(file.id));
 });
 
 // Move file to a folder (owner only)

@@ -36,7 +36,7 @@ export default function App() {
         <Route path="/clipboard" element={<RequireAuth><ClipboardPage /></RequireAuth>} />
         <Route path="/files" element={<RequireAuth><FilesPage /></RequireAuth>} />
         <Route path="/terminal" element={<RequireAuth ownerOnly><TerminalPage /></RequireAuth>} />
-        <Route path="/admin" element={<RequireAuth ownerOnly><AdminPage /></RequireAuth>} />
+        <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>

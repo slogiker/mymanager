@@ -19,14 +19,14 @@ export default function ProjectsGrid() {
   const filtered = activeTag ? projects.filter(p => [...(p.tags || []), ...(p.tech_stack || [])].includes(activeTag)) : projects;
 
   return (
-    <section id="projects" className="max-w-6xl mx-auto px-4 sm:px-6 py-20">
-      <div className="mb-12">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-0.5 bg-gradient-to-r from-cyan-400 to-purple-500" />
-          <span className="text-xs font-medium text-cyan-400 uppercase tracking-widest">Portfolio</span>
+    <section id="projects" className="w-full px-[5%] py-24">
+      <div className="mb-14">
+        <div className="flex items-center gap-3.5 mb-5">
+          <div className="w-10 h-0.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500" />
+          <span className="text-xs font-semibold text-cyan-400 uppercase tracking-widest">Portfolio</span>
         </div>
-        <h2 className="section-title text-4xl mb-4">Things I've built</h2>
-        <p className="text-slate-400 max-w-xl">A collection of projects I've worked on. Most are open-source.</p>
+        <h2 className="section-title text-5xl mb-5 tracking-tight font-extrabold">Things I've built</h2>
+        <p className="text-slate-400 text-lg max-w-2xl leading-relaxed">A collection of projects I've worked on. Most are open-source.</p>
       </div>
 
       {tags.length > 0 && (

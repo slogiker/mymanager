@@ -79,8 +79,20 @@ const io = new Server(server, {
 });
 
 io.on('connection', (socket) => {
-  const token = socket.handshake.auth?.token;
-  if (!token) return socket.disconnect(true);
+  let token = socket.handshake.auth?.token;
+  if (!token && socket.handshake.headers.cookie) {
+    const tokenCookie = socket.handshake.headers.cookie
+      .split('; ')
+      .find((r) => r.trim().startsWith('token='));
+    if (tokenCookie) {
+      token = decodeURIComponent(tokenCookie.split('=')[1]);
+    }
+  }
+
+  if (!token) {
+    console.log('Terminal connection rejected: No auth token found.');
+    return socket.disconnect(true);
+  }
 
   let user;
   try { user = jwt.verify(token, JWT_SECRET); } catch { return socket.disconnect(true); }
@@ -91,13 +103,20 @@ io.on('connection', (socket) => {
 
   let conn = null;
 
-  socket.on('ssh-connect', ({ password } = {}) => {
+  socket.on('ssh-connect', ({ host, port, username, password } = {}) => {
     conn = new SSHClient();
 
+    const sshHost = host || process.env.SSH_HOST || 'ssh.slogiker.si';
+    const sshPort = parseInt(port || process.env.SSH_PORT || '2222');
+    const sshUser = username || process.env.SSH_USERNAME || 'slogiker';
+    const sshPass = password || process.env.OWNER_PASSWORD;
+
     conn.on('ready', () => {
+      console.log(`SSH Connection established to ${sshUser}@${sshHost}:${sshPort}`);
       socket.emit('data', '\r\n\x1b[32m*** SSH Connected ***\x1b[0m\r\n');
       conn.shell((err, stream) => {
         if (err) {
+          console.error('Shell execution error:', err);
           socket.emit('data', `\r\n\x1b[31mShell error: ${err.message}\x1b[0m\r\n`);
           return;
         }
@@ -112,15 +131,33 @@ io.on('connection', (socket) => {
       });
     });
 
-    conn.on('error', err => socket.emit('data', `\r\n\x1b[31mSSH Error: ${err.message}\x1b[0m\r\n`));
-
-    conn.connect({
-      host: process.env.SSH_HOST || 'ssh.slogiker.si',
-      port: parseInt(process.env.SSH_PORT || '2222'),
-      username: process.env.SSH_USERNAME || 'slogiker',
-      password: password || process.env.OWNER_PASSWORD,
-      readyTimeout: 10000,
+    conn.on('keyboard-interactive', (name, instructions, instructionsLang, prompts, finish) => {
+      if (prompts.length > 0 && prompts[0].prompt.toLowerCase().includes('password')) {
+        finish([sshPass]);
+      } else {
+        finish([]);
+      }
     });
+
+    conn.on('error', err => {
+      console.error(`SSH Connection Error to ${sshUser}@${sshHost}:${sshPort}:`, err);
+      socket.emit('data', `\r\n\x1b[31mSSH Error: ${err.message}\x1b[0m\r\n`);
+    });
+
+    try {
+      conn.connect({
+        host: sshHost,
+        port: sshPort,
+        username: sshUser,
+        password: sshPass,
+        readyTimeout: 10000,
+        tryKeyboard: true, // Try keyboard-interactive authentication fallback
+        hostVerifier: () => true, // Accept any server host key fingerprint automatically
+      });
+    } catch (e) {
+      console.error('SSH Connection Call failed:', e);
+      socket.emit('data', `\r\n\x1b[31mSSH Init Error: ${e.message}\x1b[0m\r\n`);
+    }
   });
 
   socket.on('disconnect', () => { if (conn) conn.end(); });
