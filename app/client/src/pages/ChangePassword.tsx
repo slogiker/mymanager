@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function ChangePasswordPage() {
   const { user, changePassword } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState<{ currentPassword: string; newPassword: string; confirm: string }>({ currentPassword: '', newPassword: '', confirm: '' });
+  const [showCurrentPwd, setShowCurrentPwd] = useState<boolean>(false);
+  const [showNewPwd, setShowNewPwd] = useState<boolean>(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -45,18 +49,70 @@ export default function ChangePasswordPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1.5">Current (one-time) password</label>
-              <input type="password" className="input-field" placeholder="••••••••"
-                value={form.currentPassword} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, currentPassword: e.target.value }))} required autoFocus />
+              <div className="relative">
+                <input
+                  type={showCurrentPwd ? 'text' : 'password'}
+                  className="input-field pr-10"
+                  placeholder="••••••••"
+                  value={form.currentPassword}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, currentPassword: e.target.value }))}
+                  required
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPwd(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showCurrentPwd ? 'Hide password' : 'Show password'}
+                >
+                  {showCurrentPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1.5">New password</label>
-              <input type="password" className="input-field" placeholder="At least 6 characters"
-                value={form.newPassword} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, newPassword: e.target.value }))} required />
+              <div className="relative">
+                <input
+                  type={showNewPwd ? 'text' : 'password'}
+                  className="input-field pr-10"
+                  placeholder="At least 6 characters"
+                  value={form.newPassword}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, newPassword: e.target.value }))}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPwd(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showNewPwd ? 'Hide password' : 'Show password'}
+                >
+                  {showNewPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1.5">Confirm new password</label>
-              <input type="password" className="input-field" placeholder="••••••••"
-                value={form.confirm} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, confirm: e.target.value }))} required />
+              <div className="relative">
+                <input
+                  type={showConfirmPwd ? 'text' : 'password'}
+                  className="input-field pr-10"
+                  placeholder="••••••••"
+                  value={form.confirm}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, confirm: e.target.value }))}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPwd(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                  tabIndex={-1}
+                  aria-label={showConfirmPwd ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {error && (

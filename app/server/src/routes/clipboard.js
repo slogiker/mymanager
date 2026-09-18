@@ -42,11 +42,17 @@ router.get('/', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.json([]);
 
-  const rows = db.prepare(`
-    SELECT * FROM clipboard_items
-    WHERE ${filter.col} = ? AND (expires_at IS NULL OR expires_at > datetime('now'))
-    ORDER BY pinned DESC, updated_at DESC
-  `).all(filter.val);
+  const rows = filter.col === 'user_id'
+    ? db.prepare(`
+        SELECT * FROM clipboard_items
+        WHERE user_id = ? AND (expires_at IS NULL OR expires_at > datetime('now'))
+        ORDER BY pinned DESC, updated_at DESC
+      `).all(filter.val)
+    : db.prepare(`
+        SELECT * FROM clipboard_items
+        WHERE session_id = ? AND (expires_at IS NULL OR expires_at > datetime('now'))
+        ORDER BY pinned DESC, updated_at DESC
+      `).all(filter.val);
 
   res.json(rows);
 });
@@ -84,7 +90,9 @@ router.patch('/:id/pin', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const item = db.prepare(`SELECT * FROM clipboard_items WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  const item = filter.col === 'user_id'
+    ? db.prepare('SELECT * FROM clipboard_items WHERE id = ? AND user_id = ?').get(req.params.id, filter.val)
+    : db.prepare('SELECT * FROM clipboard_items WHERE id = ? AND session_id = ?').get(req.params.id, filter.val);
   if (!item) return res.status(404).json({ error: 'Not found' });
 
   db.prepare("UPDATE clipboard_items SET pinned = ?, updated_at = datetime('now') WHERE id = ?").run(item.pinned ? 0 : 1, item.id);
@@ -95,7 +103,9 @@ router.delete('/:id', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const item = db.prepare(`SELECT * FROM clipboard_items WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  const item = filter.col === 'user_id'
+    ? db.prepare('SELECT * FROM clipboard_items WHERE id = ? AND user_id = ?').get(req.params.id, filter.val)
+    : db.prepare('SELECT * FROM clipboard_items WHERE id = ? AND session_id = ?').get(req.params.id, filter.val);
   if (!item) return res.status(404).json({ error: 'Not found' });
 
   if (item.file_path) {
@@ -111,7 +121,9 @@ router.delete('/', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const items = db.prepare(`SELECT * FROM clipboard_items WHERE ${filter.col} = ?`).all(filter.val);
+  const items = filter.col === 'user_id'
+    ? db.prepare('SELECT * FROM clipboard_items WHERE user_id = ?').all(filter.val)
+    : db.prepare('SELECT * FROM clipboard_items WHERE session_id = ?').all(filter.val);
   items.forEach(item => {
     if (item.file_path) {
       const full = path.join(__dirname, '../..', item.file_path);
@@ -119,7 +131,11 @@ router.delete('/', optionalAuth, (req, res) => {
     }
   });
 
-  db.prepare(`DELETE FROM clipboard_items WHERE ${filter.col} = ?`).run(filter.val);
+  if (filter.col === 'user_id') {
+    db.prepare('DELETE FROM clipboard_items WHERE user_id = ?').run(filter.val);
+  } else {
+    db.prepare('DELETE FROM clipboard_items WHERE session_id = ?').run(filter.val);
+  }
   res.json({ message: 'Cleared' });
 });
 

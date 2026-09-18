@@ -39,7 +39,9 @@ router.post('/', optionalAuth, (req, res) => {
 
   // Verify item belongs to user/session
   if (type === 'file') {
-    const file = db.prepare(`SELECT id, original_name FROM files WHERE id = ? AND ${filter.col} = ?`).get(item_id, filter.val);
+    const file = filter.col === 'user_id'
+      ? db.prepare('SELECT id, original_name FROM files WHERE id = ? AND user_id = ?').get(item_id, filter.val)
+      : db.prepare('SELECT id, original_name FROM files WHERE id = ? AND session_id = ?').get(item_id, filter.val);
     if (!file) return res.status(404).json({ error: 'File not found' });
   } else {
     const folder = db.prepare('SELECT id, name FROM folders WHERE id = ?').get(item_id);
@@ -75,11 +77,9 @@ router.get('/item/:type/:id', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.json([]);
 
-  const shares = db.prepare(`
-    SELECT * FROM shares 
-    WHERE type = ? AND item_id = ? AND (${filter.col} = ?)
-    ORDER BY created_at DESC
-  `).all(type, String(id), filter.val);
+  const shares = filter.col === 'user_id'
+    ? db.prepare('SELECT * FROM shares WHERE type = ? AND item_id = ? AND user_id = ? ORDER BY created_at DESC').all(type, String(id), filter.val)
+    : db.prepare('SELECT * FROM shares WHERE type = ? AND item_id = ? AND session_id = ? ORDER BY created_at DESC').all(type, String(id), filter.val);
 
   // Filter out already expired
   const now = new Date().toISOString();
@@ -92,7 +92,9 @@ router.delete('/:token', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const share = db.prepare(`SELECT * FROM shares WHERE token = ? AND ${filter.col} = ?`).get(req.params.token, filter.val);
+  const share = filter.col === 'user_id'
+    ? db.prepare('SELECT * FROM shares WHERE token = ? AND user_id = ?').get(req.params.token, filter.val)
+    : db.prepare('SELECT * FROM shares WHERE token = ? AND session_id = ?').get(req.params.token, filter.val);
   if (!share) return res.status(404).json({ error: 'Share not found' });
 
   db.prepare('DELETE FROM shares WHERE token = ?').run(req.params.token);

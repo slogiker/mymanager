@@ -1,3 +1,5 @@
+import { api } from './api';
+
 export interface UserPreferences {
   hiddenCategories: string[];
   hiddenServices: number[];
@@ -6,6 +8,7 @@ export interface UserPreferences {
   categoryOrder?: string[];
   categoryWidths?: Record<string, 1 | 2>;
   customCategories?: string[];
+  serverGauges?: Record<string, { cpu?: boolean; ram?: boolean; fan?: boolean; temp?: boolean; ports?: boolean; ping?: boolean; down?: boolean; up?: boolean }>;
   widgetVisible?: {
     clock: boolean;
     nodes: boolean;
@@ -21,6 +24,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   categoryOrder: [],
   categoryWidths: {},
   customCategories: [],
+  serverGauges: {},
   widgetVisible: {
     clock: true,
     nodes: true,
@@ -42,6 +46,7 @@ export function getUserPreferences(userId?: number): UserPreferences {
       categoryOrder: Array.isArray(parsed.categoryOrder) ? parsed.categoryOrder : [],
       categoryWidths: typeof parsed.categoryWidths === 'object' && parsed.categoryWidths ? parsed.categoryWidths : {},
       customCategories: Array.isArray(parsed.customCategories) ? parsed.customCategories : [],
+      serverGauges: typeof parsed.serverGauges === 'object' && parsed.serverGauges ? parsed.serverGauges : {},
       widgetVisible: parsed.widgetVisible ? {
         clock: parsed.widgetVisible.clock !== false,
         nodes: parsed.widgetVisible.nodes !== false,
@@ -53,12 +58,45 @@ export function getUserPreferences(userId?: number): UserPreferences {
   }
 }
 
+export async function syncUserPreferencesFromBackend(userId?: number): Promise<UserPreferences> {
+  if (!userId) return DEFAULT_PREFERENCES;
+  try {
+    const remote = await api.get<Partial<UserPreferences>>('/services/user-preferences');
+    if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
+      const merged: UserPreferences = {
+        ...DEFAULT_PREFERENCES,
+        ...remote,
+        serverGauges: typeof remote.serverGauges === 'object' && remote.serverGauges ? remote.serverGauges : {},
+        categoryWidths: typeof remote.categoryWidths === 'object' && remote.categoryWidths ? remote.categoryWidths : {},
+        categoryOrder: Array.isArray(remote.categoryOrder) ? remote.categoryOrder : [],
+        customCategories: Array.isArray(remote.customCategories) ? remote.customCategories : [],
+        hiddenCategories: Array.isArray(remote.hiddenCategories) ? remote.hiddenCategories : [],
+        hiddenServices: Array.isArray(remote.hiddenServices) ? remote.hiddenServices : [],
+        hiddenGauges: Array.isArray(remote.hiddenGauges) ? remote.hiddenGauges : [],
+        widgetVisible: remote.widgetVisible ? {
+          clock: remote.widgetVisible.clock !== false,
+          nodes: remote.widgetVisible.nodes !== false,
+          notes: remote.widgetVisible.notes !== false,
+        } : DEFAULT_PREFERENCES.widgetVisible,
+      };
+      localStorage.setItem(`mymanager_user_prefs_${userId}`, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent('mymanager_prefs_changed', { detail: merged }));
+      return merged;
+    }
+  } catch (e) {
+    // Non-fatal, fallback to local storage
+  }
+  return getUserPreferences(userId);
+}
+
 export function saveUserPreferences(userId: number | undefined, prefs: UserPreferences): void {
   if (!userId) return;
   try {
     localStorage.setItem(`mymanager_user_prefs_${userId}`, JSON.stringify(prefs));
     // Dispatch custom storage event so other open components in same window react
     window.dispatchEvent(new CustomEvent('mymanager_prefs_changed', { detail: prefs }));
+    // Persist to backend
+    api.patch('/services/user-preferences', prefs).catch(() => {});
   } catch (e) {
     console.error('Failed to save user preferences', e);
   }

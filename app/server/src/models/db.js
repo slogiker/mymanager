@@ -15,6 +15,10 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
+db.pragma('synchronous = NORMAL');
+db.pragma('cache_size = -64000');
+db.pragma('temp_store = MEMORY');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -235,7 +239,51 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_shares_token ON shares(token);
   CREATE INDEX IF NOT EXISTS idx_shares_item ON shares(type, item_id);
+
+  CREATE TABLE IF NOT EXISTS user_service_prefs (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    enabled INTEGER DEFAULT 1,
+    start_col INTEGER,
+    start_row INTEGER,
+    col_span INTEGER DEFAULT 1,
+    row_span INTEGER DEFAULT 1,
+    PRIMARY KEY (user_id, service_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_user_service_prefs_user ON user_service_prefs(user_id);
+
+  CREATE TABLE IF NOT EXISTS service_permissions (
+    service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    allowed INTEGER DEFAULT 1,
+    PRIMARY KEY (service_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_service_permissions_user ON service_permissions(user_id);
+
+  CREATE TABLE IF NOT EXISTS user_feature_flags (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    feature_key TEXT NOT NULL,
+    enabled INTEGER DEFAULT 0,
+    PRIMARY KEY (user_id, feature_key)
+  );
+  CREATE INDEX IF NOT EXISTS idx_user_feature_flags_user ON user_feature_flags(user_id);
+  CREATE INDEX IF NOT EXISTS idx_user_feature_flags_key ON user_feature_flags(feature_key);
+
+  -- Production query optimization indexes
+  CREATE INDEX IF NOT EXISTS idx_services_category_order ON services(category, display_order);
+  CREATE INDEX IF NOT EXISTS idx_service_permissions_svc ON service_permissions(service_id);
+  CREATE INDEX IF NOT EXISTS idx_user_service_prefs_svc ON user_service_prefs(service_id);
+  CREATE INDEX IF NOT EXISTS idx_clipboard_user_pinned ON clipboard_items(user_id, pinned, updated_at);
+  CREATE INDEX IF NOT EXISTS idx_messages_archived_created ON messages(archived, created_at);
+  CREATE INDEX IF NOT EXISTS idx_files_user_folder ON files(user_id, folder_id, deleted_at);
+  CREATE INDEX IF NOT EXISTS idx_analytics_created_bot ON analytics(created_at, is_bot);
 `);
+
+// Migrate: add preferences to users
+const usersCols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+if (!usersCols.includes('preferences')) {
+  db.exec('ALTER TABLE users ADD COLUMN preferences TEXT');
+}
 
 function seed() {
   const profileCount = db.prepare('SELECT COUNT(*) as c FROM profile').get();
@@ -303,6 +351,34 @@ function seed() {
       ['Git', 'Tools', '#f05032', 4, 11],
       ['Linux', 'DevOps', '#fcc624', 4, 12],
     ].forEach(s => insert.run(...s));
+  }
+
+  // Seed WireGuard status and Pi-hole stats cards if not present
+  const wgService = db.prepare("SELECT id FROM services WHERE title = 'WireGuard status' OR title = 'WireGuard'").get();
+  if (!wgService) {
+    const maxOrder = db.prepare("SELECT COALESCE(MAX(display_order), 0) as m FROM services").get().m;
+    db.prepare(`
+      INSERT INTO services (title, url, description, icon, category, is_private, requires_vpn, display_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('WireGuard status', '#', 'VPN Server and Peer Status', 'fa-shield-halved', 'System', 1, 0, maxOrder + 1);
+  }
+
+  const piholeStatsService = db.prepare("SELECT id FROM services WHERE title = 'Pi-hole stats'").get();
+  if (!piholeStatsService) {
+    const maxOrder = db.prepare("SELECT COALESCE(MAX(display_order), 0) as m FROM services").get().m;
+    db.prepare(`
+      INSERT INTO services (title, url, description, icon, category, is_private, requires_vpn, display_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('Pi-hole stats', '#', 'Pi-hole DNS Statistics', 'fa-shield-virus', 'System', 1, 0, maxOrder + 1);
+  }
+
+  const qbitService = db.prepare("SELECT id FROM services WHERE title LIKE '%qBittorrent%' OR title LIKE '%qbittorrent%'").get();
+  if (!qbitService) {
+    const maxOrder = db.prepare("SELECT COALESCE(MAX(display_order), 0) as m FROM services").get().m;
+    db.prepare(`
+      INSERT INTO services (title, url, description, icon, category, is_private, requires_vpn, display_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('qBittorrent', 'http://192.168.1.41:8090', 'Torrent Client & Downloads', 'fa-download', 'Other', 0, 0, maxOrder + 1);
   }
 }
 

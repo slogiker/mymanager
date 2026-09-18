@@ -11,7 +11,17 @@ const jwt = require('jsonwebtoken');
 require('./models/db');
 
 const { analyticsMiddleware } = require('./middleware/analytics');
-const { apiLimiter, authLimiter } = require('./middleware/rateLimit');
+const {
+  apiLimiter,
+  authLimiter,
+  loginLimiter,
+  speedtestLimiter,
+  serviceTestLimiter,
+} = require('./middleware/rateLimit');
+const { securityHeaders } = require('./middleware/securityHeaders');
+const logger = require('./utils/logger');
+
+const { isTrustedProxy } = require('./utils/ipHelper');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,22 +29,39 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'REMOVED';
 const IS_PROD = process.env.NODE_ENV === 'production';
 
-app.set('trust proxy', 1);
+// Process-level safety guards
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Promise Rejection', reason);
+});
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception', err);
+});
+
+app.set('trust proxy', isTrustedProxy);
+
+// Security headers (OWASP)
+app.use(securityHeaders);
 
 app.use(cors({
   origin: IS_PROD ? false : 'http://localhost:5173',
   credentials: true,
 }));
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Constrain payload limits (DoS prevention)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(analyticsMiddleware);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Tiered rate limiters & API routes
 app.use('/api', apiLimiter);
+app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authLimiter, require('./routes/auth'));
+app.use('/api/services/test', serviceTestLimiter);
+app.use('/api/speedtest/run', speedtestLimiter);
+
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/services', require('./routes/services'));
 app.use('/api/messages', require('./routes/messages'));
@@ -47,6 +74,12 @@ app.use('/api/files', require('./routes/files'));
 app.use('/api/folders', require('./routes/folders'));
 app.use('/api/shares', require('./routes/shares'));
 app.use('/api/skills', require('./routes/skills'));
+app.use('/api/vpn-status', require('./routes/vpn'));
+app.use('/api/qbittorrent', require('./routes/qbittorrent'));
+app.use('/api/jellyfin', require('./routes/jellyfin'));
+app.use('/api/jellyseerr', require('./routes/jellyseerr'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/speedtest', require('./routes/speedtest'));
 
 if (IS_PROD) {
   const fs = require('fs');
@@ -66,9 +99,22 @@ if (IS_PROD) {
   });
 }
 
-app.use((err, _req, res, _next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+// Centralized error handling with information disclosure protection (CWE-209)
+app.use((err, req, res, _next) => {
+  const status = err.status || err.statusCode || 500;
+  logger.error(`${req.method} ${req.originalUrl || req.url} error (${status})`, err, {
+    ip: req.ip,
+    status,
+  });
+
+  const message = IS_PROD && status >= 500
+    ? 'Internal server error'
+    : (err.message || 'An unexpected error occurred');
+
+  res.status(status).json({
+    error: message,
+    status,
+  });
 });
 
 // Socket.io — SSH terminal (owner only)

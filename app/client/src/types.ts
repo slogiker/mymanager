@@ -55,6 +55,118 @@ export interface Service {
   requires_vpn: boolean;
   status: 'online' | 'offline' | 'timeout' | 'unknown';
   display_order: number;
+  liveStat?: string;
+  telemetryType?: 'wireguard' | 'pihole' | 'qbittorrent' | 'jellyfin' | 'jellyseerr';
+  enabled?: boolean;
+  start_col?: number | null;
+  start_row?: number | null;
+  col_span?: number;
+  row_span?: number;
+}
+
+export interface WireguardPeer {
+  publicKey: string;
+  endpoint: string | null;
+  allowedIps: string;
+  latestHandshake: number;
+  transferRx: number;
+  transferTx: number;
+  connected: boolean;
+}
+
+export interface WireguardStatus {
+  online: boolean;
+  interface?: {
+    publicKey: string;
+    listenPort: string;
+  };
+  totalPeers: number;
+  connectedPeers: number;
+  peers: WireguardPeer[];
+  error?: string;
+}
+
+export interface PiholeStats {
+  online: boolean;
+  version?: string;
+  queriesToday: number;
+  blockedToday: number;
+  percentBlocked: number;
+  domainsBlocked: number;
+  uniqueClients: number;
+  status: string;
+  error?: string;
+}
+
+export interface QbittorrentTorrent {
+  name: string;
+  size: number;
+  progress: number;
+  eta: number;
+  downloadSpeed: number;
+  uploadSpeed: number;
+  state: string;
+  numSeeds: number;
+}
+
+export interface QbittorrentStats {
+  online: boolean;
+  downloadSpeed: number;
+  uploadSpeed: number;
+  downloadTotal: number;
+  uploadTotal: number;
+  connectionStatus: string;
+  activeCount: number;
+  torrents: QbittorrentTorrent[];
+  message?: string;
+}
+
+export interface JellyfinStats {
+  online: boolean;
+  activeStreamCount: number;
+  activeSessionCount: number;
+  ownerStats?: {
+    activeUsers: Array<{
+      userName: string;
+      client: string;
+      deviceName: string;
+      item: string;
+      playMethod: string;
+    }>;
+    playbackReporting?: any[];
+  };
+  message?: string;
+}
+
+export interface JellyseerrStats {
+  online: boolean;
+  pendingCount: number;
+  totalCount: number;
+  movieCount?: number;
+  tvCount?: number;
+  ownerStats?: {
+    userCounts: Array<{ username: string; count: number }>;
+    recentRequests: Array<{
+      id: number;
+      status: number;
+      type: string;
+      title: string;
+      requestedBy: string;
+      createdAt: string;
+    }>;
+    error?: string;
+  };
+  message?: string;
+}
+
+export interface SpeedtestResult {
+  timestamp: string;
+  downloadMbps: number;
+  uploadMbps: number;
+  pingMs: number;
+  server?: string;
+  status: string;
+  isRunning?: boolean;
 }
 
 export interface Message {

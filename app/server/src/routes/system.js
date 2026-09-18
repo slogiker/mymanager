@@ -17,6 +17,14 @@ router.get('/stats', verifyToken, requireOwner, async (req, res) => {
 
 router.get('/nodes', verifyToken, async (req, res) => {
   try {
+    if (req.user.role !== 'owner') {
+      const db = require('../models/db');
+      const flag = db.prepare('SELECT enabled FROM user_feature_flags WHERE user_id = ? AND feature_key = ?').get(req.user.id, 'system_telemetry');
+      if (!flag || flag.enabled !== 1) {
+        return res.status(403).json({ error: 'System telemetry access required' });
+      }
+    }
+
     const nodes = await monitor.getNodes();
     res.json(nodes);
   } catch (e) {

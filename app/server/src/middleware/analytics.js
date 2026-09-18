@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const SKIP_PATHS = ['/api/', '/uploads/', '/socket.io/', '/_vite', '/@', '/node_modules/'];
 const BOT_PATTERNS = /bot|crawler|spider|scraper|curl|wget|python|java\/|go-http|axios/i;
 
+const { getClientIp } = require('../utils/ipHelper');
+
 function analyticsMiddleware(req, res, next) {
   if (SKIP_PATHS.some(p => req.path.startsWith(p))) return next();
   if (req.method !== 'GET') return next();
@@ -25,7 +27,7 @@ function analyticsMiddleware(req, res, next) {
       });
     }
 
-    const ip = (req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim().replace('::ffff:', '');
+    const ip = getClientIp(req);
     const geo = geoip.lookup(ip) || {};
     const parser = new UAParser(ua);
     const browser = parser.getBrowser();

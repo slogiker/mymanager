@@ -32,6 +32,13 @@ function getOwnerFilter(req) {
   return sessionId ? { col: 'session_id', val: sessionId } : null;
 }
 
+function getFileForOwner(id, filter) {
+  if (!filter) return null;
+  return filter.col === 'user_id'
+    ? db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(id, filter.val)
+    : db.prepare('SELECT * FROM files WHERE id = ? AND session_id = ?').get(id, filter.val);
+}
+
 function ensureSession(req, res) {
   if (req.user) return null;
   let sessionId = req.cookies?.clip_session;
@@ -49,24 +56,26 @@ router.get('/', optionalAuth, (req, res) => {
   const { folder_id, pinned } = req.query;
 
   if (pinned === '1') {
-    return res.json(
-      db.prepare(`SELECT * FROM files WHERE ${filter.col} = ? AND pinned = 1 ORDER BY original_name ASC`).all(filter.val)
-    );
+    const rows = filter.col === 'user_id'
+      ? db.prepare('SELECT * FROM files WHERE user_id = ? AND pinned = 1 ORDER BY original_name ASC').all(filter.val)
+      : db.prepare('SELECT * FROM files WHERE session_id = ? AND pinned = 1 ORDER BY original_name ASC').all(filter.val);
+    return res.json(rows);
   }
+
   // folder_id=null → root (IS NULL), folder_id=<uuid> → specific folder
   let rows;
   if (folder_id === 'null' || folder_id === '') {
-    rows = db.prepare(
-      `SELECT * FROM files WHERE ${filter.col} = ? AND folder_id IS NULL ORDER BY created_at DESC`
-    ).all(filter.val);
+    rows = filter.col === 'user_id'
+      ? db.prepare('SELECT * FROM files WHERE user_id = ? AND folder_id IS NULL ORDER BY created_at DESC').all(filter.val)
+      : db.prepare('SELECT * FROM files WHERE session_id = ? AND folder_id IS NULL ORDER BY created_at DESC').all(filter.val);
   } else if (folder_id) {
-    rows = db.prepare(
-      `SELECT * FROM files WHERE ${filter.col} = ? AND folder_id = ? ORDER BY created_at DESC`
-    ).all(filter.val, folder_id);
+    rows = filter.col === 'user_id'
+      ? db.prepare('SELECT * FROM files WHERE user_id = ? AND folder_id = ? ORDER BY created_at DESC').all(filter.val, folder_id)
+      : db.prepare('SELECT * FROM files WHERE session_id = ? AND folder_id = ? ORDER BY created_at DESC').all(filter.val, folder_id);
   } else {
-    rows = db.prepare(
-      `SELECT * FROM files WHERE ${filter.col} = ? ORDER BY created_at DESC`
-    ).all(filter.val);
+    rows = filter.col === 'user_id'
+      ? db.prepare('SELECT * FROM files WHERE user_id = ? ORDER BY created_at DESC').all(filter.val)
+      : db.prepare('SELECT * FROM files WHERE session_id = ? ORDER BY created_at DESC').all(filter.val);
   }
   res.json(rows);
 });
@@ -158,7 +167,7 @@ router.get('/:id/content', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  const file = getFileForOwner(req.params.id, filter);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   const fullPath = path.join(__dirname, '../../uploads/files', file.stored_name);
@@ -173,7 +182,7 @@ router.put('/:id/content', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  const file = getFileForOwner(req.params.id, filter);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   const { content } = req.body;
@@ -192,7 +201,7 @@ router.patch('/:id/pin', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  const file = getFileForOwner(req.params.id, filter);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   db.prepare('UPDATE files SET pinned = ? WHERE id = ?').run(file.pinned ? 0 : 1, file.id);
@@ -207,7 +216,7 @@ router.patch('/:id', optionalAuth, (req, res) => {
   const { name } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'New name required' });
 
-  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  const file = getFileForOwner(req.params.id, filter);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   db.prepare('UPDATE files SET original_name = ? WHERE id = ?').run(name.trim(), file.id);
@@ -221,7 +230,7 @@ router.patch('/:id/move', optionalAuth, (req, res) => {
 
   const { folder_id } = req.body;
 
-  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  const file = getFileForOwner(req.params.id, filter);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   if (folder_id) {
@@ -238,7 +247,7 @@ router.get('/:id/archive-contents', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  const file = getFileForOwner(req.params.id, filter);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   const fullPath = path.join(filesDir, file.stored_name);
@@ -351,7 +360,7 @@ router.delete('/:id', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  const file = getFileForOwner(req.params.id, filter);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   const full = path.join(__dirname, '../..', file.file_path);
@@ -373,9 +382,9 @@ router.delete('/', optionalAuth, (req, res) => {
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids array required' });
 
   const placeholders = ids.map(() => '?').join(',');
-  const files = db.prepare(`
-    SELECT * FROM files WHERE id IN (${placeholders}) AND ${filter.col} = ?
-  `).all(...ids, filter.val);
+  const files = filter.col === 'user_id'
+    ? db.prepare(`SELECT * FROM files WHERE id IN (${placeholders}) AND user_id = ?`).all(...ids, filter.val)
+    : db.prepare(`SELECT * FROM files WHERE id IN (${placeholders}) AND session_id = ?`).all(...ids, filter.val);
 
   files.forEach(file => {
     const full = path.join(__dirname, '../..', file.file_path);

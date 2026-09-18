@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Cpu,
@@ -25,6 +25,9 @@ import {
   Globe,
   Lock,
   Shield,
+  ShieldAlert,
+  ShieldCheck,
+  X,
   Layers,
   Thermometer,
   Gauge,
@@ -42,6 +45,7 @@ import {
   FolderPlus,
   SlidersHorizontal,
   ChevronDown,
+  ChevronRight,
   LayoutGrid,
 } from 'lucide-react';
 import {
@@ -64,8 +68,29 @@ import { CSS } from '@dnd-kit/utilities';
 import Navbar from '../components/layout/Navbar';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../lib/api';
-import { SystemStats, ServerNode, AnalyticsSummary, Message, Project, Service, Skill, User } from '../types';
-import { getUserPreferences, saveUserPreferences, UserPreferences } from '../lib/userPreferences';
+import {
+  SystemStats,
+  ServerNode,
+  AnalyticsSummary,
+  Message,
+  Project,
+  Service,
+  Skill,
+  User,
+  SpeedtestResult,
+  WireguardStatus,
+  PiholeStats,
+  QbittorrentStats,
+  JellyfinStats,
+  JellyseerrStats,
+} from '../types';
+import { getUserPreferences, saveUserPreferences, syncUserPreferencesFromBackend, UserPreferences } from '../lib/userPreferences';
+import { GRID_CONSTANTS, CardPosition, layoutCategoryCards, getFillerCells, canResizeCard, hasOverlap, computePushedLayout } from '../lib/cardGridEngine';
+import { WireguardInspectorModal } from '../components/dashboard/WireguardInspectorModal';
+import { PiholeInspectorModal } from '../components/dashboard/PiholeInspectorModal';
+import { QbittorrentInspectorModal } from '../components/dashboard/QbittorrentInspectorModal';
+import { JellyfinInspectorModal } from '../components/dashboard/JellyfinInspectorModal';
+import { JellyseerrInspectorModal } from '../components/dashboard/JellyseerrInspectorModal';
 
 /* -------------------------------------------------------------
    Common Modals & Form Helpers
@@ -271,13 +296,19 @@ function NotesWidget() {
   const [notes, setNotes] = useState<any[]>([]);
   const [newNote, setNewNote] = useState('');
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
 
   const loadNotes = async () => {
+    setLoading(true);
     try {
       const data = await api.get<any[]>('/clipboard');
       setNotes(data.slice(0, 4));
-    } catch {
-      // ignore
+      setError('');
+    } catch (err) {
+      setError('Unable to load notes');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -293,7 +324,8 @@ function NotesWidget() {
       setNewNote('');
       loadNotes();
     } catch (err) {
-      console.error(err);
+      setError('Failed to save note');
+      setTimeout(() => setError(''), 3000);
     }
   };
 
@@ -340,8 +372,16 @@ function NotesWidget() {
         </button>
       </form>
 
+      {error && (
+        <p className="text-[10px] text-red-400 font-mono py-0.5">{error}</p>
+      )}
       <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1">
-        {notes.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-3 text-slate-500 text-xs">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5 text-slate-400" />
+            <span>Loading notes...</span>
+          </div>
+        ) : notes.length === 0 ? (
           <p className="text-[11px] text-slate-600 italic py-1">No notes yet. Add one above.</p>
         ) : (
           notes.map((n) => (
@@ -379,9 +419,187 @@ function NotesWidget() {
 }
 
 /* -------------------------------------------------------------
+   Widgets: Server Gauges Customization Modal
+------------------------------------------------------------- */
+interface ServerGaugesModalProps {
+  open: boolean;
+  onClose: () => void;
+  nodes: ServerNode[];
+  speedtest?: SpeedtestResult | null;
+  serverGauges?: Record<string, { cpu?: boolean; ram?: boolean; fan?: boolean; temp?: boolean; ports?: boolean; ping?: boolean; down?: boolean; up?: boolean }>;
+  onToggleGauge: (nodeId: string, gaugeKey: string) => void;
+  onResetGauges: () => void;
+}
+
+function ServerGaugesModal({
+  open,
+  onClose,
+  nodes,
+  speedtest,
+  serverGauges = {},
+  onToggleGauge,
+  onResetGauges,
+}: ServerGaugesModalProps) {
+  if (!open) return null;
+
+  const nodeItems = [
+    ...nodes.map((n) => ({
+      id: n.id,
+      name: n.name,
+      sub: `${n.ip} · ${n.role}`,
+      availableGauges: [
+        { key: 'ping', label: 'Ping / Latency' },
+        { key: 'cpu', label: 'CPU Load' },
+        { key: 'ram', label: 'RAM Memory' },
+        { key: 'temp', label: 'Temperature' },
+        { key: 'fan', label: 'Fan Speed' },
+        { key: 'ports', label: 'Open Ports' },
+      ],
+    })),
+    ...(speedtest
+      ? [
+          {
+            id: 'wan',
+            name: 'WAN / Internet',
+            sub: `${speedtest.server || 'Cloudflare Edge'} · Speedtest`,
+            availableGauges: [
+              { key: 'ping', label: 'Ping / Latency' },
+              { key: 'down', label: 'Download Speed' },
+              { key: 'up', label: 'Upload Speed' },
+            ],
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-2xl rounded-2xl bg-[#16181f] border border-slate-800 shadow-2xl p-6 space-y-5 max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20">
+              <SlidersHorizontal className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-white">Customize Server Gauges</h3>
+              <p className="text-xs text-slate-400">Configure which metrics and status pills are visible per server node</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="overflow-y-auto space-y-4 pr-1 flex-1">
+          {nodeItems.map((item) => {
+            const currentGauges = serverGauges[item.id] || {};
+            return (
+              <div
+                key={item.id}
+                className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-200">{item.name}</h4>
+                    <p className="text-[11px] font-mono text-slate-500">{item.sub}</p>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                    {item.id}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {item.availableGauges.map((g) => {
+                    const isChecked = (currentGauges as any)[g.key] !== false;
+                    return (
+                      <button
+                        key={g.key}
+                        type="button"
+                        onClick={() => onToggleGauge(item.id, g.key)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all border ${
+                          isChecked
+                            ? 'bg-red-500/15 border-red-500/40 text-red-300 shadow-[0_0_8px_rgba(239,68,68,0.2)]'
+                            : 'bg-slate-800/60 border-slate-700/60 text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${isChecked ? 'bg-red-400' : 'bg-slate-600'}`} />
+                        <span>{g.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t border-slate-800/80 shrink-0">
+          <button
+            type="button"
+            onClick={onResetGauges}
+            className="px-3 py-1.5 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          >
+            Reset All to Default
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.4)] transition-all"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------
    Widgets: Multi-Server Cluster Telemetry Widget
 ------------------------------------------------------------- */
-function MultiServerNodesWidget({ nodes, loading }: { nodes: ServerNode[]; loading: boolean }) {
+function MultiServerNodesWidget({
+  nodes,
+  loading,
+  speedtest,
+  serverGauges = {},
+  onUpdateServerGauges,
+  isAdmin,
+  onRunSpeedtest,
+  isRunningSpeedtest,
+}: {
+  nodes: ServerNode[];
+  loading: boolean;
+  speedtest?: SpeedtestResult | null;
+  serverGauges?: Record<string, { cpu?: boolean; ram?: boolean; fan?: boolean; temp?: boolean; ports?: boolean; ping?: boolean; down?: boolean; up?: boolean }>;
+  onUpdateServerGauges?: (gauges: Record<string, any>) => void;
+  isAdmin?: boolean;
+  onRunSpeedtest?: () => void;
+  isRunningSpeedtest?: boolean;
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const handleToggleGauge = (nodeId: string, gaugeKey: string) => {
+    if (!onUpdateServerGauges) return;
+    const current = serverGauges[nodeId] || {};
+    const currentVal = (current as any)[gaugeKey] !== false;
+    const next = {
+      ...serverGauges,
+      [nodeId]: {
+        ...current,
+        [gaugeKey]: !currentVal,
+      },
+    };
+    onUpdateServerGauges(next);
+  };
+
+  const handleResetGauges = () => {
+    if (!onUpdateServerGauges) return;
+    onUpdateServerGauges({});
+  };
+
   if (loading && nodes.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-800/80 bg-[#16181f]/70 p-4 shadow-xl backdrop-blur-md">
@@ -393,24 +611,68 @@ function MultiServerNodesWidget({ nodes, loading }: { nodes: ServerNode[]; loadi
     );
   }
 
+  const totalMonitored = nodes.length + (speedtest ? 1 : 0);
+
   return (
     <div className="space-y-2.5">
+      <ServerGaugesModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        nodes={nodes}
+        speedtest={speedtest}
+        serverGauges={serverGauges}
+        onToggleGauge={handleToggleGauge}
+        onResetGauges={handleResetGauges}
+      />
+
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-          <Server className="w-3.5 h-3.5 text-red-500" /> Cluster Nodes ({nodes.length} Monitored)
+          <Server className="w-3.5 h-3.5 text-red-500" /> Cluster & Network Telemetry ({totalMonitored} Nodes)
         </span>
-        <span className="text-[10px] font-mono text-slate-500">Live 10s Telemetry</span>
+        <div className="flex items-center gap-2">
+          {isAdmin && onUpdateServerGauges && (
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="text-[10px] font-mono text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700"
+              title="Configure visible telemetry stats per server"
+            >
+              <SlidersHorizontal className="w-3 h-3 text-red-500" />
+              <span>Customize Gauges</span>
+            </button>
+          )}
+          {onRunSpeedtest && (
+            <button
+              type="button"
+              onClick={onRunSpeedtest}
+              disabled={isRunningSpeedtest}
+              className="text-[10px] font-mono text-slate-400 hover:text-red-400 disabled:opacity-50 transition-colors flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700"
+              title="Run on-demand internet speedtest"
+            >
+              <RefreshCw className={`w-3 h-3 ${isRunningSpeedtest ? 'animate-spin text-red-500' : ''}`} />
+              <span>Speedtest</span>
+            </button>
+          )}
+          <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">Live 10s Telemetry</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${speedtest ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3.5`}>
         {nodes.map((node) => {
           const isOnline = node.status === 'online';
           const isPironman = node.id.includes('136');
+          const nodeGauges = serverGauges[node.id] || {};
+
+          const showCpu = nodeGauges.cpu !== false && !!node.cpu;
+          const showFan = nodeGauges.fan !== false && !!node.fanSpeed;
+          const showRam = nodeGauges.ram !== false && (!!node.memory && (!node.fanSpeed || !showFan));
+          const showTemp = nodeGauges.temp !== false && !!node.temperature;
+          const hasMetrics = showCpu || showFan || showRam || showTemp;
 
           return (
             <div
               key={node.id}
-              className={`rounded-2xl border p-4 space-y-2 transition-all duration-200 backdrop-blur-md ${
+              className={`group relative rounded-2xl border p-4 space-y-2 transition-all duration-200 backdrop-blur-md ${
                 isPironman
                   ? 'border-red-500/30 bg-[#16181f]/90 hover:border-red-500/50 shadow-[0_0_15px_-4px_rgba(239,68,68,0.15)]'
                   : 'border-slate-800/80 bg-[#16181f]/80 hover:border-slate-700/80 shadow-lg'
@@ -425,38 +687,56 @@ function MultiServerNodesWidget({ nodes, loading }: { nodes: ServerNode[]; loadi
                   />
                   <span className="font-bold text-xs text-white truncate">{node.name}</span>
                 </div>
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shrink-0">
-                  {node.latency}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {nodeGauges.ping !== false && (
+                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                      {node.latency}
+                    </span>
+                  )}
+                  {isAdmin && onUpdateServerGauges && (
+                    <button
+                      type="button"
+                      onClick={() => setModalOpen(true)}
+                      className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-800/80 transition-colors opacity-60 hover:opacity-100"
+                      title="Configure stats for this server"
+                    >
+                      <Settings className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <p className="text-[10px] font-mono text-slate-400 truncate">
                 {node.ip} · {node.role}
               </p>
 
-              {node.cpu ? (
+              {hasMetrics ? (
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-[10px] font-mono">
-                  <div>
-                    <span className="text-slate-500 block">CPU</span>
-                    <span className="text-slate-200 font-bold">{node.cpu.load}%</span>
-                  </div>
-                  {node.fanSpeed ? (
+                  {showCpu ? (
+                    <div>
+                      <span className="text-slate-500 block">CPU</span>
+                      <span className="text-slate-200 font-bold">{node.cpu?.load}%</span>
+                    </div>
+                  ) : <div />}
+                  {showFan ? (
                     <div>
                       <span className="text-slate-500 block">FAN</span>
                       <span className="text-cyan-400 font-bold">{node.fanSpeed}</span>
                     </div>
-                  ) : (
+                  ) : showRam ? (
                     <div>
                       <span className="text-slate-500 block">RAM</span>
                       <span className="text-slate-200 font-bold">{node.memory?.percent || 0}%</span>
                     </div>
-                  )}
-                  <div>
-                    <span className="text-slate-500 block">TEMP</span>
-                    <span className="text-amber-400 font-bold">{node.temperature || '—'}</span>
-                  </div>
+                  ) : <div />}
+                  {showTemp ? (
+                    <div>
+                      <span className="text-slate-500 block">TEMP</span>
+                      <span className="text-amber-400 font-bold">{node.temperature || '—'}</span>
+                    </div>
+                  ) : <div />}
                 </div>
-              ) : node.ports ? (
+              ) : (node.ports && nodeGauges.ports !== false) ? (
                 <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800/80">
                   {node.ports.map((p) => (
                     <span
@@ -471,6 +751,55 @@ function MultiServerNodesWidget({ nodes, loading }: { nodes: ServerNode[]; loadi
             </div>
           );
         })}
+
+        {speedtest && (
+          <div className="group relative rounded-2xl border border-slate-800/80 bg-[#16181f]/80 hover:border-slate-700/80 shadow-lg p-4 space-y-2 transition-all duration-200 backdrop-blur-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${speedtest.status === 'success' || speedtest.status === 'cached' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-500'}`} />
+                <span className="font-bold text-xs text-white truncate">WAN / Internet</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {serverGauges['wan']?.ping !== false && (
+                  <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                    {speedtest.pingMs ? `${speedtest.pingMs}ms` : 'WAN'}
+                  </span>
+                )}
+                {isAdmin && onUpdateServerGauges && (
+                  <button
+                    type="button"
+                    onClick={() => setModalOpen(true)}
+                    className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-800/80 transition-colors opacity-60 hover:opacity-100"
+                    title="Configure stats for WAN"
+                  >
+                    <Settings className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <p className="text-[10px] font-mono text-slate-400 truncate">
+              {speedtest.server || 'Cloudflare Edge'} · Speedtest
+            </p>
+
+            {(serverGauges['wan']?.down !== false || serverGauges['wan']?.up !== false) && (
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-[10px] font-mono">
+                {serverGauges['wan']?.down !== false ? (
+                  <div>
+                    <span className="text-slate-500 block">DOWN</span>
+                    <span className="text-emerald-400 font-bold">↓ {speedtest.downloadMbps}M</span>
+                  </div>
+                ) : <div />}
+                {serverGauges['wan']?.up !== false ? (
+                  <div>
+                    <span className="text-slate-500 block">UP</span>
+                    <span className="text-cyan-400 font-bold">↑ {speedtest.uploadMbps}M</span>
+                  </div>
+                ) : <div />}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -483,24 +812,32 @@ interface SortableCategoryColumnProps {
   id: string;
   category: string;
   items: Service[];
-  colSpan: 1 | 2;
-  onSetColSpan: (span: 1 | 2) => void;
+  colSpan?: 1 | 2;
+  vpnConnected?: boolean;
+  onVpnLockedClick?: (title: string, url: string) => void;
+  isOwner?: boolean;
   onRename: (oldName: string) => void;
   onAddService: (cat: string) => void;
   onEditService: (s: Service) => void;
   onDeleteService: (id: number) => void;
+  onUpdateCardLayout?: (updates: Array<{ id: number; start_col: number; start_row: number; col_span: number; row_span: number }>) => void;
+  onOpenInspector?: (type: 'wireguard' | 'pihole' | 'qbittorrent' | 'jellyfin' | 'jellyseerr') => void;
 }
 
 function SortableCategoryColumn({
   id,
   category,
   items,
-  colSpan,
-  onSetColSpan,
+  colSpan = 1,
+  vpnConnected,
+  onVpnLockedClick,
+  isOwner = true,
   onRename,
   onAddService,
   onEditService,
   onDeleteService,
+  onUpdateCardLayout,
+  onOpenInspector,
 }: SortableCategoryColumnProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
@@ -521,6 +858,128 @@ function SortableCategoryColumn({
     setTimeout(() => setCopiedUrlId(null), 1500);
   };
 
+  // Compute placed cards in the category mini-grid
+  const placedCards = useMemo(() => {
+    return layoutCategoryCards(items, GRID_CONSTANTS.COLS);
+  }, [items]);
+
+  // Live pushed cards state during dragging
+  const [livePushedCards, setLivePushedCards] = useState<(Service & CardPosition)[] | null>(null);
+  const livePushedCardsRef = useRef(livePushedCards);
+  livePushedCardsRef.current = livePushedCards;
+
+  const activeCards = livePushedCards || placedCards;
+
+  // Compute filler placeholder cells for unoccupied slots
+  const fillerCells = useMemo(() => {
+    return getFillerCells(activeCards, GRID_CONSTANTS.COLS, 2);
+  }, [activeCards]);
+
+  // Resizing state
+  const [resizing, setResizing] = useState<{
+    id: number;
+    startCol: number;
+    startRow: number;
+    colSpan: number;
+    rowSpan: number;
+  } | null>(null);
+  const resizingRef = useRef(resizing);
+  resizingRef.current = resizing;
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  const handleStartResize = (e: React.MouseEvent, card: Service & CardPosition) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialColSpan = card.colSpan;
+    const initialRowSpan = card.rowSpan;
+    const gridWidth = gridRef.current ? gridRef.current.clientWidth : 320;
+    const colWidth = (gridWidth - GRID_CONSTANTS.GAP) / GRID_CONSTANTS.COLS;
+    const rowHeight = GRID_CONSTANTS.CELL_HEIGHT;
+
+    const initialCandidate = {
+      id: card.id,
+      startCol: card.startCol,
+      startRow: card.startRow,
+      colSpan: initialColSpan,
+      rowSpan: initialRowSpan,
+    };
+    setResizing(initialCandidate);
+    setLivePushedCards(null);
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+
+      const colStep = Math.round(deltaX / (colWidth * 0.45));
+      const rowStep = Math.round(deltaY / (rowHeight * 0.45));
+
+      const candidateColSpan = Math.max(1, Math.min(GRID_CONSTANTS.COLS, initialColSpan + colStep));
+      const candidateRowSpan = Math.max(1, Math.min(3, initialRowSpan + rowStep));
+      const candidateStartCol = candidateColSpan >= GRID_CONSTANTS.COLS ? 0 : card.startCol;
+
+      const candidate: CardPosition = {
+        id: card.id,
+        startCol: candidateStartCol,
+        startRow: card.startRow,
+        colSpan: candidateColSpan,
+        rowSpan: candidateRowSpan,
+      };
+
+      // Real-time layout computation pushing colliding cards down into new rows
+      const pushedLayout = computePushedLayout(candidate, placedCards, GRID_CONSTANTS.COLS);
+      livePushedCardsRef.current = pushedLayout;
+      setResizing(candidate);
+      setLivePushedCards(pushedLayout);
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      const finalLayout = livePushedCardsRef.current;
+      if (finalLayout && onUpdateCardLayout) {
+        const changedCards: Array<{
+          id: number;
+          start_col: number;
+          start_row: number;
+          col_span: number;
+          row_span: number;
+        }> = [];
+
+        for (const item of finalLayout) {
+          const original = placedCards.find((c) => c.id === item.id);
+          if (
+            !original ||
+            original.startCol !== item.startCol ||
+            original.startRow !== item.startRow ||
+            original.colSpan !== item.colSpan ||
+            original.rowSpan !== item.rowSpan
+          ) {
+            changedCards.push({
+              id: item.id,
+              start_col: item.startCol,
+              start_row: item.startRow,
+              col_span: item.colSpan,
+              row_span: item.rowSpan,
+            });
+          }
+        }
+
+        if (changedCards.length > 0) {
+          onUpdateCardLayout(changedCards);
+        }
+      }
+      livePushedCardsRef.current = null;
+      setResizing(null);
+      setLivePushedCards(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -529,41 +988,6 @@ function SortableCategoryColumn({
         colSpan === 2 ? 'col-span-1 md:col-span-2' : 'col-span-1'
       }`}
     >
-      {/* Interactive Hover Border for Resizing */}
-      <div
-        className="absolute -right-3.5 top-0 bottom-0 w-6 z-30 flex items-center justify-center cursor-ew-resize group/border opacity-0 group-hover/col:opacity-100 transition-opacity"
-        title="Hover border to select column width"
-      >
-        {/* Subtle vertical indicator line that glows red on hover */}
-        <div className="w-1 h-full rounded-full bg-slate-800/80 group-hover/border:bg-red-500 group-hover/border:shadow-[0_0_10px_rgba(239,68,68,0.8)] transition-all" />
-
-        {/* Dynamic width selector popup on hover */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden group-hover/border:flex items-center gap-1.5 p-1.5 rounded-2xl bg-[#16181f] border border-slate-700 shadow-2xl z-50 text-[10px] font-mono whitespace-nowrap">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onSetColSpan(1); }}
-            className={`px-2.5 py-1 rounded-xl transition-all ${
-              colSpan === 1
-                ? 'bg-red-600 text-white font-bold shadow-[0_0_10px_rgba(239,68,68,0.5)]'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            1x Normal
-          </button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onSetColSpan(2); }}
-            className={`px-2.5 py-1 rounded-xl transition-all ${
-              colSpan === 2
-                ? 'bg-red-600 text-white font-bold shadow-[0_0_10px_rgba(239,68,68,0.5)]'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            2x Wide
-          </button>
-        </div>
-      </div>
-
       {/* Category Header — Clean, open, invisible box */}
       <div className="flex items-center justify-between pb-1 px-1">
         <div className="flex items-center gap-2 min-w-0">
@@ -575,118 +999,318 @@ function SortableCategoryColumn({
           >
             <GripVertical className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => onRename(category)}
-            className="font-bold text-xs uppercase tracking-wider text-slate-300 hover:text-red-400 transition-colors truncate text-left flex items-center gap-1.5"
-            title="Click to rename category"
-          >
-            <span>{category}</span>
-            <Edit2 className="w-3 h-3 text-slate-600 opacity-60 hover:opacity-100" />
-          </button>
+          {isOwner ? (
+            <button
+              onClick={() => onRename(category)}
+              className="font-bold text-xs uppercase tracking-wider text-slate-300 hover:text-red-400 transition-colors truncate text-left flex items-center gap-1.5"
+              title="Click to rename category"
+            >
+              <span>{category}</span>
+              <Edit2 className="w-3 h-3 text-slate-600 opacity-60 hover:opacity-100" />
+            </button>
+          ) : (
+            <span className="font-bold text-xs uppercase tracking-wider text-slate-300 truncate">
+              {category}
+            </span>
+          )}
           <span className="text-[10px] font-mono text-slate-500">({items.length})</span>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => onAddService(category)}
-            className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-            title="Add service to this category"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        {isOwner && (
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => onAddService(category)}
+              className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+              title="Add service to this category"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Cards stacked vertically */}
-      <div className="space-y-2.5">
-        {items.map((s) => {
+      {/* Freeform Category Mini-Grid */}
+      <div
+        ref={gridRef}
+        className="grid grid-cols-2 gap-2.5 relative select-none"
+        style={{
+          gridAutoRows: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
+        }}
+      >
+        {/* Filler Placeholder Cells for Unoccupied Slots */}
+        {fillerCells.map((filler) => (
+          <div
+            key={`filler-${filler.col}-${filler.row}`}
+            style={{
+              gridColumn: `${filler.col + 1} / span 1`,
+              gridRow: `${filler.row + 1} / span 1`,
+              minHeight: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
+            }}
+            className="rounded-xl border border-dashed border-slate-800/40 bg-slate-900/10 flex items-center justify-center select-none pointer-events-none transition-colors"
+          >
+            <span className="text-[10px] font-mono text-slate-700/60">+</span>
+          </div>
+        ))}
+
+        {/* Placed Service Cards */}
+        {activeCards.map((s) => {
+          const isCurrentResizing = resizing?.id === s.id;
+          const currentColSpan = isCurrentResizing && resizing ? resizing.colSpan : s.colSpan;
+          const currentRowSpan = isCurrentResizing && resizing ? resizing.rowSpan : s.rowSpan;
+          const startCol = s.startCol;
+          const startRow = s.startRow;
+
           const isOnline = s.status === 'online';
           const isOffline = s.status === 'offline' || s.status === 'timeout';
+          const isCompact = currentColSpan === 1 && currentRowSpan === 1;
+
+          const isVpnRequired = Boolean(
+            s.requires_vpn ||
+            (s.url && (s.url.includes('.home.arpa') || s.url.includes('192.168.1.') || s.url.includes('10.7.235.')))
+          );
+          const isVpnLocked = isVpnRequired && vpnConnected === false;
 
           return (
             <div
               key={s.id}
-              onClick={() => window.open(s.url, '_blank', 'noopener,noreferrer')}
+              onClick={() => {
+                if (isVpnLocked) {
+                  onVpnLockedClick?.(s.title, s.url);
+                  return;
+                }
+                if (s.url === '#' || !s.url) {
+                  if (s.telemetryType && onOpenInspector) {
+                    onOpenInspector(s.telemetryType);
+                  }
+                } else {
+                  window.open(s.url, '_blank', 'noopener,noreferrer');
+                }
+              }}
               role="link"
               tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter') window.open(s.url, '_blank', 'noopener,noreferrer'); }}
-              className="group relative flex items-center justify-between p-3.5 rounded-xl border border-slate-800/80 bg-[#16181f]/80 hover:bg-[#1c1f2b] hover:border-slate-700/80 hover:shadow-lg transition-all duration-150 cursor-pointer select-none"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (isVpnLocked) {
+                    onVpnLockedClick?.(s.title, s.url);
+                    return;
+                  }
+                  if (s.url === '#' || !s.url) {
+                    if (s.telemetryType && onOpenInspector) onOpenInspector(s.telemetryType);
+                  } else {
+                    window.open(s.url, '_blank', 'noopener,noreferrer');
+                  }
+                }
+              }}
+              style={{
+                gridColumn: `${startCol + 1} / span ${currentColSpan}`,
+                gridRow: `${startRow + 1} / span ${currentRowSpan}`,
+              }}
+              className={`group relative rounded-xl border transition-all duration-150 cursor-pointer select-none overflow-hidden ${
+                isCurrentResizing
+                  ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] bg-[#1c1f2b] z-30'
+                  : isVpnLocked
+                  ? 'border-amber-500/30 bg-[#16181f]/60 opacity-60 hover:opacity-85 hover:border-amber-500/50 hover:shadow-lg'
+                  : 'border-slate-800/80 bg-[#16181f]/80 hover:bg-[#1c1f2b] hover:border-slate-700/80 hover:shadow-lg'
+              } ${isCompact ? 'p-2.5 flex flex-col justify-between' : 'p-3.5 flex items-center justify-between'}`}
             >
-              {/* Left: Icon, Title & URL (No description) */}
-              <div className="flex items-center gap-3 min-w-0 pr-2">
-                <ServiceIcon icon={s.icon} title={s.title} />
-                <div className="min-w-0">
-                  <div className="font-bold text-sm text-slate-100 group-hover:text-red-400 transition-colors truncate flex items-center gap-1.5">
-                    <span>{s.title}</span>
-                    <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              {isCompact ? (
+                /* Compact 1x1 Card */
+                <>
+                  <div className="flex items-center gap-2 min-w-0 pr-4">
+                    <ServiceIcon icon={s.icon} title={s.title} />
+                    <div className="min-w-0">
+                      <div className="font-bold text-xs text-slate-100 group-hover:text-red-400 transition-colors truncate flex items-center gap-1">
+                        <span className="truncate">{s.title}</span>
+                        {isVpnLocked && <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500 truncate block mt-0.5">
+                        {s.url.replace(/^https?:\/\//, '')}
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-500 truncate block mt-0.5">
-                    {s.url.replace(/^https?:\/\//, '')}
-                  </span>
-                </div>
-              </div>
 
-              {/* Right: VPN badge (Priv removed!), Status Pill & Quick Actions */}
-              <div className="flex items-center gap-2 shrink-0">
-                {s.requires_vpn && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                    <Shield className="w-2.5 h-2.5 text-purple-400" />
-                    VPN
-                  </span>
-                )}
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-800/40 text-[9px] font-mono">
+                    <span
+                      className={`flex items-center gap-1 ${
+                        isOnline ? 'text-emerald-400' : isOffline ? 'text-rose-400' : 'text-slate-500'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isOnline ? 'bg-emerald-400 animate-pulse' : isOffline ? 'bg-rose-500' : 'bg-slate-500'
+                        }`}
+                      />
+                      {s.status || 'ping'}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {s.telemetryType && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onOpenInspector?.(s.telemetryType!);
+                          }}
+                          className="p-0.5 text-slate-400 hover:text-emerald-400 transition-colors"
+                          title="Open live telemetry inspector"
+                        >
+                          <Activity className="w-3 h-3 text-emerald-400" />
+                        </button>
+                      )}
+                      {isVpnLocked ? (
+                        <span className="inline-flex items-center gap-0.5 text-amber-400 font-mono font-bold" title="WireGuard VPN or LAN required">
+                          <Lock className="w-2.5 h-2.5" />
+                          VPN
+                        </span>
+                      ) : (
+                        s.requires_vpn && <span className="text-purple-400 font-bold">VPN</span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Wide 2x1 or Multi-row Card */
+                <>
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                    <ServiceIcon icon={s.icon} title={s.title} />
+                    <div className="min-w-0">
+                      <div className="font-bold text-sm text-slate-100 group-hover:text-red-400 transition-colors truncate flex items-center gap-1.5">
+                        <span>{s.title}</span>
+                        {isVpnLocked ? (
+                          <Lock className="w-3 h-3 text-amber-400 shrink-0" title="WireGuard VPN or LAN required to access this service" />
+                        ) : (
+                          <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                        )}
+                      </div>
+                      <span className="text-[11px] font-mono text-slate-500 truncate block mt-0.5">
+                        {s.url.replace(/^https?:\/\//, '')}
+                      </span>
+                    </div>
+                  </div>
 
-                {/* Status Indicator */}
-                <div
-                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider border ${
-                    isOnline
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                      : isOffline
-                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
-                  }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      isOnline ? 'bg-emerald-400 animate-pulse' : isOffline ? 'bg-rose-500' : 'bg-slate-500'
-                    }`}
-                  />
-                  <span>{s.status || 'ping'}</span>
-                </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {s.liveStat && (
+                      <span className="hidden sm:inline-block text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 truncate max-w-[130px]">
+                        {s.liveStat}
+                      </span>
+                    )}
+                    {isVpnLocked ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30" title="Connect to WireGuard VPN to access this hostname">
+                        <Lock className="w-2.5 h-2.5 text-amber-400" />
+                        VPN Locked
+                      </span>
+                    ) : s.requires_vpn ? (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                        <Shield className="w-2.5 h-2.5 text-purple-400" />
+                        VPN
+                      </span>
+                    ) : null}
 
-                {/* Hover Actions */}
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    onClick={(e) => handleCopy(e, s)}
-                    className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
-                    title="Copy URL"
-                  >
-                    {copiedUrlId === s.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditService(s); }}
-                    className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
-                    title="Edit"
-                  >
-                    <Edit2 className="w-3 h-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteService(s.id); }}
-                    className="p-1 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
+                    <div
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider border ${
+                        isOnline
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : isOffline
+                          ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isOnline ? 'bg-emerald-400 animate-pulse' : isOffline ? 'bg-rose-500' : 'bg-slate-500'
+                        }`}
+                      />
+                      <span>{s.status || 'ping'}</span>
+                    </div>
+
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {s.telemetryType && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onOpenInspector?.(s.telemetryType!);
+                          }}
+                          className="p-1 text-slate-400 hover:text-emerald-400 rounded hover:bg-slate-800 transition-colors"
+                          title="Inspect live telemetry"
+                        >
+                          <Activity className="w-3 h-3 text-emerald-400" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopy(e, s)}
+                        className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                        title="Copy URL"
+                      >
+                        {copiedUrlId === s.id ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                      {isOwner && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onEditService(s);
+                            }}
+                            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onDeleteService(s.id);
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Resize indicator badge when dragging */}
+              {isCurrentResizing && (
+                <span className="absolute top-1 right-1 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40">
+                  {currentColSpan}×{currentRowSpan}
+                </span>
+              )}
+
+              {/* Drag Handle to Resize Card */}
+              <div
+                onMouseDown={(e) => handleStartResize(e, s)}
+                className="absolute bottom-0.5 right-0.5 w-4 h-4 cursor-se-resize flex items-center justify-center text-slate-600 hover:text-red-400 opacity-20 group-hover:opacity-100 transition-opacity z-20"
+                title="Drag to resize card (1x1, 2x1, 1x2, 2x2)"
+              >
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="text-current">
+                  <circle cx="7" cy="7" r="1" fill="currentColor" />
+                  <circle cx="7" cy="4" r="1" fill="currentColor" />
+                  <circle cx="7" cy="1" r="1" fill="currentColor" />
+                  <circle cx="4" cy="7" r="1" fill="currentColor" />
+                  <circle cx="4" cy="4" r="1" fill="currentColor" />
+                  <circle cx="1" cy="7" r="1" fill="currentColor" />
+                </svg>
               </div>
             </div>
           );
         })}
 
         {items.length === 0 && (
-          <div className="py-5 text-center border border-dashed border-slate-800/80 rounded-xl">
+          <div className="col-span-2 py-5 text-center border border-dashed border-slate-800/80 rounded-xl">
             <p className="text-xs text-slate-600">No services in this category</p>
             <button
               onClick={() => onAddService(category)}
@@ -697,6 +1321,48 @@ function SortableCategoryColumn({
           </div>
         )}
       </div>
+
+      {/* Stacked Live Stats for Category */}
+      {items.some((s) => s.liveStat || s.telemetryType) && (
+        <div className="pt-2 border-t border-slate-800/80 space-y-1.5 mt-1">
+          <div className="flex items-center justify-between px-1 text-[10px] font-mono uppercase tracking-wider text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <Activity className="w-3 h-3 text-red-500" />
+              <span>Category Telemetry</span>
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+          {items
+            .filter((s) => s.liveStat || s.telemetryType)
+            .map((s) => (
+              <div
+                key={`cat-stat-${s.id}`}
+                onClick={() => {
+                  if (s.telemetryType && onOpenInspector) {
+                    onOpenInspector(s.telemetryType);
+                  }
+                }}
+                className={`group/pill flex items-center justify-between px-3 py-2 rounded-xl bg-[#12141c]/90 border border-slate-800/80 hover:border-slate-700/80 transition-all text-xs ${
+                  s.telemetryType ? 'cursor-pointer hover:bg-[#181b28] hover:border-red-500/30' : ''
+                }`}
+                title={s.telemetryType ? 'Click to inspect live details' : undefined}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="font-semibold text-slate-200 group-hover/pill:text-white truncate">{s.title}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    {s.liveStat || 'Live'}
+                  </span>
+                  {s.telemetryType && (
+                    <ChevronRight className="w-3 h-3 text-slate-500 group-hover/pill:text-white transition-transform group-hover/pill:translate-x-0.5" />
+                  )}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -720,11 +1386,23 @@ function HomelabBoard({
   services,
   nodes,
   loadingNodes,
+  speedtest,
+  vpnConnected,
+  onRunSpeedtest,
+  isRunningSpeedtest,
+  onUpdateCardLayout,
+  onOpenInspector,
   onRefresh,
 }: {
   services: Service[];
   nodes: ServerNode[];
   loadingNodes: boolean;
+  speedtest?: SpeedtestResult | null;
+  vpnConnected?: boolean;
+  onRunSpeedtest?: () => void;
+  isRunningSpeedtest?: boolean;
+  onUpdateCardLayout?: (updates: Array<{ id: number; start_col: number; start_row: number; col_span: number; row_span: number }>) => void;
+  onOpenInspector?: (type: 'wireguard' | 'pihole' | 'qbittorrent' | 'jellyfin' | 'jellyseerr') => void;
   onRefresh: () => void;
 }) {
   const { user } = useAuth();
@@ -750,6 +1428,19 @@ function HomelabBoard({
     error?: string;
     latency?: string;
   } | null>(null);
+
+  const [vpnNotice, setVpnNotice] = useState<{ title: string; url: string } | null>(null);
+
+  const handleVpnLockedClick = (title: string, url: string) => {
+    setVpnNotice({ title, url });
+  };
+
+  useEffect(() => {
+    if (vpnNotice) {
+      const timer = setTimeout(() => setVpnNotice(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [vpnNotice]);
 
   const [prefs, setPrefs] = useState<UserPreferences>(() => getUserPreferences(user?.id));
 
@@ -960,7 +1651,20 @@ function HomelabBoard({
     <div className="space-y-8">
       {/* Cluster Telemetry Row (Host, 192.168.1.136, 192.168.1.112, 192.168.1.41) */}
       {prefs.widgetVisible?.nodes !== false && (
-        <MultiServerNodesWidget nodes={nodes} loading={loadingNodes} />
+        <MultiServerNodesWidget
+          nodes={nodes}
+          loading={loadingNodes}
+          speedtest={speedtest}
+          serverGauges={prefs.serverGauges}
+          onUpdateServerGauges={(updated) => {
+            const next = { ...prefs, serverGauges: updated };
+            setPrefs(next);
+            saveUserPreferences(user?.id, next);
+          }}
+          isAdmin={user?.role === 'owner'}
+          onRunSpeedtest={user?.role === 'owner' ? onRunSpeedtest : undefined}
+          isRunningSpeedtest={isRunningSpeedtest}
+        />
       )}
 
       {/* Top Widgets: Time and Quick Notes */}
@@ -991,14 +1695,16 @@ function HomelabBoard({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCategoryModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:border-slate-700 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors"
-            title="Create a new custom category box"
-          >
-            <FolderPlus className="w-3.5 h-3.5 text-red-400" />
-            <span>Add Category</span>
-          </button>
+          {user?.role === 'owner' && (
+            <button
+              onClick={() => setCategoryModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:border-slate-700 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors"
+              title="Create a new custom category box"
+            >
+              <FolderPlus className="w-3.5 h-3.5 text-red-400" />
+              <span>Add Category</span>
+            </button>
+          )}
           <button
             onClick={() => setViewModal(true)}
             className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:border-slate-700 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors"
@@ -1019,26 +1725,60 @@ function HomelabBoard({
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => openNew()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_20px_-5px_rgba(239,68,68,0.4)] transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Service
-          </button>
+          {user?.role === 'owner' && (
+            <button
+              onClick={() => openNew()}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_20px_-5px_rgba(239,68,68,0.4)] transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Service
+            </button>
+          )}
         </div>
       </div>
 
       <ErrBox msg={error} />
 
-      {/* Free-Play Sortable Grid */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={orderedCategories} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 items-start">
-            {orderedCategories.map((cat) => {
-              if (prefs.hiddenCategories.includes(cat)) return null;
-              const items = filteredServices.filter(s => (s.category?.trim() || 'Services') === cat);
-              const colSpan = (prefs.categoryWidths && prefs.categoryWidths[cat]) || 1;
+      {/* Free-Play Sortable Grid or Empty State */}
+      {orderedCategories.length === 0 || !orderedCategories.some(cat => !prefs.hiddenCategories.includes(cat) && (user?.role === 'owner' || filteredServices.some(s => (s.category?.trim() || 'Services') === cat))) ? (
+        <div className="py-16 px-6 text-center rounded-2xl border border-slate-800/80 bg-[#16181f]/80">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3">
+            <LayoutGrid className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-semibold text-white">No service cards visible</h3>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            {search
+              ? `No services matched "${search}". Try clearing your search.`
+              : user?.role === 'owner'
+              ? 'Your homelab board is empty or all categories are currently hidden. Add a service or customize your grid view.'
+              : 'No service cards are currently assigned to your account. Contact an administrator for access.'}
+          </p>
+          {search ? (
+            <button
+              onClick={() => setSearch('')}
+              className="mt-4 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 rounded-lg transition-colors"
+            >
+              Clear search filter
+            </button>
+          ) : user?.role === 'owner' ? (
+            <button
+              onClick={() => openNew()}
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-red-600/20 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add First Service
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={orderedCategories} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 items-start">
+              {orderedCategories.map((cat) => {
+                if (prefs.hiddenCategories.includes(cat)) return null;
+                const items = filteredServices.filter(s => (s.category?.trim() || 'Services') === cat);
+                if (user?.role !== 'owner' && items.length === 0) return null;
+                const colSpan = (prefs.categoryWidths && prefs.categoryWidths[cat]) || 1;
 
               return (
                 <SortableCategoryColumn
@@ -1047,17 +1787,54 @@ function HomelabBoard({
                   category={cat}
                   items={items}
                   colSpan={colSpan}
-                  onSetColSpan={(span) => setColSpan(cat, span)}
+                  vpnConnected={vpnConnected}
+                  onVpnLockedClick={handleVpnLockedClick}
+                  isOwner={user?.role === 'owner'}
                   onRename={(old) => setRenameModal({ open: true, oldName: old, newName: old })}
                   onAddService={(c) => openNew(c)}
                   onEditService={openEdit}
                   onDeleteService={remove}
+                  onUpdateCardLayout={onUpdateCardLayout}
+                  onOpenInspector={onOpenInspector}
                 />
               );
             })}
           </div>
         </SortableContext>
       </DndContext>
+      )}
+
+      {/* VPN / LAN Locked Host Toast Notification */}
+      {vpnNotice && (
+        <div className="fixed bottom-6 right-6 max-w-md p-4 rounded-2xl border border-amber-500/40 bg-[#16181f]/95 text-slate-200 shadow-2xl backdrop-blur-md z-50 animate-in fade-in slide-in-from-bottom-5">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-bold text-amber-400">WireGuard VPN / LAN Required</h4>
+              <p className="text-xs text-slate-300 mt-1">
+                <strong className="text-white">{vpnNotice.title}</strong> uses an internal homelab address{' '}
+                <code className="text-amber-300 font-mono text-[11px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                  {vpnNotice.url.replace(/^https?:\/\//, '')}
+                </code>{' '}
+                which cannot be reached without an active WireGuard VPN connection or local home network access.
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1.5">
+                <Shield className="w-3 h-3 text-purple-400" />
+                Connect to WireGuard VPN to unlock and open this service.
+              </p>
+            </div>
+            <button
+              onClick={() => setVpnNotice(null)}
+              className="text-slate-500 hover:text-white p-1 rounded-lg transition-colors"
+              title="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {orderedCategories.length === 0 && (
         <div className="p-12 text-center rounded-2xl border border-slate-800/80 bg-[#16181f]">
@@ -1878,9 +2655,531 @@ function SkillsTab() {
 }
 
 /* -------------------------------------------------------------
-   Users Tab
+   Service Permissions Grid (Phase 9)
 ------------------------------------------------------------- */
-function UsersTab() {
+interface ServicePermissionsData {
+  users: Array<{ id: number; name: string; username: string; email: string; role: string }>;
+  services: Array<{ id: number; title: string; category: string; icon: string; is_private: boolean; requires_vpn: boolean; display_order: number }>;
+  permissions: Array<{ service_id: number; user_id: number; allowed: number }>;
+}
+
+function ServicePermissionsGrid() {
+  const [data, setData] = useState<ServicePermissionsData | null>(null);
+  const [gridState, setGridState] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [selectedCat, setSelectedCat] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get<ServicePermissionsData>('/admin/service-permissions');
+      setData(res);
+
+      const rulesMap = new Map<string, boolean>();
+      for (const p of res.permissions) {
+        rulesMap.set(`${p.service_id}_${p.user_id}`, p.allowed === 1);
+      }
+
+      const state: Record<string, boolean> = {};
+      const regularUsers = res.users.filter(u => u.role !== 'owner');
+      for (const s of res.services) {
+        for (const u of regularUsers) {
+          const key = `${s.id}_${u.id}`;
+          if (rulesMap.has(key)) {
+            state[key] = rulesMap.get(key)!;
+          } else {
+            state[key] = true;
+          }
+        }
+      }
+      setGridState(state);
+    } catch (e) {
+      setError((e as Error).message || 'Failed to load service permissions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const toggleCell = (serviceId: number, userId: number) => {
+    const key = `${serviceId}_${userId}`;
+    setGridState(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleAllForUser = (userId: number) => {
+    if (!data) return;
+    const allChecked = data.services.every(s => gridState[`${s.id}_${userId}`] === true);
+    const nextVal = !allChecked;
+    setGridState(prev => {
+      const next = { ...prev };
+      for (const s of data.services) {
+        next[`${s.id}_${userId}`] = nextVal;
+      }
+      return next;
+    });
+  };
+
+  const toggleAllForService = (serviceId: number) => {
+    if (!data) return;
+    const regularUsers = data.users.filter(u => u.role !== 'owner');
+    const allChecked = regularUsers.every(u => gridState[`${serviceId}_${u.id}`] === true);
+    const nextVal = !allChecked;
+    setGridState(prev => {
+      const next = { ...prev };
+      for (const u of regularUsers) {
+        next[`${serviceId}_${u.id}`] = nextVal;
+      }
+      return next;
+    });
+  };
+
+  const save = async () => {
+    if (!data) return;
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    const regularUsers = data.users.filter(u => u.role !== 'owner');
+    const payload: Array<{ service_id: number; user_id: number; allowed: number }> = [];
+
+    for (const s of data.services) {
+      for (const u of regularUsers) {
+        const key = `${s.id}_${u.id}`;
+        payload.push({
+          service_id: s.id,
+          user_id: u.id,
+          allowed: gridState[key] ? 1 : 0,
+        });
+      }
+    }
+
+    try {
+      await api.patch('/admin/service-permissions', { permissions: payload });
+      setSuccess(`Permissions saved successfully for ${regularUsers.length} users and ${data.services.length} services!`);
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (e) {
+      setError((e as Error).message || 'Failed to save permissions');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const categories = useMemo(() => {
+    if (!data) return [];
+    return Array.from(new Set(data.services.map(s => s.category?.trim() || 'Services'))).filter(Boolean);
+  }, [data]);
+
+  const filteredServices = useMemo(() => {
+    if (!data) return [];
+    return data.services.filter(s => {
+      if (selectedCat !== 'all' && (s.category?.trim() || 'Services') !== selectedCat) return false;
+      if (searchQuery.trim() && !s.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      return true;
+    });
+  }, [data, selectedCat, searchQuery]);
+
+  const regularUsers = useMemo(() => {
+    if (!data) return [];
+    return data.users.filter(u => u.role !== 'owner');
+  }, [data]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Service Visibility Permissions Grid
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Configure individual card visibility for non-owner users across the homelab dashboard.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={load}
+            disabled={loading || saving}
+            className="p-2 border border-slate-800 hover:border-slate-700 bg-slate-900/80 rounded-xl text-slate-400 hover:text-white transition-colors"
+            title="Refresh permissions"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || loading || regularUsers.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_20px_-5px_rgba(239,68,68,0.5)] transition-all disabled:opacity-50"
+          >
+            {saving ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Save Permissions Matrix</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <ErrBox msg={error} />
+
+      {success && (
+        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          <span>{success}</span>
+        </div>
+      )}
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          <button
+            onClick={() => setSelectedCat('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              selectedCat === 'all'
+                ? 'bg-red-600/20 text-red-400 border border-red-500/40'
+                : 'text-slate-400 hover:text-slate-200 border border-slate-800 bg-slate-900/60'
+            }`}
+          >
+            All Categories ({data?.services.length || 0})
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCat(cat)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                selectedCat === cat
+                  ? 'bg-red-600/20 text-red-400 border border-red-500/40'
+                  : 'text-slate-400 hover:text-slate-200 border border-slate-800 bg-slate-900/60'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search services..."
+            className="w-full pl-8 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-red-500 transition-colors"
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <Spinner />
+      ) : regularUsers.length === 0 ? (
+        <div className="p-8 text-center text-slate-500 text-xs rounded-xl border border-slate-800 bg-[#16181f]">
+          No regular user accounts exist yet. Create a standard user account to configure custom service visibility.
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-800 bg-[#16181f] overflow-x-auto shadow-2xl">
+          <table className="min-w-full text-left text-xs font-mono">
+            <thead className="bg-slate-900/90 border-b border-slate-800 text-[11px] text-slate-400">
+              <tr>
+                <th className="p-3 font-semibold min-w-[200px]">Service Card</th>
+                <th className="p-3 font-semibold w-32">Category</th>
+                {regularUsers.map(u => (
+                  <th key={u.id} className="p-3 text-center min-w-[120px]">
+                    <div className="flex flex-col items-center">
+                      <span className="text-white font-bold">@{u.username}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleAllForUser(u.id)}
+                        className="text-[10px] text-red-400 hover:text-red-300 underline font-normal mt-0.5"
+                      >
+                        Toggle All
+                      </button>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 text-slate-200">
+              {filteredServices.map(s => (
+                <tr key={s.id} className="hover:bg-white/[0.015] transition-colors">
+                  <td className="p-3 font-medium">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleAllForService(s.id)}
+                        className="text-left font-semibold text-slate-200 hover:text-red-400 transition-colors"
+                        title="Click to toggle for all users"
+                      >
+                        {s.title}
+                      </button>
+                      {s.requires_vpn && (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
+                          VPN
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800/80 border border-slate-700/60 text-slate-400">
+                      {s.category || 'Services'}
+                    </span>
+                  </td>
+                  {regularUsers.map(u => {
+                    const key = `${s.id}_${u.id}`;
+                    const isAllowed = gridState[key] !== false;
+                    return (
+                      <td key={u.id} className="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isAllowed}
+                          onChange={() => toggleCell(s.id, u.id)}
+                          className="w-4 h-4 rounded border-slate-700 bg-slate-900 accent-red-600 cursor-pointer focus:ring-0 focus:ring-offset-0"
+                          aria-label={`Toggle ${s.title} for @${u.username}`}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              {filteredServices.length === 0 && (
+                <tr>
+                  <td colSpan={2 + regularUsers.length} className="p-8 text-center text-slate-500">
+                    No services match the selected filter.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------
+   Feature Flags Grid (Phase 9)
+------------------------------------------------------------- */
+interface FeatureFlagsData {
+  users: Array<{ id: number; name: string; username: string; role: string }>;
+  featureKeys: string[];
+  flags: Array<{ user_id: number; feature_key: string; enabled: number }>;
+}
+
+const FEATURE_META: Record<string, { label: string; desc: string }> = {
+  system_telemetry: {
+    label: 'System Telemetry & Hardware Nodes',
+    desc: 'Access to System category cards, CPU/RAM/Disk gauges, and internal node metrics',
+  },
+  wireguard_status: {
+    label: 'WireGuard VPN Widget & Peer Status',
+    desc: 'Access to WireGuard status cards, connection state, and peer transfer inspector',
+  },
+  pihole_stats: {
+    label: 'Pi-hole DNS Statistics',
+    desc: 'Access to Pi-hole query rate charts, ad-blocking statistics, and inspector modal',
+  },
+};
+
+function FeatureFlagsGrid() {
+  const [data, setData] = useState<FeatureFlagsData | null>(null);
+  const [flagState, setFlagState] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get<FeatureFlagsData>('/admin/feature-flags');
+      setData(res);
+
+      const state: Record<string, boolean> = {};
+      const regularUsers = res.users.filter(u => u.role !== 'owner');
+
+      for (const u of regularUsers) {
+        for (const k of res.featureKeys) {
+          const match = res.flags.find(f => f.user_id === u.id && f.feature_key === k);
+          state[`${u.id}_${k}`] = match ? match.enabled === 1 : false;
+        }
+      }
+      setFlagState(state);
+    } catch (e) {
+      setError((e as Error).message || 'Failed to load feature flags');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const toggleCell = (userId: number, key: string) => {
+    const k = `${userId}_${key}`;
+    setFlagState(prev => ({ ...prev, [k]: !prev[k] }));
+  };
+
+  const save = async () => {
+    if (!data) return;
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    const regularUsers = data.users.filter(u => u.role !== 'owner');
+    const payload: Array<{ user_id: number; feature_key: string; enabled: number }> = [];
+
+    for (const u of regularUsers) {
+      for (const k of data.featureKeys) {
+        const key = `${u.id}_${k}`;
+        payload.push({
+          user_id: u.id,
+          feature_key: k,
+          enabled: flagState[key] ? 1 : 0,
+        });
+      }
+    }
+
+    try {
+      await api.patch('/admin/feature-flags', { flags: payload });
+      setSuccess(`Feature flags updated successfully for ${regularUsers.length} users!`);
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (e) {
+      setError((e as Error).message || 'Failed to save feature flags');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const regularUsers = useMemo(() => {
+    if (!data) return [];
+    return data.users.filter(u => u.role !== 'owner');
+  }, [data]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Per-User Feature Flags UI
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Grant or restrict privileged telemetry, WireGuard, and Pi-hole views for regular homelab accounts.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={load}
+            disabled={loading || saving}
+            className="p-2 border border-slate-800 hover:border-slate-700 bg-slate-900/80 rounded-xl text-slate-400 hover:text-white transition-colors"
+            title="Refresh feature flags"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || loading || regularUsers.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_20px_-5px_rgba(239,68,68,0.5)] transition-all disabled:opacity-50"
+          >
+            {saving ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Save Feature Flags</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <ErrBox msg={error} />
+
+      {success && (
+        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          <span>{success}</span>
+        </div>
+      )}
+
+      {loading ? (
+        <Spinner />
+      ) : regularUsers.length === 0 ? (
+        <div className="p-8 text-center text-slate-500 text-xs rounded-xl border border-slate-800 bg-[#16181f]">
+          No regular user accounts exist yet. Create a standard user account to configure custom feature flags.
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-800 bg-[#16181f] overflow-x-auto shadow-2xl">
+          <table className="min-w-full text-left text-xs font-mono">
+            <thead className="bg-slate-900/90 border-b border-slate-800 text-[11px] text-slate-400">
+              <tr>
+                <th className="p-3 font-semibold min-w-[240px]">Feature Flag</th>
+                <th className="p-3 font-semibold font-sans">Description</th>
+                {regularUsers.map(u => (
+                  <th key={u.id} className="p-3 text-center min-w-[120px]">
+                    <span className="text-white font-bold">@{u.username}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 text-slate-200">
+              {(data?.featureKeys || []).map(key => {
+                const meta = FEATURE_META[key] || { label: key, desc: 'Feature flag' };
+                return (
+                  <tr key={key} className="hover:bg-white/[0.015] transition-colors">
+                    <td className="p-3 font-medium text-white">
+                      <div className="font-semibold font-mono text-red-400">{key}</div>
+                      <div className="text-[11px] text-slate-300 font-sans mt-0.5">{meta.label}</div>
+                    </td>
+                    <td className="p-3 text-slate-400 font-sans text-xs max-w-md">
+                      {meta.desc}
+                    </td>
+                    {regularUsers.map(u => {
+                      const isEnabled = flagState[`${u.id}_${key}`] === true;
+                      return (
+                        <td key={u.id} className="p-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isEnabled}
+                            onChange={() => toggleCell(u.id, key)}
+                            className="w-4 h-4 rounded border-slate-700 bg-slate-900 accent-red-600 cursor-pointer focus:ring-0 focus:ring-offset-0"
+                            aria-label={`Toggle ${key} for @${u.username}`}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------
+   Users Tab (Enhanced with Permissions and Feature Flags)
+------------------------------------------------------------- */
+function UsersTab({ defaultSubTab = 'accounts' }: { defaultSubTab?: 'accounts' | 'permissions' | 'features' }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get('tab');
+  const initialSubTab = (currentTab === 'permissions' || currentTab === 'features') 
+    ? currentTab 
+    : defaultSubTab;
+  const [subTab, setSubTab] = useState<'accounts' | 'permissions' | 'features'>(initialSubTab);
+
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -1905,6 +3204,7 @@ function UsersTab() {
     wasGenerated: boolean;
     action: 'created' | 'reset';
   } | null>(null);
+  const [showBannerPwd, setShowBannerPwd] = useState<boolean>(true);
   const [copiedField, setCopiedField] = useState<string>('');
 
   const load = async () => {
@@ -1914,6 +3214,13 @@ function UsersTab() {
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+
+  // Synchronize when outer tab changes
+  useEffect(() => {
+    if (currentTab === 'permissions' || currentTab === 'features' || currentTab === 'users') {
+      setSubTab(currentTab === 'permissions' ? 'permissions' : currentTab === 'features' ? 'features' : 'accounts');
+    }
+  }, [currentTab]);
 
   const copyText = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -1949,6 +3256,7 @@ function UsersTab() {
       setModal(false);
       setModalError('');
       setForm({ username: '', name: '', email: '', role: 'user', passwordMode: 'auto', password: '' });
+      setShowBannerPwd(true);
       setCredentialsBanner({
         username: res.user.username,
         password: res.oneTimePassword,
@@ -1967,6 +3275,7 @@ function UsersTab() {
     if (!confirm(`Reset password for "${u.username}"? A new temporary password will be generated.`)) return;
     try {
       const res = await api.post<{ oneTimePassword: string }>(`/users/${u.id}/reset-password`);
+      setShowBannerPwd(true);
       setCredentialsBanner({
         username: u.username,
         password: res.oneTimePassword,
@@ -1994,295 +3303,349 @@ function UsersTab() {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">User Management ({users.length})</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Manage registered accounts, grant roles, and issue password resets.</p>
-        </div>
+    <div className="space-y-6">
+      {/* Sub-tab Navigation */}
+      <div className="flex items-center gap-2 border-b border-slate-800/80 pb-3 overflow-x-auto">
         <button
-          onClick={() => {
-            setError('');
-            setModalError('');
-            setForm({ username: '', name: '', email: '', role: 'user', passwordMode: 'auto', password: '' });
-            setModal(true);
-          }}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_20px_-5px_rgba(239,68,68,0.4)] transition-all"
+          onClick={() => { setSubTab('accounts'); setSearchParams({ tab: 'users' }); }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            subTab === 'accounts'
+              ? 'bg-red-600 text-white shadow-[0_0_20px_-4px_rgba(239,68,68,0.5)]'
+              : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
         >
-          <Plus className="w-3.5 h-3.5" />
-          Create User
+          <UsersIcon className="w-4 h-4" />
+          User Accounts
+        </button>
+        <button
+          onClick={() => { setSubTab('permissions'); setSearchParams({ tab: 'permissions' }); }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            subTab === 'permissions'
+              ? 'bg-red-600 text-white shadow-[0_0_20px_-4px_rgba(239,68,68,0.5)]'
+              : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          Service Permissions Grid
+        </button>
+        <button
+          onClick={() => { setSubTab('features'); setSearchParams({ tab: 'features' }); }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            subTab === 'features'
+              ? 'bg-red-600 text-white shadow-[0_0_20px_-4px_rgba(239,68,68,0.5)]'
+              : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+          }`}
+        >
+          <Sliders className="w-4 h-4" />
+          Feature Flags UI
         </button>
       </div>
 
-      <ErrBox msg={error} />
-
-      {/* Prominent Credentials Banner */}
-      {credentialsBanner && (
-        <div className="p-4 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 backdrop-blur-md shadow-lg space-y-3 animate-fade-in">
+      {subTab === 'permissions' && <ServicePermissionsGrid />}
+      {subTab === 'features' && <FeatureFlagsGrid />}
+      {subTab === 'accounts' && (
+        <div className="space-y-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>
-                User {credentialsBanner.action === 'created' ? 'Created' : 'Password Reset'} Successfully!
-              </span>
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">User Management ({users.length})</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Manage registered accounts, grant roles, and issue password resets.</p>
             </div>
             <button
-              onClick={() => setCredentialsBanner(null)}
-              className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded hover:bg-white/10"
+              onClick={() => {
+                setError('');
+                setModalError('');
+                setForm({ username: '', name: '', email: '', role: 'user', passwordMode: 'auto', password: '' });
+                setModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_20px_-5px_rgba(239,68,68,0.4)] transition-all"
             >
-              Dismiss
+              <Plus className="w-3.5 h-3.5" />
+              Create User
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-emerald-500/20 text-xs font-mono">
-            <div>
-              <span className="text-[10px] text-slate-500 uppercase block">Username</span>
-              <span className="text-white font-bold">{credentialsBanner.username}</span>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-500 uppercase block">
-                {credentialsBanner.wasGenerated ? 'Temporary Password (OTP)' : 'Custom Password'}
-              </span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-emerald-300 font-bold tracking-wider">{credentialsBanner.password}</span>
+          <ErrBox msg={error} />
+
+          {/* Prominent Credentials Banner */}
+          {credentialsBanner && (
+            <div className="p-4 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 backdrop-blur-md shadow-lg space-y-3 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>
+                    User {credentialsBanner.action === 'created' ? 'Created' : 'Password Reset'} Successfully!
+                  </span>
+                </div>
                 <button
-                  type="button"
-                  onClick={() => copyText(credentialsBanner.password, 'password')}
-                  className="p-1 text-slate-400 hover:text-white bg-slate-800 rounded transition-colors"
-                  title="Copy Password"
+                  onClick={() => setCredentialsBanner(null)}
+                  className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded hover:bg-white/10"
                 >
-                  {copiedField === 'password' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  Dismiss
                 </button>
               </div>
-            </div>
-          </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
-            <span>
-              {credentialsBanner.wasGenerated
-                ? '⚠️ The user will be required to choose a new password upon first login.'
-                : '✓ The user can log in immediately with this password.'}
-            </span>
-            <button
-              type="button"
-              onClick={() => copyText(`${window.location.origin}/login\nUsername: ${credentialsBanner.username}\nPassword: ${credentialsBanner.password}`, 'all')}
-              className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-lg font-sans font-medium transition-colors inline-flex items-center gap-1.5"
-            >
-              {copiedField === 'all' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              {copiedField === 'all' ? 'Copied with Login Link!' : 'Copy Credentials'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {loading ? <Spinner /> : (
-        <div className="rounded-xl border border-slate-800 bg-[#16181f] overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/60 border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
-              <tr>
-                <th className="p-3">Username</th>
-                <th className="p-3">Name</th>
-                <th className="p-3">Email</th>
-                <th className="p-3">Role</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {users.map(u => (
-                <tr key={u.id} className="hover:bg-white/[0.01]">
-                  <td className="p-3 font-mono font-medium text-slate-200">
-                    @{u.username}
-                  </td>
-                  <td className="p-3 text-slate-400">{u.name || '—'}</td>
-                  <td className="p-3 font-mono text-slate-400">{u.email || '—'}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
-                      u.role === 'owner' 
-                        ? 'bg-red-950/40 text-red-400 border-red-500/40 font-bold'
-                        : 'bg-slate-800 text-slate-300 border-slate-700/60'
-                    }`}>
-                      {u.role}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-emerald-500/20 text-xs font-mono">
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">Username</span>
+                  <span className="text-white font-bold">{credentialsBanner.username}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase block">
+                    {credentialsBanner.wasGenerated ? 'Temporary Password (OTP)' : 'Custom Password'}
+                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-emerald-300 font-bold tracking-wider font-mono">
+                      {showBannerPwd ? credentialsBanner.password : '••••••••••••'}
                     </span>
-                  </td>
-                  <td className="p-3">
-                    {u.must_change_password ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950/40 text-amber-400 border border-amber-500/30">
-                        Must Change Pwd
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/30 text-emerald-400 border border-emerald-500/20">
-                        Active
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-right space-x-2">
                     <button
-                      onClick={() => resetUserPassword(u)}
-                      className="p-1 text-slate-500 hover:text-amber-400 transition-colors"
-                      title={`Reset password for @${u.username}`}
+                      type="button"
+                      onClick={() => setShowBannerPwd(v => !v)}
+                      className="p-1 text-slate-400 hover:text-white bg-slate-800 rounded transition-colors"
+                      title={showBannerPwd ? 'Hide Password' : 'Show Password'}
+                      aria-label={showBannerPwd ? 'Hide Password' : 'Show Password'}
                     >
-                      <Key className="w-3.5 h-3.5 inline" />
+                      {showBannerPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
-                    {u.role !== 'owner' && (
-                      <button
-                        onClick={() => remove(u)}
-                        className="p-1 text-slate-500 hover:text-red-400 transition-colors"
-                        title={`Delete @${u.username}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5 inline" />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    <button
+                      type="button"
+                      onClick={() => copyText(credentialsBanner.password, 'password')}
+                      className="p-1 text-slate-400 hover:text-white bg-slate-800 rounded transition-colors"
+                      title="Copy Password"
+                    >
+                      {copiedField === 'password' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-      {/* Create User Modal */}
-      <Modal
-        open={modal}
-        onClose={() => { setModal(false); setModalError(''); }}
-        title="Create User"
-        footer={
-          <>
-            <button
-              onClick={() => { setModal(false); setModalError(''); }}
-              className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={submit}
-              disabled={submitting}
-              className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_15px_-3px_rgba(239,68,68,0.5)] transition-all disabled:opacity-50"
-            >
-              {submitting ? 'Creating...' : 'Create User'}
-            </button>
-          </>
-        }
-      >
-        <form onSubmit={submit} className="space-y-4 text-xs">
-          {/* Modal error display right inside the modal */}
-          <ErrBox msg={modalError} />
-
-          {/* Helper alert */}
-          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-[11px] leading-relaxed">
-            Only <strong className="text-white">Username</strong> is required. Name and email can be left blank to default to the username handle.
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Username <span className="text-red-500 font-bold">*</span>
-            </label>
-            <input
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500 font-mono"
-              required
-              placeholder="e.g. johndoe"
-              value={form.username}
-              onChange={(e) => setForm(f => ({ ...f, username: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Full Name <span className="text-slate-500 font-normal">(Optional)</span>
-            </label>
-            <input
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
-              placeholder="e.g. John Doe (defaults to username)"
-              value={form.name}
-              onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Email Address <span className="text-slate-500 font-normal">(Optional)</span>
-            </label>
-            <input
-              type="email"
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
-              placeholder="e.g. john@local.lan (defaults to username@local.lan)"
-              value={form.email}
-              onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Role
-            </label>
-            <select
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
-              value={form.role}
-              onChange={(e) => setForm(f => ({ ...f, role: e.target.value }))}
-            >
-              <option value="user">User (Standard Access)</option>
-              <option value="owner">Owner (Full Admin Access)</option>
-            </select>
-          </div>
-
-          {/* Password Options */}
-          <div className="pt-2 border-t border-slate-800/80 space-y-3">
-            <label className="block text-xs font-medium text-slate-300">
-              Password Provisioning
-            </label>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, passwordMode: 'auto' }))}
-                className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
-                  form.passwordMode === 'auto'
-                    ? 'bg-red-600/10 border-red-500/50 text-white'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
-                }`}
-              >
-                <div className="font-semibold text-[11px]">Auto-Generate OTP</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Secure one-time temporary password</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, passwordMode: 'custom' }))}
-                className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
-                  form.passwordMode === 'custom'
-                    ? 'bg-red-600/10 border-red-500/50 text-white'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
-                }`}
-              >
-                <div className="font-semibold text-[11px]">Set Custom Password</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">Define password right now</div>
-              </button>
-            </div>
-
-            {form.passwordMode === 'custom' ? (
-              <div className="relative pt-1">
-                <input
-                  type={showCustomPwd ? 'text' : 'password'}
-                  className="w-full pl-3 pr-9 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500 font-mono"
-                  placeholder="Enter password (minimum 6 characters)"
-                  value={form.password}
-                  onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))}
-                />
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                <span>
+                  {credentialsBanner.wasGenerated
+                    ? '⚠️ The user will be required to choose a new password upon first login.'
+                    : '✓ The user can log in immediately with this password.'}
+                </span>
                 <button
                   type="button"
-                  onClick={() => setShowCustomPwd(v => !v)}
-                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
+                  onClick={() => copyText(`${window.location.origin}/login\nUsername: ${credentialsBanner.username}\nPassword: ${credentialsBanner.password}`, 'all')}
+                  className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-lg font-sans font-medium transition-colors inline-flex items-center gap-1.5"
                 >
-                  {showCustomPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  {copiedField === 'all' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copiedField === 'all' ? 'Copied with Login Link!' : 'Copy Credentials'}
                 </button>
               </div>
-            ) : (
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                A 12-character secure password will be generated and displayed upon creation. The user will be required to change it on their first login.
-              </p>
-            )}
-          </div>
-        </form>
-      </Modal>
+            </div>
+          )}
+
+          {loading ? <Spinner /> : (
+            <div className="rounded-xl border border-slate-800 bg-[#16181f] overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-900/60 border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
+                  <tr>
+                    <th className="p-3">Username</th>
+                    <th className="p-3">Name</th>
+                    <th className="p-3">Email</th>
+                    <th className="p-3">Role</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {users.map(u => (
+                    <tr key={u.id} className="hover:bg-white/[0.01]">
+                      <td className="p-3 font-mono font-medium text-slate-200">
+                        @{u.username}
+                      </td>
+                      <td className="p-3 text-slate-400">{u.name || '—'}</td>
+                      <td className="p-3 font-mono text-slate-400">{u.email || '—'}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                          u.role === 'owner' 
+                            ? 'bg-red-950/40 text-red-400 border-red-500/40 font-bold'
+                            : 'bg-slate-800 text-slate-300 border-slate-700/60'
+                        }`}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        {u.must_change_password ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950/40 text-amber-400 border border-amber-500/30">
+                            Must Change Pwd
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/30 text-emerald-400 border border-emerald-500/20">
+                            Active
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-right space-x-2">
+                        <button
+                          onClick={() => resetUserPassword(u)}
+                          className="p-1 text-slate-500 hover:text-amber-400 transition-colors"
+                          title={`Reset password for @${u.username}`}
+                        >
+                          <Key className="w-3.5 h-3.5 inline" />
+                        </button>
+                        {u.role !== 'owner' && (
+                          <button
+                            onClick={() => remove(u)}
+                            className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                            title={`Delete @${u.username}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 inline" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Create User Modal */}
+          <Modal
+            open={modal}
+            onClose={() => { setModal(false); setModalError(''); }}
+            title="Create User"
+            footer={
+              <>
+                <button
+                  onClick={() => { setModal(false); setModalError(''); }}
+                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submit}
+                  disabled={submitting}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_15px_-3px_rgba(239,68,68,0.5)] transition-all disabled:opacity-50"
+                >
+                  {submitting ? 'Creating...' : 'Create User'}
+                </button>
+              </>
+            }
+          >
+            <form onSubmit={submit} className="space-y-4 text-xs">
+              {/* Modal error display right inside the modal */}
+              <ErrBox msg={modalError} />
+
+              {/* Helper alert */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-[11px] leading-relaxed">
+                Only <strong className="text-white">Username</strong> is required. Name and email can be left blank to default to the username handle.
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Username <span className="text-red-500 font-bold">*</span>
+                </label>
+                <input
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500 font-mono"
+                  required
+                  placeholder="e.g. johndoe"
+                  value={form.username}
+                  onChange={(e) => setForm(f => ({ ...f, username: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Full Name <span className="text-slate-500 font-normal">(Optional)</span>
+                </label>
+                <input
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
+                  placeholder="e.g. John Doe (defaults to username)"
+                  value={form.name}
+                  onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Email Address <span className="text-slate-500 font-normal">(Optional)</span>
+                </label>
+                <input
+                  type="email"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
+                  placeholder="e.g. john@local.lan (defaults to username@local.lan)"
+                  value={form.email}
+                  onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Role
+                </label>
+                <select
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
+                  value={form.role}
+                  onChange={(e) => setForm(f => ({ ...f, role: e.target.value }))}
+                >
+                  <option value="user">User (Standard Access)</option>
+                  <option value="owner">Owner (Full Admin Access)</option>
+                </select>
+              </div>
+
+              {/* Password Options */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-3">
+                <label className="block text-xs font-medium text-slate-300">
+                  Password Provisioning
+                </label>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, passwordMode: 'auto' }))}
+                    className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
+                      form.passwordMode === 'auto'
+                        ? 'bg-red-600/10 border-red-500/50 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <div className="font-semibold text-[11px]">Auto-Generate OTP</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Secure one-time temporary password</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, passwordMode: 'custom' }))}
+                    className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
+                      form.passwordMode === 'custom'
+                        ? 'bg-red-600/10 border-red-500/50 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <div className="font-semibold text-[11px]">Set Custom Password</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Define password right now</div>
+                  </button>
+                </div>
+
+                {form.passwordMode === 'custom' ? (
+                  <div className="relative pt-1">
+                    <input
+                      type={showCustomPwd ? 'text' : 'password'}
+                      className="w-full pl-3 pr-9 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500 font-mono"
+                      placeholder="Enter password (minimum 6 characters)"
+                      value={form.password}
+                      onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomPwd(v => !v)}
+                      className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
+                    >
+                      {showCustomPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    A 12-character secure password will be generated and displayed upon creation. The user will be required to change it on their first login.
+                  </p>
+                )}
+              </div>
+            </form>
+          </Modal>
+        </div>
+      )}
     </div>
   );
 }
@@ -2295,7 +3658,9 @@ const ADMIN_VIEWS = [
   { id: 'messages', label: 'Messages', icon: Inbox },
   { id: 'projects', label: 'Projects', icon: Code2 },
   { id: 'skills', label: 'Skills', icon: Wrench },
-  { id: 'users', label: 'Users', icon: UsersIcon },
+  { id: 'users', label: 'User Accounts', icon: UsersIcon },
+  { id: 'permissions', label: 'Service Permissions', icon: ShieldCheck },
+  { id: 'features', label: 'Feature Flags', icon: Sliders },
 ];
 
 export default function DashboardPage() {
@@ -2306,11 +3671,21 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [nodes, setNodes] = useState<ServerNode[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [speedtest, setSpeedtest] = useState<SpeedtestResult | null>(null);
+  const [runningSpeedtest, setRunningSpeedtest] = useState<boolean>(false);
   const [unread, setUnread] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingNodes, setLoadingNodes] = useState<boolean>(true);
   const [adminMenuOpen, setAdminMenuOpen] = useState<boolean>(false);
   const [prefs, setPrefs] = useState<UserPreferences>(() => getUserPreferences(user?.id));
+
+  const [wgStats, setWgStats] = useState<WireguardStatus | null>(null);
+  const [piholeStats, setPiholeStats] = useState<PiholeStats | null>(null);
+  const [qbitStats, setQbitStats] = useState<QbittorrentStats | null>(null);
+  const [jellyfinStats, setJellyfinStats] = useState<JellyfinStats | null>(null);
+  const [jellyseerrStats, setJellyseerrStats] = useState<JellyseerrStats | null>(null);
+  const [vpnStatus, setVpnStatus] = useState<{ connected: boolean; ip: string; isVpn?: boolean; isLan?: boolean } | null>(null);
+  const [activeInspector, setActiveInspector] = useState<'wireguard' | 'pihole' | 'qbittorrent' | 'jellyfin' | 'jellyseerr' | null>(null);
 
   useEffect(() => {
     const onPrefsChange = () => setPrefs(getUserPreferences(user?.id));
@@ -2319,9 +3694,101 @@ export default function DashboardPage() {
   }, [user?.id]);
 
   const loadAll = () => {
-    // Load services
-    api.get<Service[]>('/services')
-      .then(res => setServices(res))
+    // Load VPN / LAN network connectivity status
+    api.get<{ connected: boolean; ip: string; isVpn?: boolean; isLan?: boolean }>('/vpn-status')
+      .then(res => setVpnStatus(res))
+      .catch(() => setVpnStatus({ connected: false, ip: '' }));
+
+    // Load services from /services/mine (Phase 3 & 5 backend persistence + permissions)
+    api.get<Service[]>('/services/mine')
+      .then(res => {
+        setServices(res);
+        // Fetch live metrics for all applicable services
+        const statRequests: Promise<any>[] = [
+          api.get<any>('/qbittorrent/stats').catch(() => null),
+          api.get<any>('/jellyfin/stats').catch(() => null),
+          api.get<any>('/jellyseerr/stats').catch(() => null),
+        ];
+
+        if (user?.role === 'owner') {
+          statRequests.push(api.get<any>('/admin/wireguard/status').catch(() => null));
+          statRequests.push(api.get<any>('/admin/pihole/stats').catch(() => null));
+        }
+
+        Promise.allSettled(statRequests).then((results) => {
+          const qRes = results[0]?.status === 'fulfilled' ? results[0].value : null;
+          const jRes = results[1]?.status === 'fulfilled' ? results[1].value : null;
+          const sRes = results[2]?.status === 'fulfilled' ? results[2].value : null;
+          const wgRes = results[3]?.status === 'fulfilled' ? results[3].value : null;
+          const piRes = results[4]?.status === 'fulfilled' ? results[4].value : null;
+
+          if (qRes) setQbitStats(qRes);
+          if (jRes) setJellyfinStats(jRes);
+          if (sRes) setJellyseerrStats(sRes);
+          if (wgRes) setWgStats(wgRes);
+          if (piRes) setPiholeStats(piRes);
+
+          const qbit = qRes?.online ? qRes : null;
+          const jellyfin = jRes?.online ? jRes : null;
+          const jellyseerr = sRes?.online ? sRes : null;
+          const wireguard = wgRes?.online ? wgRes : null;
+          const pihole = piRes?.online ? piRes : null;
+
+          setServices(currentServices => currentServices.map(s => {
+            const title = s.title.toLowerCase();
+            let statText: string | undefined = undefined;
+            let telemetryType: 'wireguard' | 'pihole' | 'qbittorrent' | 'jellyfin' | 'jellyseerr' | undefined = undefined;
+
+            if (title.includes('qbit')) {
+              telemetryType = 'qbittorrent';
+              if (qbit) {
+                const mb = (qbit.downloadSpeed / (1024 * 1024)).toFixed(1);
+                statText = `↓ ${mb} MB/s · ${qbit.activeCount} active`;
+              } else if (qRes?.online === false) {
+                statText = 'Offline';
+              }
+            } else if (title.includes('jellyfin')) {
+              telemetryType = 'jellyfin';
+              if (jellyfin) {
+                const streams = jellyfin.activeStreamCount;
+                statText = `${streams} stream${streams === 1 ? '' : 's'} active`;
+              } else if (jRes?.online === false) {
+                statText = 'Offline';
+              }
+            } else if (title.includes('jellyseerr')) {
+              telemetryType = 'jellyseerr';
+              if (jellyseerr) {
+                const pending = jellyseerr.pendingCount;
+                statText = `${pending} pending request${pending === 1 ? '' : 's'}`;
+              } else if (sRes?.online === false) {
+                statText = 'Offline';
+              }
+            } else if (title.includes('wireguard')) {
+              telemetryType = 'wireguard';
+              if (wireguard) {
+                const peers = wireguard.connectedPeers ?? wireguard.activePeers ?? (wireguard.peers?.filter((p: any) => p.connected)?.length ?? 0);
+                statText = `${peers} active peer${peers === 1 ? '' : 's'}`;
+              } else if (wgRes?.online === false) {
+                statText = 'Offline';
+              }
+            } else if (title.includes('pi-hole') || title.includes('pihole')) {
+              telemetryType = 'pihole';
+              if (pihole) {
+                const queries = pihole.queriesToday?.toLocaleString?.() ?? pihole.queriesToday ?? 0;
+                statText = `${queries} queries · ${pihole.percentBlocked ?? 0}% blocked`;
+              } else if (piRes?.online === false) {
+                statText = 'Offline';
+              }
+            }
+
+            return {
+              ...s,
+              liveStat: statText !== undefined ? statText : s.liveStat,
+              telemetryType: telemetryType || s.telemetryType,
+            };
+          }));
+        });
+      })
       .catch(() => {});
 
     // Load nodes telemetry
@@ -2329,6 +3796,11 @@ export default function DashboardPage() {
       .then(res => setNodes(res))
       .catch(() => {})
       .finally(() => setLoadingNodes(false));
+
+    // Load speedtest latest
+    api.get<SpeedtestResult>('/speedtest/latest')
+      .then(res => setSpeedtest(res))
+      .catch(() => {});
 
     // Load stats & unread
     Promise.all([
@@ -2340,15 +3812,66 @@ export default function DashboardPage() {
     }).finally(() => setLoading(false));
   };
 
+  const handleRunSpeedtest = async () => {
+    setRunningSpeedtest(true);
+    try {
+      const res = await api.post<SpeedtestResult>('/admin/speedtest/run', {});
+      setSpeedtest(res);
+    } catch {
+    } finally {
+      setRunningSpeedtest(false);
+    }
+  };
+
   useEffect(() => {
+    if (user?.id) {
+      syncUserPreferencesFromBackend(user.id);
+    }
     loadAll();
     const interval = setInterval(loadAll, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.id]);
 
   const selectTab = (nextTab: string) => {
     setSearchParams({ tab: nextTab });
     setAdminMenuOpen(false);
+  };
+
+  const handleUpdateCardLayout = async (
+    updates: Array<{ id: number; start_col: number; start_row: number; col_span: number; row_span: number }>
+  ) => {
+    if (!updates || updates.length === 0) return;
+
+    setServices((prev) =>
+      prev.map((s) => {
+        const update = updates.find((u) => u.id === s.id);
+        if (update) {
+          return {
+            ...s,
+            start_col: update.start_col,
+            start_row: update.start_row,
+            col_span: update.col_span,
+            row_span: update.row_span,
+          };
+        }
+        return s;
+      })
+    );
+
+    try {
+      await api.patch('/services/mine', {
+        preferences: updates.map((u) => ({
+          service_id: u.id,
+          start_col: u.start_col,
+          start_row: u.start_row,
+          col_span: u.col_span,
+          row_span: u.row_span,
+          enabled: true,
+        })),
+      });
+    } catch (e) {
+      console.error('Failed to persist card layout', e);
+    }
   };
 
   return (
@@ -2421,6 +3944,34 @@ export default function DashboardPage() {
 
           {/* Quick Hub Tools */}
           <div className="flex items-center gap-2 text-xs font-mono">
+            {/* VPN / Network Status Badge */}
+            {vpnStatus && (
+              <div
+                className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-colors ${
+                  vpnStatus.connected
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                }`}
+                title={
+                  vpnStatus.connected
+                    ? `Connected to Homelab (${vpnStatus.isVpn ? 'WireGuard VPN' : 'Home LAN'} · ${vpnStatus.ip})`
+                    : `External Connection (${vpnStatus.ip}) — Local .home.arpa services locked`
+                }
+              >
+                {vpnStatus.connected ? (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{vpnStatus.isVpn ? 'VPN Active' : 'LAN Active'}</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                    <span>External (No VPN)</span>
+                  </>
+                )}
+              </div>
+            )}
+
             {tab !== 'board' && (
               <button
                 onClick={() => selectTab('board')}
@@ -2459,16 +4010,67 @@ export default function DashboardPage() {
             services={services}
             nodes={nodes}
             loadingNodes={loadingNodes}
+            speedtest={speedtest}
+            vpnConnected={vpnStatus?.connected}
+            onRunSpeedtest={handleRunSpeedtest}
+            isRunningSpeedtest={runningSpeedtest}
+            onUpdateCardLayout={handleUpdateCardLayout}
+            onOpenInspector={(type) => setActiveInspector(type)}
             onRefresh={loadAll}
           />
         )}
+
+        {/* Telemetry Inspector Modals (Phase 6) */}
+        <WireguardInspectorModal
+          open={activeInspector === 'wireguard'}
+          onClose={() => setActiveInspector(null)}
+          data={wgStats}
+          loading={loading}
+          onRefresh={loadAll}
+        />
+
+        <PiholeInspectorModal
+          open={activeInspector === 'pihole'}
+          onClose={() => setActiveInspector(null)}
+          data={piholeStats}
+          loading={loading}
+          onRefresh={loadAll}
+        />
+
+        <QbittorrentInspectorModal
+          open={activeInspector === 'qbittorrent'}
+          onClose={() => setActiveInspector(null)}
+          data={qbitStats}
+          loading={loading}
+          onRefresh={loadAll}
+        />
+
+        <JellyfinInspectorModal
+          open={activeInspector === 'jellyfin'}
+          onClose={() => setActiveInspector(null)}
+          data={jellyfinStats}
+          isOwner={user?.role === 'owner'}
+          loading={loading}
+          onRefresh={loadAll}
+        />
+
+        <JellyseerrInspectorModal
+          open={activeInspector === 'jellyseerr'}
+          onClose={() => setActiveInspector(null)}
+          data={jellyseerrStats}
+          isOwner={user?.role === 'owner'}
+          loading={loading}
+          onRefresh={loadAll}
+        />
 
         {/* Secondary Management Views */}
         {tab === 'analytics' && <AnalyticsTab />}
         {tab === 'messages' && <MessagesTab />}
         {tab === 'projects' && <ProjectsTab />}
         {tab === 'skills' && <SkillsTab />}
-        {tab === 'users' && <UsersTab />}
+        {(tab === 'users' || tab === 'permissions' || tab === 'features') && (
+          <UsersTab defaultSubTab={tab === 'permissions' ? 'permissions' : tab === 'features' ? 'features' : 'accounts'} />
+        )}
       </main>
     </div>
   );

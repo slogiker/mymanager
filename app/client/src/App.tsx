@@ -49,7 +49,7 @@ export default function App() {
             <Route path="/" element={<PortfolioPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
-            <Route path="/dashboard" element={<RequireAuth ownerOnly><DashboardPage /></RequireAuth>} />
+            <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
             <Route path="/clipboard" element={<RequireAuth><ClipboardPage /></RequireAuth>} />
             <Route path="/files" element={<FilesPage />} />
             <Route path="/share/:token" element={<SharePage />} />

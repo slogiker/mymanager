@@ -14,7 +14,7 @@ export default function LoginPage() {
   const { t } = useTranslation();
 
   if (user && Boolean(user.must_change_password)) return <Navigate to="/change-password" replace />;
-  if (user && !user.must_change_password) return <Navigate to={user.role === 'owner' ? '/dashboard' : '/'} replace />;
+  if (user && !user.must_change_password) return <Navigate to="/dashboard" replace />;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,7 +25,7 @@ export default function LoginPage() {
       if (data.mustChangePassword || data.must_change_password || data.user.must_change_password) {
         navigate('/change-password');
       } else {
-        navigate(data.user.role === 'owner' ? '/dashboard' : '/');
+        navigate('/dashboard');
       }
     } catch (err) {
       setError((err as Error).message || 'Invalid username or password');

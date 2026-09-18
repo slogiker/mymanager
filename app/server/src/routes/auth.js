@@ -91,6 +91,49 @@ router.post('/change-password', verifyToken, (req, res) => {
   res.json({ message: 'Password changed successfully' });
 });
 
+router.patch('/username', verifyToken, (req, res) => {
+  const { username } = req.body;
+  if (!username || typeof username !== 'string') {
+    return res.status(400).json({ error: 'Username required' });
+  }
+
+  const clean = username.trim().toLowerCase();
+  if (clean.length < 3) {
+    return res.status(400).json({ error: 'Username must be at least 3 characters' });
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(clean)) {
+    return res.status(400).json({ error: 'Username may only contain alphanumeric characters, underscores, and hyphens' });
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  if (clean === user.username) {
+    return res.json({ message: 'Username unchanged', username: clean, user });
+  }
+
+  const existing = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(clean, user.id);
+  if (existing) {
+    return res.status(409).json({ error: 'Username already taken' });
+  }
+
+  db.prepare("UPDATE users SET username = ?, updated_at = datetime('now') WHERE id = ?").run(clean, user.id);
+
+  const updatedUser = db.prepare('SELECT id, name, username, email, role, must_change_password, created_at FROM users WHERE id = ?').get(user.id);
+
+  const payload = {
+    id: updatedUser.id,
+    username: updatedUser.username,
+    name: updatedUser.name,
+    role: updatedUser.role,
+    must_change_password: updatedUser.must_change_password ? 1 : 0,
+  };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+  res.cookie('token', token, COOKIE_OPTS);
+
+  res.json({ message: 'Username updated successfully', username: clean, user: updatedUser });
+});
+
 router.post('/logout', (req, res) => {
   res.clearCookie('token');
   res.json({ message: 'Logged out' });
@@ -107,25 +150,45 @@ router.patch('/me', verifyToken, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  // Check unique username/email if changing
-  if (username && username.toLowerCase() !== user.username) {
-    const exists = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username.toLowerCase(), user.id);
-    if (exists) return res.status(409).json({ error: 'Username already taken' });
+  let cleanUsername = user.username;
+  if (username !== undefined) {
+    cleanUsername = username.toLowerCase().trim();
+    if (cleanUsername.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+      return res.status(400).json({ error: 'Username may only contain alphanumeric characters, underscores, and hyphens' });
+    }
+    if (cleanUsername !== user.username) {
+      const exists = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(cleanUsername, user.id);
+      if (exists) return res.status(409).json({ error: 'Username already taken' });
+    }
   }
-  if (email && email.toLowerCase() !== user.email) {
-    const exists = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email.toLowerCase(), user.id);
+
+  if (email && email.toLowerCase().trim() !== user.email) {
+    const exists = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email.toLowerCase().trim(), user.id);
     if (exists) return res.status(409).json({ error: 'Email already taken' });
   }
 
   const updatedName = name !== undefined ? name.trim() : user.name;
-  const updatedUsername = username !== undefined ? username.toLowerCase().trim() : user.username;
   const updatedEmail = email !== undefined ? email.toLowerCase().trim() : user.email;
 
   db.prepare(`
     UPDATE users SET name = ?, username = ?, email = ?, updated_at = datetime('now') WHERE id = ?
-  `).run(updatedName, updatedUsername, updatedEmail, user.id);
+  `).run(updatedName, cleanUsername, updatedEmail, user.id);
 
   const updatedUser = db.prepare('SELECT id, name, username, email, role, must_change_password, created_at FROM users WHERE id = ?').get(user.id);
+
+  const payload = {
+    id: updatedUser.id,
+    username: updatedUser.username,
+    name: updatedUser.name,
+    role: updatedUser.role,
+    must_change_password: updatedUser.must_change_password ? 1 : 0,
+  };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+  res.cookie('token', token, COOKIE_OPTS);
+
   res.json(updatedUser);
 });
 

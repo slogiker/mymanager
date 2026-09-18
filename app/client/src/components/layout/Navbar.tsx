@@ -114,11 +114,9 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-2">
           {user ? (
             <>
+              <Link to="/dashboard" className="text-sm font-medium px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.03] transition-colors">{t('nav_dashboard')}</Link>
               {user.role === 'owner' && (
-                <>
-                  <Link to="/dashboard" className="text-sm font-medium px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.03] transition-colors">{t('nav_dashboard')}</Link>
-                  <Link to="/terminal" className="text-sm font-medium px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.03] transition-colors">{t('nav_terminal')}</Link>
-                </>
+                <Link to="/terminal" className="text-sm font-medium px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.03] transition-colors">{t('nav_terminal')}</Link>
               )}
               <Link to="/profile" className="text-sm font-medium px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.03] transition-colors">{t('nav_profile')}</Link>
               <button
@@ -181,11 +179,9 @@ export default function Navbar() {
           <div className="border-t border-slate-800/40 pt-3 mt-3">
             {user ? (
               <>
+                <Link to="/dashboard" onClick={() => setMenuOpen(false)} className="block py-2 text-sm text-slate-400 hover:text-white">{t('nav_dashboard')}</Link>
                 {user.role === 'owner' && (
-                  <>
-                    <Link to="/dashboard" onClick={() => setMenuOpen(false)} className="block py-2 text-sm text-slate-400 hover:text-white">{t('nav_dashboard')}</Link>
-                    <Link to="/terminal" onClick={() => setMenuOpen(false)} className="block py-2 text-sm text-slate-400 hover:text-white">{t('nav_terminal')}</Link>
-                  </>
+                  <Link to="/terminal" onClick={() => setMenuOpen(false)} className="block py-2 text-sm text-slate-400 hover:text-white">{t('nav_terminal')}</Link>
                 )}
                 <Link to="/profile" onClick={() => setMenuOpen(false)} className="block py-2 text-sm text-slate-400 hover:text-white">{t('nav_profile')}</Link>
                 <button onClick={handleLogout} className="block w-full text-left py-2 text-sm text-red-400 hover:text-red-300">{t('nav_signout')}</button>

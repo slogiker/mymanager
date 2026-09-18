@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Eye, EyeOff, Copy, Check } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import { api } from '../lib/api';
 import { AnalyticsSummary, AnalyticsVisit, Message, Project, Service, Skill, User } from '../types';
@@ -304,6 +305,8 @@ function UsersTab() {
   const [modal, setModal] = useState<boolean>(false);
   const [form, setForm] = useState<UserForm>({ username: '', name: '', email: '', role: 'user' });
   const [otp, setOtp] = useState<OtpState | null>(null);
+  const [showOtpPwd, setShowOtpPwd] = useState<boolean>(true);
+  const [otpCopied, setOtpCopied] = useState<boolean>(false);
 
   const load = async () => {
     setLoading(true);
@@ -321,6 +324,7 @@ function UsersTab() {
     try {
       const res = await api.post<{ user: User; oneTimePassword: string }>('/users', form);
       setOtp({ user: res.user, password: res.oneTimePassword });
+      setShowOtpPwd(true);
       setModal(false);
       setForm({ username: '', name: '', email: '', role: 'user' });
       load();
@@ -333,6 +337,7 @@ function UsersTab() {
       const res = await api.post<{ oneTimePassword: string }>(`/users/${id}/reset-password`);
       const target = users.find((u) => u.id === id);
       setOtp({ user: target, password: res.oneTimePassword });
+      setShowOtpPwd(true);
     } catch (e) { setError((e as Error).message); }
   };
 
@@ -354,7 +359,33 @@ function UsersTab() {
         <div className="card flex items-start justify-between gap-4 p-4">
           <div className="min-w-0">
             <div className="text-sm text-slate-300">One-time password for <span className="font-semibold text-slate-100">{otp.user?.username}</span>:</div>
-            <code className="mt-2 block break-all rounded bg-slate-900 px-3 py-2 font-mono text-cyan-300 text-sm">{otp.password}</code>
+            <div className="mt-2 flex items-center gap-2">
+              <code className="block break-all rounded bg-slate-900 px-3 py-2 font-mono text-cyan-300 text-sm">
+                {showOtpPwd ? otp.password : '••••••••••••'}
+              </code>
+              <button
+                type="button"
+                onClick={() => setShowOtpPwd(v => !v)}
+                className="btn-outline p-2"
+                title={showOtpPwd ? 'Hide Password' : 'Show Password'}
+                aria-label={showOtpPwd ? 'Hide Password' : 'Show Password'}
+              >
+                {showOtpPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(otp.password);
+                  setOtpCopied(true);
+                  setTimeout(() => setOtpCopied(false), 2000);
+                }}
+                className="btn-outline p-2"
+                title="Copy Password"
+                aria-label="Copy Password"
+              >
+                {otpCopied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+              </button>
+            </div>
             <div className="mt-1 text-xs text-slate-400">Share securely — user must change on first login.</div>
           </div>
           <button onClick={() => setOtp(null)} className="btn-outline flex-shrink-0">Dismiss</button>
