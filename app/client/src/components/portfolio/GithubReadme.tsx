@@ -31,8 +31,8 @@ export default function GithubReadme() {
     <section id="portfolio" className="w-full px-[5%] py-20 border-t border-slate-800/40">
       <div className="mb-12">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-0.5 bg-gradient-to-r from-cyan-400 to-purple-500" />
-          <span className="text-xs font-medium text-cyan-400 uppercase tracking-widest">Portfolio</span>
+          <div className="w-8 h-0.5 bg-gradient-to-r from-red-600 to-slate-400" />
+          <span className="text-xs font-medium text-red-500 uppercase tracking-widest">Portfolio</span>
         </div>
         <h2 className="section-title text-4xl mb-4">About Me & Activities</h2>
       </div>

@@ -35,13 +35,20 @@ router.post('/login', (req, res) => {
   const match = bcrypt.compareSync(password, user.password_hash);
   if (!match) return res.status(401).json({ error: 'Invalid username or password' });
 
-  const payload = { id: user.id, username: user.username, name: user.name, role: user.role };
+  const payload = {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    must_change_password: user.must_change_password ? 1 : 0,
+  };
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
   res.cookie('token', token, COOKIE_OPTS);
 
   res.json({
     user: payload,
     mustChangePassword: user.must_change_password === 1,
+    must_change_password: user.must_change_password === 1,
   });
 });
 
@@ -93,6 +100,45 @@ router.get('/me', verifyToken, (req, res) => {
   const user = db.prepare('SELECT id, name, username, email, role, must_change_password, created_at FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json(user);
+});
+
+router.patch('/me', verifyToken, (req, res) => {
+  const { name, email, username } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Check unique username/email if changing
+  if (username && username.toLowerCase() !== user.username) {
+    const exists = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username.toLowerCase(), user.id);
+    if (exists) return res.status(409).json({ error: 'Username already taken' });
+  }
+  if (email && email.toLowerCase() !== user.email) {
+    const exists = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email.toLowerCase(), user.id);
+    if (exists) return res.status(409).json({ error: 'Email already taken' });
+  }
+
+  const updatedName = name !== undefined ? name.trim() : user.name;
+  const updatedUsername = username !== undefined ? username.toLowerCase().trim() : user.username;
+  const updatedEmail = email !== undefined ? email.toLowerCase().trim() : user.email;
+
+  db.prepare(`
+    UPDATE users SET name = ?, username = ?, email = ?, updated_at = datetime('now') WHERE id = ?
+  `).run(updatedName, updatedUsername, updatedEmail, user.id);
+
+  const updatedUser = db.prepare('SELECT id, name, username, email, role, must_change_password, created_at FROM users WHERE id = ?').get(user.id);
+  res.json(updatedUser);
+});
+
+router.delete('/me', verifyToken, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (user.role === 'owner') {
+    return res.status(403).json({ error: 'Owner account cannot be deleted' });
+  }
+
+  db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+  res.clearCookie('token');
+  res.json({ message: 'Account deleted successfully' });
 });
 
 module.exports = router;

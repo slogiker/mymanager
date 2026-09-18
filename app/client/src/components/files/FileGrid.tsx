@@ -14,13 +14,21 @@ interface Props {
   sortDir: 'asc' | 'desc';
   onSortChange: (by: 'name' | 'date' | 'size') => void;
   onUpload: (files: File[], folderId: string | null) => Promise<void>;
-  onSelect: (id: number) => void;
+  onSelect: (id: number, e?: React.MouseEvent) => void;
   onDoubleClick: (id: number) => void;
   onDelete: (id: number) => void;
   onPin: (id: number) => void;
   onCheck: (id: number, checked: boolean) => void;
   onNewFile: () => void;
   onFolderOpen: (id: string, name: string) => void;
+  onZipDropped?: (file: File) => void;
+  onContextMenuFile?: (e: React.MouseEvent, file: FileItem) => void;
+  onContextMenuFolder?: (e: React.MouseEvent, folder: FolderItem) => void;
+  onContextMenuCanvas?: (e: React.MouseEvent) => void;
+  onRenameFile?: (id: number, name: string) => Promise<void>;
+  onPinFolder?: (id: string) => void;
+  onDownloadFolderZip?: (id: string, name: string) => void;
+  onDeleteFolder?: (id: string) => void;
 }
 
 async function readEntry(entry: FileSystemEntry, pathPrefix = ''): Promise<File[]> {
@@ -43,11 +51,18 @@ export default function FileGrid({
   files, folders, view, currentFolderId, selectedId, checkedIds,
   sortBy, sortDir, onSortChange,
   onUpload, onSelect, onDoubleClick, onDelete, onPin, onCheck, onNewFile, onFolderOpen,
+  onZipDropped,
+  onContextMenuFile,
+  onContextMenuFolder,
+  onContextMenuCanvas,
+  onRenameFile,
+  onPinFolder,
+  onDownloadFolderZip,
+  onDeleteFolder,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [draggingOver, setDraggingOver] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [ghostMenuOpen, setGhostMenuOpen] = useState(false);
 
   async function processDataTransfer(dt: DataTransfer) {
@@ -66,12 +81,31 @@ export default function FileGrid({
     e.stopPropagation();
     setDraggingOver(false);
     const allFiles = await processDataTransfer(e.dataTransfer);
-    if (allFiles.length) { setUploading(true); await onUpload(allFiles, currentFolderId); setUploading(false); }
+    if (!allFiles.length) return;
+
+    // Check for dropped zip file to offer extraction prompt (Directive 1)
+    const zipFile = allFiles.find(f => f.name.toLowerCase().endsWith('.zip'));
+    if (zipFile && onZipDropped) {
+      onZipDropped(zipFile);
+      const remaining = allFiles.filter(f => f !== zipFile);
+      if (remaining.length > 0) await onUpload(remaining, currentFolderId);
+    } else {
+      await onUpload(allFiles, currentFolderId);
+    }
   }
 
   async function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files || []);
-    if (picked.length) { setUploading(true); await onUpload(picked, currentFolderId); setUploading(false); }
+    if (picked.length) {
+      const zipFile = picked.find(f => f.name.toLowerCase().endsWith('.zip'));
+      if (zipFile && onZipDropped) {
+        onZipDropped(zipFile);
+        const remaining = picked.filter(f => f !== zipFile);
+        if (remaining.length > 0) await onUpload(remaining, currentFolderId);
+      } else {
+        await onUpload(picked, currentFolderId);
+      }
+    }
     e.target.value = '';
   }
 
@@ -160,12 +194,6 @@ export default function FileGrid({
         </>
       )}
 
-      {uploading && (
-        <div className="flex items-center gap-2 text-xs text-cyan-400 mb-3">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" /> Uploading…
-        </div>
-      )}
-
       {/* Sort controls */}
       <div className="flex items-center gap-1 mb-3">
         <span className="text-xs text-slate-600 mr-1">Sort:</span>
@@ -175,18 +203,24 @@ export default function FileGrid({
       </div>
 
       <div
-        className="relative"
+        className="relative min-h-[300px]"
         onDragOver={e => { e.preventDefault(); setDraggingOver(true); }}
         onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDraggingOver(false); }}
         onDrop={handleDrop}
         onClick={() => { if (ghostMenuOpen) setGhostMenuOpen(false); }}
+        onContextMenu={e => {
+          if (onContextMenuCanvas) {
+            e.preventDefault();
+            onContextMenuCanvas(e);
+          }
+        }}
       >
         {/* Drop zone overlay */}
         {draggingOver && (
-          <div className="absolute inset-0 z-30 rounded-xl border-2 border-cyan-400/60 bg-cyan-500/5 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 z-30 rounded-xl border-2 border-cyan-400/60 bg-cyan-500/10 flex items-center justify-center pointer-events-none">
             <div className="flex flex-col items-center gap-2 text-cyan-400">
               <Upload size={36} className="animate-bounce" />
-              <p className="text-sm font-medium">Drop to upload</p>
+              <p className="text-sm font-medium">Drop to upload to this folder</p>
             </div>
           </div>
         )}
@@ -205,6 +239,11 @@ export default function FileGrid({
               folder={f}
               view={view}
               onOpen={onFolderOpen}
+              onDropFiles={onUpload}
+              onContextMenu={onContextMenuFolder}
+              onPinToggle={onPinFolder}
+              onDownloadZip={onDownloadFolderZip}
+              onDelete={onDeleteFolder}
             />
           ))}
 
@@ -220,6 +259,8 @@ export default function FileGrid({
               onDelete={onDelete}
               onPin={onPin}
               onCheck={onCheck}
+              onContextMenu={onContextMenuFile}
+              onRename={onRenameFile}
             />
           ))}
 

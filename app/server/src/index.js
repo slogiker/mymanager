@@ -45,6 +45,7 @@ app.use('/api/profile', require('./routes/profile'));
 app.use('/api/clipboard', require('./routes/clipboard'));
 app.use('/api/files', require('./routes/files'));
 app.use('/api/folders', require('./routes/folders'));
+app.use('/api/shares', require('./routes/shares'));
 app.use('/api/skills', require('./routes/skills'));
 
 if (IS_PROD) {

@@ -57,6 +57,58 @@ router.patch('/:id', (req, res) => {
   res.json(db.prepare('SELECT * FROM folders WHERE id = ?').get(req.params.id));
 });
 
+const path = require('path');
+const fs = require('fs');
+const AdmZip = require('adm-zip');
+
+router.get('/tree', (req, res) => {
+  const folders = db.prepare('SELECT * FROM folders WHERE user_id = ? ORDER BY name ASC').all(req.user.id);
+  res.json(folders);
+});
+
+router.get('/pinned', (req, res) => {
+  const pinned = db.prepare('SELECT * FROM folders WHERE user_id = ? AND pinned = 1 ORDER BY name ASC').all(req.user.id);
+  res.json(pinned);
+});
+
+router.patch('/:id/pin', (req, res) => {
+  const folder = db.prepare('SELECT * FROM folders WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+  const nextPinned = folder.pinned ? 0 : 1;
+  db.prepare('UPDATE folders SET pinned = ? WHERE id = ?').run(nextPinned, folder.id);
+  res.json({ ...folder, pinned: nextPinned });
+});
+
+router.get('/:id/download', (req, res) => {
+  const folder = db.prepare('SELECT * FROM folders WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+  const filesDir = path.join(__dirname, '../../uploads/files');
+  const zip = new AdmZip();
+
+  function addFolderToZip(folderId, zipPath) {
+    const folderFiles = db.prepare('SELECT * FROM files WHERE folder_id = ?').all(folderId);
+    for (const f of folderFiles) {
+      const full = path.join(filesDir, f.stored_name);
+      if (fs.existsSync(full)) {
+        zip.addLocalFile(full, zipPath, f.original_name);
+      }
+    }
+    const children = db.prepare('SELECT * FROM folders WHERE parent_id = ?').all(folderId);
+    for (const child of children) {
+      addFolderToZip(child.id, path.join(zipPath, child.name));
+    }
+  }
+
+  addFolderToZip(folder.id, '');
+
+  const buffer = zip.toBuffer();
+  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(folder.name)}.zip"`);
+  res.setHeader('Content-Type', 'application/zip');
+  res.send(buffer);
+});
+
 router.delete('/:id', (req, res) => {
   const folder = db.prepare('SELECT * FROM folders WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!folder) return res.status(404).json({ error: 'Folder not found' });

@@ -1,11 +1,12 @@
-import { useRef } from 'react';
-import { Folder } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Folder, Download, Trash2, Pin, PinOff } from 'lucide-react';
 import { useDroppable, useDndMonitor } from '@dnd-kit/core';
 
 export interface FolderItem {
   id: string;
   name: string;
   parent_id: string | null;
+  pinned?: number;
   created_at: string;
 }
 
@@ -13,20 +14,33 @@ interface Props {
   folder: FolderItem;
   view: 'grid' | 'list';
   onOpen: (id: string, name: string) => void;
+  onDropFiles?: (files: File[], folderId: string) => void;
+  onContextMenu?: (e: React.MouseEvent, folder: FolderItem) => void;
+  onPinToggle?: (id: string) => void;
+  onDownloadZip?: (id: string, name: string) => void;
+  onDelete?: (id: string) => void;
 }
 
-export default function FolderCard({ folder, view, onOpen }: Props) {
-  // Prefix with 'card-' to avoid ID collision with the same folder in FolderSidebar
+export default function FolderCard({
+  folder,
+  view,
+  onOpen,
+  onDropFiles,
+  onContextMenu,
+  onPinToggle,
+  onDownloadZip,
+  onDelete,
+}: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: `card-${folder.id}` });
+  const [nativeDragOver, setNativeDragOver] = useState(false);
 
-  // Track whether a drag just ended over this folder so we can suppress the click
+  // Suppress click after dnd-kit drag end
   const dragEndedOver = useRef(false);
   useDndMonitor({
     onDragEnd(event) {
       const overId = String(event.over?.id ?? '');
       if (overId === `card-${folder.id}`) {
         dragEndedOver.current = true;
-        // Reset after the click event fires (next microtask)
         setTimeout(() => { dragEndedOver.current = false; }, 50);
       }
     },
@@ -37,14 +51,53 @@ export default function FolderCard({ folder, view, onOpen }: Props) {
     onOpen(folder.id, folder.name);
   }
 
+  // Native HTML5 drop for files dragged from desktop/computer (Issue #22)
+  function handleNativeDragOver(e: React.DragEvent) {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      e.stopPropagation();
+      setNativeDragOver(true);
+    }
+  }
+
+  function handleNativeDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setNativeDragOver(false);
+  }
+
+  function handleNativeDrop(e: React.DragEvent) {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      e.stopPropagation();
+      setNativeDragOver(false);
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      if (droppedFiles.length > 0 && onDropFiles) {
+        onDropFiles(droppedFiles, folder.id);
+      }
+    }
+  }
+
+  const highlightOver = isOver || nativeDragOver;
+  const isPinned = Boolean(folder.pinned);
+
   if (view === 'list') {
     return (
       <div
         ref={setNodeRef}
         onClick={handleClick}
+        onContextMenu={e => {
+          if (onContextMenu) {
+            e.preventDefault();
+            onContextMenu(e, folder);
+          }
+        }}
+        onDragOver={handleNativeDragOver}
+        onDragLeave={handleNativeDragLeave}
+        onDrop={handleNativeDrop}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer group select-none
           hover:bg-white/4 border
-          ${isOver ? 'border-cyan-500/50 bg-cyan-500/5 ring-1 ring-cyan-500/30' : 'border-transparent'}`}
+          ${highlightOver ? 'border-cyan-500/50 bg-cyan-500/10 ring-2 ring-cyan-500/40' : 'border-transparent'}`}
       >
         <div className="w-8 h-8 rounded-md bg-gradient-to-br from-yellow-500/15 to-amber-500/5 border border-yellow-500/30 flex items-center justify-center shrink-0">
           <Folder size={16} className="text-yellow-400" />
@@ -56,7 +109,37 @@ export default function FolderCard({ folder, view, onOpen }: Props) {
         <span className="text-xs text-slate-500 shrink-0 w-24 text-right hidden sm:block">
           {new Date(folder.created_at).toLocaleDateString()}
         </span>
-        <div className="w-16 shrink-0" />
+
+        {/* Action icons on hover */}
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={e => e.stopPropagation()}>
+          {onPinToggle && (
+            <button
+              onClick={() => onPinToggle(folder.id)}
+              className={`p-1.5 transition-colors rounded-md hover:bg-white/5 ${isPinned ? 'text-amber-400' : 'text-slate-400 hover:text-amber-400'}`}
+              title={isPinned ? 'Unpin folder' : 'Pin folder'}
+            >
+              {isPinned ? <PinOff size={13} /> : <Pin size={13} />}
+            </button>
+          )}
+          {onDownloadZip && (
+            <button
+              onClick={() => onDownloadZip(folder.id, folder.name)}
+              className="p-1.5 text-slate-400 hover:text-cyan-400 transition-colors rounded-md hover:bg-cyan-500/10"
+              title="Download as ZIP"
+            >
+              <Download size={13} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => onDelete(folder.id)}
+              className="p-1.5 text-slate-400 hover:text-red-400 transition-colors rounded-md hover:bg-red-500/10"
+              title="Delete folder"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -65,10 +148,60 @@ export default function FolderCard({ folder, view, onOpen }: Props) {
     <div
       ref={setNodeRef}
       onClick={handleClick}
+      onContextMenu={e => {
+        if (onContextMenu) {
+          e.preventDefault();
+          onContextMenu(e, folder);
+        }
+      }}
+      onDragOver={handleNativeDragOver}
+      onDragLeave={handleNativeDragLeave}
+      onDrop={handleNativeDrop}
       className={`group relative rounded-xl border transition-all cursor-pointer select-none overflow-hidden
         border-slate-700/50 bg-slate-800/40 hover:border-yellow-500/40 hover:bg-slate-800/70
-        ${isOver ? 'ring-2 ring-cyan-400 border-cyan-500/50 bg-cyan-500/5' : ''}`}
+        ${highlightOver ? 'ring-2 ring-cyan-400 border-cyan-500/60 bg-cyan-500/10 scale-102' : ''}`}
     >
+      {/* Pin Badge */}
+      {isPinned && (
+        <div className="absolute top-2 left-2 z-10 w-5 h-5 flex items-center justify-center pointer-events-none">
+          <Pin size={12} className="text-amber-400" />
+        </div>
+      )}
+
+      {/* Action overlay top-right */}
+      <div
+        className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        onClick={e => e.stopPropagation()}
+      >
+        {onPinToggle && (
+          <button
+            onClick={() => onPinToggle(folder.id)}
+            className={`p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md transition-colors ${isPinned ? 'text-amber-400' : 'text-slate-400 hover:text-amber-400'}`}
+            title={isPinned ? 'Unpin folder' : 'Pin folder'}
+          >
+            {isPinned ? <PinOff size={11} /> : <Pin size={11} />}
+          </button>
+        )}
+        {onDownloadZip && (
+          <button
+            onClick={() => onDownloadZip(folder.id, folder.name)}
+            className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-cyan-400 transition-colors"
+            title="Download as ZIP"
+          >
+            <Download size={11} />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={() => onDelete(folder.id)}
+            className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-red-400 transition-colors"
+            title="Delete folder"
+          >
+            <Trash2 size={11} />
+          </button>
+        )}
+      </div>
+
       <div className="h-28 flex items-center justify-center bg-gradient-to-br from-yellow-500/10 to-amber-500/5">
         <Folder size={42} className="text-yellow-400/60 group-hover:text-yellow-400 transition-colors" />
       </div>

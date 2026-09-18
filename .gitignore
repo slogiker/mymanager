@@ -1,3 +1,11 @@
 node_modules/
 .env
+.env.*
 .DS_Store
+dist/
+app/client/dist/
+app/server/uploads/
+app/server/data/
+*.db
+*.sqlite
+*.log

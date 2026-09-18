@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useTranslation } from '../context/LanguageContext';
 
 export default function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState<{ username: string; password: string }>({ username: '', password: '' });
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const { t } = useTranslation();
 
+  if (user && Boolean(user.must_change_password)) return <Navigate to="/change-password" replace />;
   if (user && !user.must_change_password) return <Navigate to={user.role === 'owner' ? '/dashboard' : '/'} replace />;
-  if (user?.must_change_password) return <Navigate to="/change-password" replace />;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -18,54 +22,68 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await login(form.username, form.password);
-      if (data.mustChangePassword) navigate('/change-password');
-      else navigate(data.user.role === 'owner' ? '/dashboard' : '/');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      if (data.mustChangePassword || data.must_change_password || data.user.must_change_password) {
+        navigate('/change-password');
+      } else {
+        navigate(data.user.role === 'owner' ? '/dashboard' : '/');
+      }
+    } catch (err) {
+      setError((err as Error).message || 'Invalid username or password');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden text-slate-200">
       {/* Background Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse-slow" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px] pointer-events-none animate-pulse-slow" style={{ animationDelay: '1s' }} />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500/10 rounded-full blur-[120px] pointer-events-none animate-pulse-slow" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-slate-500/10 rounded-full blur-[120px] pointer-events-none animate-pulse-slow" style={{ animationDelay: '1s' }} />
 
       <div className="w-full max-w-sm animate-slide-up relative z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-slate-700/50 items-center justify-center mb-4">
-            <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-flex w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/20 to-slate-500/20 border border-slate-700/50 items-center justify-center mb-4">
+            <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-extrabold text-slate-100 tracking-tight">Welcome back</h1>
-          <p className="text-slate-400 text-sm mt-2">Sign in to continue to your dashboard</p>
+          <h1 className="text-3xl font-extrabold text-slate-100 tracking-tight">{t('login_welcome')}</h1>
+          <p className="text-slate-400 text-sm mt-2">{t('login_desc')}</p>
         </div>
 
         <div className="card p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Username</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">{t('login_user')}</label>
               <input
                 className="input-field"
-                placeholder="slogiker"
+                placeholder={t('login_user')}
                 value={form.username}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, username: e.target.value }))}
                 required autoFocus
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Password</label>
-              <input
-                type="password"
-                className="input-field"
-                placeholder="••••••••"
-                value={form.password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, password: e.target.value }))}
-                required
-              />
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">{t('login_password')}</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="input-field pr-10"
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, password: e.target.value }))}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus:outline-none transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -78,7 +96,9 @@ export default function LoginPage() {
             )}
 
             <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5">
-              {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Sign in'}
+              {loading ? (
+                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />{t('login_signing')}</>
+              ) : t('login_btn')}
             </button>
           </form>
         </div>

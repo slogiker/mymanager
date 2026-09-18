@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import ProjectCard from './ProjectCard';
 import type { Project } from '../../types';
+import { useTranslation } from '../../context/LanguageContext';
 
 export default function ProjectsGrid() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const { t } = useTranslation();
 
   useEffect(() => {
     Promise.all([api.get<Project[]>('/projects'), api.get<string[]>('/projects/tags')])
@@ -22,11 +24,11 @@ export default function ProjectsGrid() {
     <section id="projects" className="w-full px-[5%] py-24">
       <div className="mb-14">
         <div className="flex items-center gap-3.5 mb-5">
-          <div className="w-10 h-0.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500" />
-          <span className="text-xs font-semibold text-cyan-400 uppercase tracking-widest">Portfolio</span>
+          <div className="w-10 h-0.5 bg-gradient-to-r from-red-600 via-red-500 to-slate-400" />
+          <span className="text-xs font-semibold text-red-500 uppercase tracking-widest">{t('portfolio_tag')}</span>
         </div>
-        <h2 className="section-title text-5xl mb-5 tracking-tight font-extrabold">Things I've built</h2>
-        <p className="text-slate-400 text-lg max-w-2xl leading-relaxed">A collection of projects I've worked on. Most are open-source.</p>
+        <h2 className="section-title text-5xl mb-5 tracking-tight font-extrabold">{t('portfolio_title')}</h2>
+        <p className="text-slate-400 text-lg max-w-2xl leading-relaxed">{t('portfolio_desc')}</p>
       </div>
 
       {tags.length > 0 && (
@@ -34,15 +36,15 @@ export default function ProjectsGrid() {
           <button
             onClick={() => setActiveTag(null)}
             className={`badge border px-3 py-1 transition-colors ${!activeTag
-              ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40'
+              ? 'bg-red-500/20 text-red-500 border-red-500/40'
               : 'bg-slate-800/50 text-slate-400 border-slate-700/50 hover:text-slate-200'}`}
           >
-            All
+            {t('portfolio_filter_all')}
           </button>
           {tags.map(tag => (
             <button key={tag} onClick={() => setActiveTag(activeTag === tag ? null : tag)}
               className={`badge border px-3 py-1 transition-colors ${activeTag === tag
-                ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40'
+                ? 'bg-red-500/20 text-red-500 border-red-500/40'
                 : 'bg-slate-800/50 text-slate-400 border-slate-700/50 hover:text-slate-200'}`}>
               {tag}
             </button>

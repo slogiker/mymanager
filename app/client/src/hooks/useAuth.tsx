@@ -25,9 +25,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(username: string, password: string) {
-    const data = await api.post<{ user: User; mustChangePassword: boolean }>('/auth/login', { username, password });
-    setUser(data.user);
-    return data;
+    const data = await api.post<{ user: User; mustChangePassword?: boolean; must_change_password?: boolean }>('/auth/login', { username, password });
+    const mustChange = Boolean(data.mustChangePassword || data.must_change_password || data.user?.must_change_password);
+    const userObj: User = {
+      ...data.user,
+      must_change_password: mustChange ? 1 : 0,
+    };
+    setUser(userObj);
+    return {
+      user: userObj,
+      mustChangePassword: mustChange,
+      must_change_password: mustChange,
+      role: userObj.role,
+    };
   }
 
   async function logout() {

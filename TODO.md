@@ -1,6 +1,31 @@
 # TODO — continue next session
 
-## BUGS (fix first)
+## 🧪 NEXT SESSION PRIORITY: FULL SYSTEM TESTING & BUG HUNTING
+The next session will focus entirely on thorough end-to-end testing of the application and catching edge-case bugs:
+
+1. **File Manager Testing:**
+   - [ ] Drag & Drop raw ZIP file -> Prompt modal appears (Upload as ZIP vs Extract into folder).
+   - [ ] Archive Extraction -> Unpacks files into target folder with correct paths and names.
+   - [ ] ZIP Archive Preview -> Clicking `.zip` displays archive contents list in preview pane without downloading/extracting.
+   - [ ] Folder Download -> Right-click or folder action bundles entire tree recursively into `.zip` and downloads cleanly.
+   - [ ] Public Sharing -> Create share link with various expiry times (`never`, `1h`, `1d`, `7d`, `30d`), open in incognito `/share/:token`, test downloads and preview.
+   - [ ] Upload Drawer -> Upload multiple files, check progress bars, test the Cancel (`XHR.abort()`) button.
+   - [ ] Fullscreen Preview -> Void backdrop click closes, `Esc` key closes, `Ctrl + scroll wheel` zooms image smoothly.
+   - [ ] Text / Markdown Editing -> Auto-resizing textarea as lines are added, save changes.
+   - [ ] Video Formats -> Play `.mov`, `.mkv`, `.webm`, `.avi` files.
+   - [ ] 3D CAD Preview -> Verify `.stl`, `.obj`, and `.f3d` CAD preview with 3D orbit controls.
+   - [ ] Folder Navigation & Hierarchy -> Expanding/collapsing tree in sidebar, pinning subfolders, drag-dropping items into breadcrumbs to move up hierarchy.
+   - [ ] Renaming & Deletions -> In-app renaming of files and folders, multi-selection batch deletion.
+2. **Auth & Sessions Testing:**
+   - [ ] Owner login with `slogiker` / `changeme123`.
+   - [ ] Password visibility toggle (eye icon).
+   - [ ] Guest vs Owner file access and persistence across page reloads.
+3. **Dashboard & Other Modules:**
+   - [ ] Web Terminal (SSH connection).
+   - [ ] Clipboard tool.
+   - [ ] Portfolio public contact form & links.
+
+---
 
 ### Login returns "internal server error"
 - POST /api/auth/login with {username:"slogiker", password:"REMOVED"}
@@ -12,14 +37,14 @@
 - Fixed by configuring `npm-host-bridge` as a dynamic local bridge network in `docker-compose.yml` and corrected the build workspace name in `Dockerfile`.
 - Fixed SQLite database migration error (unique column alter table constraint issue) in `db.js`.
 
-### Drag and drop folder issue
-- When drag and drop folder inside, it transports the data/files inside rather than uploading the folder itself or preserving the folder structure.
+### Drag and drop folder issue [FIXED]
+- Added interactive ZIP drag-drop prompt (upload as ZIP vs extract into folder) and recursive directory preservation on drop.
 
-### Multi-file deletion does nothing
-- When selecting multiple files and trying to delete them, the delete action does nothing.
+### Multi-file deletion does nothing [FIXED]
+- Fixed by accepting ids in both body and query params (?ids=1,2,3) in DELETE /api/files and updating frontend call.
 
-### "All Files" navigation issue
-- When inside a folder and clicking "All Files" (breadcrumb/navigation), the file list does not load or navigate back to the root files view correctly.
+### "All Files" navigation issue [FIXED]
+- Fixed state reset in navigateToRoot and breadcrumbs so root view loads seamlessly.
 
 ---
 
@@ -50,10 +75,11 @@
 
 ## INCOMPLETE FEATURES
 
-- File Manager: add preview functionality for office documents (PowerPoint/PPTX, DOCX, Excel/XLSX)
-- File Manager: When creating a new file, after selecting the file type (txt, md, html...), handle the extension automatically so only the name is required.
-- File Manager: Allow creating new empty folders from the "Add File" dialog/button.
-- File Manager: Support moving files to a different folder/path when inside folders.
+- File Manager: add preview functionality for office documents (DOCX, Excel/XLSX, ODS, ODT, CSV), 3D files (STL, OBJ, GLTF, CAD F3D/STEP), and Archive contents inspection [COMPLETED]
+- File Manager: Support moving files to a different folder/path when inside folders, including droppable parent breadcrumbs [COMPLETED]
+- File Manager: Public file and folder sharing with expiration presets [COMPLETED]
+- File Manager: Recursive folder download as ZIP [COMPLETED]
+- File Manager: In-app file and folder renaming [COMPLETED]
 - Admin: Profile tab missing (edit bio/title/avatar/links, resume upload)
 - Portfolio: ProjectCard thumbnails not displayed nicely
 - Services public page (portfolio view of self-hosted services)

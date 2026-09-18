@@ -208,6 +208,35 @@ if (!filesCols.includes('deleted_at')) {
   db.exec('ALTER TABLE files ADD COLUMN deleted_at TEXT');
 }
 
+// Migrate: add preview_path and preview_type to files
+if (!filesCols.includes('preview_path')) {
+  db.exec('ALTER TABLE files ADD COLUMN preview_path TEXT');
+}
+if (!filesCols.includes('preview_type')) {
+  db.exec('ALTER TABLE files ADD COLUMN preview_type TEXT');
+}
+
+// Migrate: add pinned to folders
+if (!folderCols.includes('pinned')) {
+  db.exec('ALTER TABLE folders ADD COLUMN pinned INTEGER DEFAULT 0');
+}
+
+// Shares table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shares (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    session_id TEXT,
+    type TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_shares_token ON shares(token);
+  CREATE INDEX IF NOT EXISTS idx_shares_item ON shares(type, item_id);
+`);
+
 function seed() {
   const profileCount = db.prepare('SELECT COUNT(*) as c FROM profile').get();
   if (profileCount.c === 0) {

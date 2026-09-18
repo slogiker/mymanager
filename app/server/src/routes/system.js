@@ -15,4 +15,13 @@ router.get('/stats', verifyToken, requireOwner, async (req, res) => {
   }
 });
 
+router.get('/nodes', verifyToken, async (req, res) => {
+  try {
+    const nodes = await monitor.getNodes();
+    res.json(nodes);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to get server nodes' });
+  }
+});
+
 module.exports = router;

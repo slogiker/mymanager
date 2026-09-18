@@ -13,23 +13,31 @@ router.get('/', verifyToken, requireOwner, (req, res) => {
 });
 
 router.post('/', verifyToken, requireOwner, (req, res) => {
-  const { name, username, email, role = 'user' } = req.body;
-  if (!name || !username || !email) return res.status(400).json({ error: 'Name, username, and email required' });
+  const { name, username, email, role = 'user', password } = req.body;
+  if (!username || !username.trim()) {
+    return res.status(400).json({ error: 'Username is required' });
+  }
 
-  const exists = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username.toLowerCase(), email.toLowerCase());
+  const cleanUsername = username.trim().toLowerCase();
+  const cleanName = name && name.trim() ? name.trim() : username.trim();
+  const cleanEmail = email && email.trim() ? email.trim().toLowerCase() : `${cleanUsername}@local.lan`;
+
+  const exists = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(cleanUsername, cleanEmail);
   if (exists) return res.status(409).json({ error: 'Username or email already taken' });
 
-  const otp = randomBytes(6).toString('hex');
-  const hash = bcrypt.hashSync(otp, 10);
+  const plainPassword = password && password.trim().length >= 6 ? password.trim() : randomBytes(6).toString('hex');
+  const hash = bcrypt.hashSync(plainPassword, 10);
+  const mustChange = password && password.trim().length >= 6 ? 0 : 1;
 
   const result = db.prepare(`
     INSERT INTO users (name, username, email, password_hash, role, must_change_password)
-    VALUES (?, ?, ?, ?, ?, 1)
-  `).run(name.trim(), username.toLowerCase(), email.toLowerCase(), hash, role === 'owner' ? 'owner' : 'user');
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(cleanName, cleanUsername, cleanEmail, hash, role === 'owner' ? 'owner' : 'user', mustChange);
 
   res.status(201).json({
     user: db.prepare('SELECT id, name, username, email, role, must_change_password, created_at FROM users WHERE id = ?').get(result.lastInsertRowid),
-    oneTimePassword: otp,
+    oneTimePassword: plainPassword,
+    wasGenerated: mustChange === 1,
   });
 });
 

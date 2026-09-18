@@ -7,16 +7,21 @@ import ContactForm from '../components/portfolio/ContactForm';
 
 export default function PortfolioPage() {
   return (
-    <div className="relative">
+    <div className="relative min-h-screen">
       <Navbar />
       <main>
         <Hero />
-        <ApplicationsGrid />
-        <SkillsSection />
-        <ContactForm />
+        <div className="border-t border-slate-800/20">
+          <ApplicationsGrid />
+        </div>
+        <div className="border-t border-slate-800/20">
+          <SkillsSection />
+        </div>
+        <div className="border-t border-slate-800/20">
+          <ContactForm />
+        </div>
       </main>
       <Footer />
     </div>
   );
 }
-

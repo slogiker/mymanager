@@ -87,10 +87,26 @@ router.post('/', uploadLimiter, optionalAuth, (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     const folderId = req.body.folder_id || null;
+    let previewPath = null;
+    let previewType = null;
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (ext === '.f3d') {
+      try {
+        const AdmZip = require('adm-zip');
+        const zip = new AdmZip(path.join(filesDir, req.file.filename));
+        const thumbEntry = zip.getEntries().find(e => e.entryName.toLowerCase().endsWith('.png') || e.entryName.toLowerCase().includes('thumbnail'));
+        if (thumbEntry) {
+          const thumbFileName = `thumb_${uuidv4()}.png`;
+          fs.writeFileSync(path.join(filesDir, thumbFileName), thumbEntry.getData());
+          previewPath = `/uploads/files/${thumbFileName}`;
+          previewType = 'cad-thumbnail';
+        }
+      } catch (e) {}
+    }
 
     const result = db.prepare(`
-      INSERT INTO files (user_id, session_id, folder_id, original_name, stored_name, file_path, mime_type, size)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO files (user_id, session_id, folder_id, original_name, stored_name, file_path, mime_type, size, preview_path, preview_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       req.user?.id ?? null,
       req.user ? null : sessionId,
@@ -99,7 +115,9 @@ router.post('/', uploadLimiter, optionalAuth, (req, res) => {
       req.file.filename,
       `/uploads/files/${req.file.filename}`,
       req.file.mimetype,
-      req.file.size
+      req.file.size,
+      previewPath,
+      previewType
     );
 
     res.status(201).json(db.prepare('SELECT * FROM files WHERE id = ?').get(result.lastInsertRowid));
@@ -181,20 +199,152 @@ router.patch('/:id/pin', optionalAuth, (req, res) => {
   res.json(db.prepare('SELECT * FROM files WHERE id = ?').get(file.id));
 });
 
-// Move file to a folder (owner only)
-router.patch('/:id/move', verifyToken, requireOwner, (req, res) => {
+// Rename file
+router.patch('/:id', optionalAuth, (req, res) => {
+  const filter = getOwnerFilter(req);
+  if (!filter) return res.status(401).json({ error: 'Not authenticated' });
+
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'New name required' });
+
+  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  db.prepare('UPDATE files SET original_name = ? WHERE id = ?').run(name.trim(), file.id);
+  res.json(db.prepare('SELECT * FROM files WHERE id = ?').get(file.id));
+});
+
+// Move file to a folder (supports both logged in and session users)
+router.patch('/:id/move', optionalAuth, (req, res) => {
+  const filter = getOwnerFilter(req);
+  if (!filter) return res.status(401).json({ error: 'Not authenticated' });
+
   const { folder_id } = req.body;
 
-  const file = db.prepare('SELECT * FROM files WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   if (folder_id) {
-    const folder = db.prepare('SELECT id FROM folders WHERE id = ? AND user_id = ?').get(folder_id, req.user.id);
+    const folder = db.prepare('SELECT id FROM folders WHERE id = ?').get(folder_id);
     if (!folder) return res.status(404).json({ error: 'Folder not found' });
   }
 
   db.prepare('UPDATE files SET folder_id = ? WHERE id = ?').run(folder_id || null, req.params.id);
   res.json(db.prepare('SELECT * FROM files WHERE id = ?').get(req.params.id));
+});
+
+// Inspect archive contents without extracting
+router.get('/:id/archive-contents', optionalAuth, (req, res) => {
+  const filter = getOwnerFilter(req);
+  if (!filter) return res.status(401).json({ error: 'Not authenticated' });
+
+  const file = db.prepare(`SELECT * FROM files WHERE id = ? AND ${filter.col} = ?`).get(req.params.id, filter.val);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  const fullPath = path.join(filesDir, file.stored_name);
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File not on disk' });
+
+  try {
+    const AdmZip = require('adm-zip');
+    const zip = new AdmZip(fullPath);
+    const entries = zip.getEntries().map(e => ({
+      name: path.basename(e.entryName),
+      entryName: e.entryName,
+      isDirectory: e.isDirectory,
+      size: e.header.size,
+      compressedSize: e.header.compressedSize,
+    }));
+    res.json({ entries, count: entries.length });
+  } catch (err) {
+    res.status(400).json({ error: 'Could not read archive contents', details: err.message });
+  }
+});
+
+// Extract a zip file into a folder
+router.post('/extract-zip', uploadLimiter, optionalAuth, (req, res) => {
+  const sessionId = ensureSession(req, res);
+  const upload = multer({ storage, limits: getFileLimits(req) });
+
+  upload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No zip file uploaded' });
+
+    const AdmZip = require('adm-zip');
+    const zipFilePath = path.join(filesDir, req.file.filename);
+    const parentFolderId = req.body.folder_id || null;
+
+    try {
+      const zip = new AdmZip(zipFilePath);
+      const zipEntries = zip.getEntries();
+      const baseFolderName = path.basename(req.file.originalname, path.extname(req.file.originalname));
+
+      // Create root extracted folder
+      const rootFolderId = uuidv4();
+      const userId = req.user?.id ?? null;
+      db.prepare('INSERT INTO folders (id, user_id, name, parent_id) VALUES (?, ?, ?, ?)').run(rootFolderId, userId, baseFolderName, parentFolderId);
+
+      const folderMap = new Map(); // relative path -> folder id
+      folderMap.set('', rootFolderId);
+
+      // Create any nested subfolders first
+      zipEntries.forEach(entry => {
+        if (entry.isDirectory) {
+          const cleanPath = entry.entryName.replace(/\/+$/, '');
+          const parts = cleanPath.split('/');
+          let currentParent = rootFolderId;
+          let accPath = '';
+
+          for (const part of parts) {
+            accPath = accPath ? `${accPath}/${part}` : part;
+            if (!folderMap.has(accPath)) {
+              const newFid = uuidv4();
+              try {
+                db.prepare('INSERT INTO folders (id, user_id, name, parent_id) VALUES (?, ?, ?, ?)').run(newFid, userId, part, currentParent);
+                folderMap.set(accPath, newFid);
+              } catch {}
+            }
+            currentParent = folderMap.get(accPath);
+          }
+        }
+      });
+
+      // Extract and insert files
+      const insertedFiles = [];
+      zipEntries.forEach(entry => {
+        if (!entry.isDirectory) {
+          const dirName = path.dirname(entry.entryName);
+          const targetFolderId = dirName === '.' ? rootFolderId : (folderMap.get(dirName) || rootFolderId);
+          const fileName = path.basename(entry.entryName);
+          const ext = path.extname(fileName);
+          const stored = `${uuidv4()}${ext}`;
+          const outPath = path.join(filesDir, stored);
+
+          fs.writeFileSync(outPath, entry.getData());
+          const size = entry.header.size;
+          const mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'application/octet-stream';
+
+          const resDb = db.prepare(`
+            INSERT INTO files (user_id, session_id, folder_id, original_name, stored_name, file_path, mime_type, size)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(userId, req.user ? null : sessionId, targetFolderId, fileName, stored, `/uploads/files/${stored}`, mime, size);
+
+          insertedFiles.push(resDb.lastInsertRowid);
+        }
+      });
+
+      // Remove the temporary raw zip if extraction was requested
+      try { fs.unlinkSync(zipFilePath); } catch {}
+
+      res.status(201).json({
+        message: 'Extracted successfully',
+        folder_id: rootFolderId,
+        folder_name: baseFolderName,
+        files_count: insertedFiles.length,
+      });
+    } catch (zipErr) {
+      res.status(500).json({ error: 'Failed to extract zip archive', details: zipErr.message });
+    }
+  });
 });
 
 router.delete('/:id', optionalAuth, (req, res) => {
@@ -215,7 +365,11 @@ router.delete('/', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
-  const { ids } = req.body;
+  // Accept ids from body or query params (comma-separated)
+  let ids = req.body?.ids;
+  if (!ids && req.query.ids) {
+    ids = String(req.query.ids).split(',').map(s => Number(s.trim())).filter(n => !isNaN(n));
+  }
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids array required' });
 
   const placeholders = ids.map(() => '?').join(',');

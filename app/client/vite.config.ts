@@ -27,4 +27,16 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'three-vendor': ['three'],
+          'xterm-vendor': ['@xterm/xterm', '@xterm/addon-fit'],
+          'socket-vendor': ['socket.io-client'],
+        },
+      },
+    },
+  },
 });

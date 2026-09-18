@@ -36,8 +36,8 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   return (
     <article className="card card-hover p-6 flex flex-col gap-4 h-full group">
       <div className="flex items-start justify-between gap-3">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-slate-700/50 flex items-center justify-center flex-shrink-0">
-          <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500/20 to-slate-500/10 border border-slate-700/50 flex items-center justify-center flex-shrink-0">
+          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
           </svg>
         </div>
@@ -62,7 +62,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
       </div>
 
       <div className="flex-1">
-        <h3 className="font-semibold text-slate-100 mb-2 group-hover:text-cyan-400 transition-colors">{title}</h3>
+        <h3 className="font-semibold text-slate-100 mb-2 group-hover:text-red-500 transition-colors">{title}</h3>
         {description && <p className="text-sm text-slate-400 leading-relaxed line-clamp-3">{description}</p>}
       </div>
 

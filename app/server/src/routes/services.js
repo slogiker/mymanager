@@ -70,15 +70,46 @@ router.delete('/:id', verifyToken, requireOwner, (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
-router.post('/reorder', verifyToken, requireOwner, (req, res) => {
-  const { order } = req.body;
-  if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array of IDs' });
+router.post('/test', verifyToken, async (req, res) => {
+  const { url } = req.body;
+  if (!url || url === '#' || !url.startsWith('http')) {
+    return res.status(400).json({ error: 'Valid HTTP/HTTPS URL required (e.g. http://192.168.1.50:8080)' });
+  }
 
-  const update = db.prepare('UPDATE services SET display_order = ? WHERE id = ?');
-  const tx = db.transaction(() => order.forEach((id, i) => update.run(i + 1, id)));
-  tx();
+  const start = Date.now();
+  try {
+    const mod = url.startsWith('https') ? https : http;
+    const clientReq = mod.get(url, { timeout: 3500, rejectUnauthorized: false }, (clientRes) => {
+      const latency = `${Date.now() - start}ms`;
+      const isOk = clientRes.statusCode < 400;
+      clientRes.resume();
+      return res.json({
+        status: isOk ? 'online' : 'error',
+        statusCode: clientRes.statusCode,
+        statusText: clientRes.statusMessage || (isOk ? 'OK' : 'HTTP Error'),
+        latency,
+      });
+    });
 
-  res.json({ message: 'Reordered' });
+    clientReq.on('error', (err) => {
+      return res.json({
+        status: 'offline',
+        error: err.message || 'Host unreachable or port closed',
+        latency: `${Date.now() - start}ms`,
+      });
+    });
+
+    clientReq.on('timeout', () => {
+      clientReq.destroy();
+      return res.json({
+        status: 'timeout',
+        error: 'Connection timed out (>3.5s)',
+        latency: '>3500ms',
+      });
+    });
+  } catch (err) {
+    return res.json({ status: 'offline', error: err.message });
+  }
 });
 
 module.exports = router;

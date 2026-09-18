@@ -101,6 +101,22 @@ export interface SystemStats {
   uptime: string;
 }
 
+export interface ServerNode {
+  id: string;
+  name: string;
+  ip: string;
+  role: string;
+  status: 'online' | 'offline' | 'timeout';
+  latency: string;
+  cpu?: { model?: string; cores?: number; load: string; speedMain?: string; speedMax?: string };
+  memory?: { total: string; used: string; free?: string; percent: number };
+  disk?: { total: string; used: string; free?: string; percent: number };
+  temperature?: string;
+  uptime?: string;
+  fanSpeed?: string;
+  ports?: string[];
+}
+
 export interface AnalyticsSummary {
   totalViews: number;
   uniqueVisitors: number;
