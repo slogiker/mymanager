@@ -8,7 +8,7 @@ export interface UserPreferences {
   categoryOrder?: string[];
   categoryWidths?: Record<string, 1 | 2>;
   customCategories?: string[];
-  serverGauges?: Record<string, { cpu?: boolean; ram?: boolean; fan?: boolean; temp?: boolean; ports?: boolean; ping?: boolean; down?: boolean; up?: boolean }>;
+  serverGauges?: Record<string, { cpu?: boolean; ram?: boolean; storage?: boolean; net?: boolean; fan?: boolean; temp?: boolean; ports?: boolean; ping?: boolean; down?: boolean; up?: boolean }>;
   widgetVisible?: {
     clock: boolean;
     nodes: boolean;

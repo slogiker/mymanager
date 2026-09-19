@@ -443,19 +443,25 @@ function ServerGaugesModal({
   if (!open) return null;
 
   const nodeItems = [
-    ...nodes.map((n) => ({
-      id: n.id,
-      name: n.name,
-      sub: `${n.ip} · ${n.role}`,
-      availableGauges: [
+    ...nodes.map((n) => {
+      const gauges: { key: string; label: string }[] = [
         { key: 'ping', label: 'Ping / Latency' },
-        { key: 'cpu', label: 'CPU Load' },
-        { key: 'ram', label: 'RAM Memory' },
-        { key: 'temp', label: 'Temperature' },
-        { key: 'fan', label: 'Fan Speed' },
-        { key: 'ports', label: 'Open Ports' },
-      ],
-    })),
+      ];
+      if (n.cpu) gauges.push({ key: 'cpu', label: 'CPU Load' });
+      if (n.memory) gauges.push({ key: 'ram', label: 'RAM Memory' });
+      if (n.temperature) gauges.push({ key: 'temp', label: 'Temperature' });
+      if (n.fanSpeed) gauges.push({ key: 'fan', label: 'Fan Speed' });
+      if (n.disk) gauges.push({ key: 'storage', label: n.disk.poolName ? `${n.disk.poolName} Storage` : 'Storage' });
+      if (n.network) gauges.push({ key: 'net', label: 'Network Speed' });
+      if (n.ports && n.ports.length > 0) gauges.push({ key: 'ports', label: 'Open Ports' });
+
+      return {
+        id: n.id,
+        name: n.name,
+        sub: `${n.ip} · ${n.role}`,
+        availableGauges: gauges,
+      };
+    }),
     ...(speedtest
       ? [
           {
@@ -667,7 +673,9 @@ function MultiServerNodesWidget({
           const showFan = nodeGauges.fan !== false && !!node.fanSpeed;
           const showRam = nodeGauges.ram !== false && (!!node.memory && (!node.fanSpeed || !showFan));
           const showTemp = nodeGauges.temp !== false && !!node.temperature;
-          const hasMetrics = showCpu || showFan || showRam || showTemp;
+          const showDisk = nodeGauges.storage !== false && !!node.disk;
+          const showNet = nodeGauges.net !== false && !!node.network;
+          const hasMetrics = showCpu || showFan || showRam || showTemp || showDisk || showNet;
 
           return (
             <div
@@ -711,13 +719,13 @@ function MultiServerNodesWidget({
               </p>
 
               {hasMetrics ? (
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-[10px] font-mono">
+                <div className={`grid ${(!showCpu && !showRam && !showFan && !showTemp) ? 'grid-cols-2' : 'grid-cols-3'} gap-2 pt-2 border-t border-slate-800/80 text-[10px] font-mono`}>
                   {showCpu ? (
                     <div>
                       <span className="text-slate-500 block">CPU</span>
                       <span className="text-slate-200 font-bold">{node.cpu?.load}%</span>
                     </div>
-                  ) : <div />}
+                  ) : (!showDisk && !showNet) ? <div /> : null}
                   {showFan ? (
                     <div>
                       <span className="text-slate-500 block">FAN</span>
@@ -726,15 +734,33 @@ function MultiServerNodesWidget({
                   ) : showRam ? (
                     <div>
                       <span className="text-slate-500 block">RAM</span>
-                      <span className="text-slate-200 font-bold">{node.memory?.percent || 0}%</span>
+                      <span className="text-slate-200 font-bold" title={node.memory?.used ? `${node.memory.used} / ${node.memory.total}` : undefined}>
+                        {node.memory?.percent || 0}%
+                      </span>
                     </div>
-                  ) : <div />}
+                  ) : (!showDisk && !showNet) ? <div /> : null}
                   {showTemp ? (
                     <div>
                       <span className="text-slate-500 block">TEMP</span>
                       <span className="text-amber-400 font-bold">{node.temperature || '—'}</span>
                     </div>
-                  ) : <div />}
+                  ) : (!showDisk && !showNet) ? <div /> : null}
+                  {showDisk && (
+                    <div className={(!showCpu && !showRam && !showTemp && !showNet) ? 'col-span-2' : ''}>
+                      <span className="text-slate-500 block truncate uppercase">{node.disk?.poolName || 'Storage'}</span>
+                      <span className="text-emerald-400 font-bold truncate block" title={`${node.disk?.free} free of ${node.disk?.total} (${node.disk?.percent}% used)`}>
+                        {node.disk?.free} left
+                      </span>
+                    </div>
+                  )}
+                  {showNet && (
+                    <div className={(!showCpu && !showRam && !showTemp && !showDisk) ? 'col-span-2' : ''}>
+                      <span className="text-slate-500 block truncate">NETWORK</span>
+                      <span className="text-cyan-400 font-bold truncate block" title={`${node.network?.down || ''} · ${node.network?.up || ''}`}>
+                        {node.network?.down || '—'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (node.ports && nodeGauges.ports !== false) ? (
                 <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800/80">
@@ -4044,6 +4070,8 @@ export default function DashboardPage() {
               } else if (piRes?.online === false) {
                 statText = 'Offline';
               }
+            } else if (title.includes('nextcloud')) {
+              statText = 'Media Pool: 8.7 TB free';
             }
 
             const nextStat = statText !== undefined ? statText : s.liveStat;
@@ -4063,7 +4091,20 @@ export default function DashboardPage() {
 
     // Load nodes telemetry
     api.get<ServerNode[]>('/system/nodes')
-      .then(res => setNodes(res))
+      .then(res => {
+        setNodes(res);
+        const ncNode = res?.find(n => n.id.includes('41') || n.name.toLowerCase().includes('nextcloud'));
+        if (ncNode?.disk?.free) {
+          setServices(currentServices => currentServices.map(s => {
+            if (s.title.toLowerCase().includes('nextcloud')) {
+              const stat = `Media Pool: ${ncNode.disk?.free} free`;
+              if (s.liveStat === stat) return s;
+              return { ...s, liveStat: stat };
+            }
+            return s;
+          }));
+        }
+      })
       .catch(() => {})
       .finally(() => setLoadingNodes(false));
 

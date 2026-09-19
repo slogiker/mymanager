@@ -222,7 +222,8 @@ export interface ServerNode {
   latency: string;
   cpu?: { model?: string; cores?: number; load: string; speedMain?: string; speedMax?: string };
   memory?: { total: string; used: string; free?: string; percent: number };
-  disk?: { total: string; used: string; free?: string; percent: number };
+  disk?: { total: string; used: string; free?: string; percent: number; poolName?: string };
+  network?: { down?: string; up?: string };
   temperature?: string;
   uptime?: string;
   fanSpeed?: string;
