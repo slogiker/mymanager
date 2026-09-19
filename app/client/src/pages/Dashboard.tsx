@@ -887,6 +887,130 @@ function SortableCategoryColumn({
   resizingRef.current = resizing;
   const gridRef = useRef<HTMLDivElement>(null);
 
+  // Prevent card click navigation during or immediately after resize/drag
+  const preventClickRef = useRef<boolean>(false);
+
+  // Card Dragging state
+  const [cardDragging, setCardDragging] = useState<{
+    id: number;
+    startCol: number;
+    startRow: number;
+    colSpan: number;
+    rowSpan: number;
+  } | null>(null);
+
+  const handleStartCardDrag = (e: React.MouseEvent, card: Service & CardPosition) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') ||
+      target.closest('a') ||
+      target.closest('.resize-handle') ||
+      target.closest('[data-no-drag]')
+    ) {
+      return;
+    }
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let isDragActive = false;
+
+    const gridRect = gridRef.current ? gridRef.current.getBoundingClientRect() : null;
+    const gridWidth = gridRef.current ? gridRef.current.clientWidth : 320;
+    const colWidth = (gridWidth - GRID_CONSTANTS.GAP) / GRID_CONSTANTS.COLS;
+    const rowHeight = GRID_CONSTANTS.CELL_HEIGHT + GRID_CONSTANTS.GAP;
+
+    const grabOffsetCol = gridRect ? Math.floor((startX - gridRect.left) / colWidth) - card.startCol : 0;
+    const grabOffsetRow = gridRect ? Math.floor((startY - gridRect.top) / rowHeight) - card.startRow : 0;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const dist = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+      if (!isDragActive) {
+        if (dist < 6) return;
+        isDragActive = true;
+        preventClickRef.current = true;
+      }
+
+      if (!gridRef.current) return;
+      const currentGridRect = gridRef.current.getBoundingClientRect();
+      const currentX = moveEvent.clientX - currentGridRect.left;
+      const currentY = moveEvent.clientY - currentGridRect.top;
+
+      const rawCol = Math.floor(currentX / colWidth) - grabOffsetCol;
+      const rawRow = Math.floor(currentY / rowHeight) - grabOffsetRow;
+
+      const targetCol = Math.max(0, Math.min(GRID_CONSTANTS.COLS - card.colSpan, rawCol));
+      const targetRow = Math.max(0, Math.min(GRID_CONSTANTS.MAX_ROWS - 1, rawRow));
+
+      const candidate: CardPosition = {
+        id: card.id,
+        startCol: targetCol,
+        startRow: targetRow,
+        colSpan: card.colSpan,
+        rowSpan: card.rowSpan,
+      };
+
+      const pushedLayout = computePushedLayout(candidate, placedCards, GRID_CONSTANTS.COLS);
+      livePushedCardsRef.current = pushedLayout;
+      setCardDragging(candidate);
+      setLivePushedCards(pushedLayout);
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+
+      if (isDragActive) {
+        const finalLayout = livePushedCardsRef.current;
+        if (finalLayout && onUpdateCardLayout) {
+          const changedCards: Array<{
+            id: number;
+            start_col: number;
+            start_row: number;
+            col_span: number;
+            row_span: number;
+          }> = [];
+
+          for (const item of finalLayout) {
+            const original = placedCards.find((c) => c.id === item.id);
+            if (
+              !original ||
+              original.startCol !== item.startCol ||
+              original.startRow !== item.startRow ||
+              original.colSpan !== item.colSpan ||
+              original.rowSpan !== item.rowSpan
+            ) {
+              changedCards.push({
+                id: item.id,
+                start_col: item.startCol,
+                start_row: item.startRow,
+                col_span: item.colSpan,
+                row_span: item.rowSpan,
+              });
+            }
+          }
+
+          if (changedCards.length > 0) {
+            onUpdateCardLayout(changedCards);
+          }
+        }
+        preventClickRef.current = true;
+        setTimeout(() => {
+          preventClickRef.current = false;
+        }, 150);
+      } else {
+        preventClickRef.current = false;
+      }
+
+      livePushedCardsRef.current = null;
+      setCardDragging(null);
+      setLivePushedCards(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   const handleStartResize = (e: React.MouseEvent, card: Service & CardPosition) => {
     e.preventDefault();
     e.stopPropagation();
@@ -910,6 +1034,7 @@ function SortableCategoryColumn({
     setLivePushedCards(null);
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
+      preventClickRef.current = true;
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
 
@@ -938,6 +1063,11 @@ function SortableCategoryColumn({
     const handleMouseUp = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      preventClickRef.current = true;
+      setTimeout(() => {
+        preventClickRef.current = false;
+      }, 150);
+
       const finalLayout = livePushedCardsRef.current;
       if (finalLayout && onUpdateCardLayout) {
         const changedCards: Array<{
@@ -1041,19 +1171,27 @@ function SortableCategoryColumn({
         {fillerCells.map((filler) => (
           <div
             key={`filler-${filler.col}-${filler.row}`}
+            onClick={() => isOwner && onAddService(category)}
             style={{
               gridColumn: `${filler.col + 1} / span 1`,
               gridRow: `${filler.row + 1} / span 1`,
               minHeight: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
             }}
-            className="rounded-xl border border-dashed border-slate-800/40 bg-slate-900/10 flex items-center justify-center select-none pointer-events-none transition-colors"
+            className={`rounded-xl border-2 border-dotted border-slate-800/80 bg-slate-950/20 flex items-center justify-center gap-1.5 transition-all select-none ${
+              isOwner
+                ? 'hover:border-red-500/50 hover:bg-red-500/[0.04] text-slate-500 hover:text-red-400 cursor-pointer group/slot'
+                : 'text-slate-700/40 pointer-events-none'
+            }`}
+            title={isOwner ? `Add new service to ${category}` : undefined}
           >
-            <span className="text-[10px] font-mono text-slate-700/60">+</span>
+            <Plus className="w-3.5 h-3.5 transition-transform group-hover/slot:scale-110" />
+            <span className="text-xs font-medium tracking-tight">Add new</span>
           </div>
         ))}
 
         {/* Placed Service Cards */}
         {activeCards.map((s) => {
+          const isCurrentDragging = cardDragging?.id === s.id;
           const isCurrentResizing = resizing?.id === s.id;
           const currentColSpan = isCurrentResizing && resizing ? resizing.colSpan : s.colSpan;
           const currentRowSpan = isCurrentResizing && resizing ? resizing.rowSpan : s.rowSpan;
@@ -1073,7 +1211,13 @@ function SortableCategoryColumn({
           return (
             <div
               key={s.id}
-              onClick={() => {
+              onMouseDown={(e) => isOwner && handleStartCardDrag(e, s)}
+              onClick={(e) => {
+                if (preventClickRef.current) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return;
+                }
                 if (isVpnLocked) {
                   onVpnLockedClick?.(s.title, s.url);
                   return;
@@ -1105,12 +1249,14 @@ function SortableCategoryColumn({
                 gridColumn: `${startCol + 1} / span ${currentColSpan}`,
                 gridRow: `${startRow + 1} / span ${currentRowSpan}`,
               }}
-              className={`group relative rounded-xl border transition-all duration-150 cursor-pointer select-none overflow-hidden ${
-                isCurrentResizing
-                  ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] bg-[#1c1f2b] z-30'
+              className={`group relative rounded-xl border transition-colors duration-150 select-none overflow-hidden ${
+                isCurrentDragging
+                  ? 'border-red-500 shadow-2xl scale-[1.03] bg-[#1e2230] z-40 cursor-grabbing ring-2 ring-red-500/40 opacity-95'
+                  : isCurrentResizing
+                  ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] bg-[#1c1f2b] z-30 cursor-se-resize'
                   : isVpnLocked
-                  ? 'border-amber-500/30 bg-[#16181f]/60 opacity-60 hover:opacity-85 hover:border-amber-500/50 hover:shadow-lg'
-                  : 'border-slate-800/80 bg-[#16181f]/80 hover:bg-[#1c1f2b] hover:border-slate-700/80 hover:shadow-lg'
+                  ? 'border-amber-500/30 bg-[#16181f]/60 opacity-60 hover:opacity-85 hover:border-amber-500/50 hover:shadow-lg cursor-pointer'
+                  : 'border-slate-800/80 bg-[#16181f]/80 hover:bg-[#1c1f2b] hover:border-slate-700/80 hover:shadow-lg cursor-pointer'
               } ${isCompact ? 'p-2.5 flex flex-col justify-between' : 'p-3.5 flex items-center justify-between'}`}
             >
               {isCompact ? (
@@ -1291,11 +1437,13 @@ function SortableCategoryColumn({
               )}
 
               {/* Drag Handle to Resize Card */}
-              <div
-                onMouseDown={(e) => handleStartResize(e, s)}
-                className="absolute bottom-0.5 right-0.5 w-4 h-4 cursor-se-resize flex items-center justify-center text-slate-600 hover:text-red-400 opacity-20 group-hover:opacity-100 transition-opacity z-20"
-                title="Drag to resize card (1x1, 2x1, 1x2, 2x2)"
-              >
+              {isOwner && (
+                <div
+                  onMouseDown={(e) => handleStartResize(e, s)}
+                  data-no-drag="true"
+                  className="resize-handle absolute bottom-0.5 right-0.5 w-5 h-5 cursor-se-resize flex items-center justify-center text-slate-600 hover:text-red-400 opacity-20 group-hover:opacity-100 transition-opacity z-20"
+                  title="Drag to resize card (1x1, 2x1, 1x2, 2x2)"
+                >
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="text-current">
                   <circle cx="7" cy="7" r="1" fill="currentColor" />
                   <circle cx="7" cy="4" r="1" fill="currentColor" />
@@ -1305,6 +1453,7 @@ function SortableCategoryColumn({
                   <circle cx="1" cy="7" r="1" fill="currentColor" />
                 </svg>
               </div>
+            )}
             </div>
           );
         })}
@@ -1636,14 +1785,32 @@ function HomelabBoard({
     saveUserPreferences(user?.id, updated);
   };
 
-  // Filtered services
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const toggleCategoryExpand = (cat: string) => {
+    setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
+
+  const toggleServiceHide = (serviceId: number) => {
+    const current = prefs.hiddenServices || [];
+    const updated = current.includes(serviceId)
+      ? current.filter(id => id !== serviceId)
+      : [...current, serviceId];
+    const nextPrefs = { ...prefs, hiddenServices: updated };
+    setPrefs(nextPrefs);
+    saveUserPreferences(user?.id, nextPrefs);
+  };
+
+  // Filtered services (respects hiddenServices preference)
   const filteredServices = useMemo(() => {
     return services.filter(s =>
-      s.title.toLowerCase().includes(search.toLowerCase()) ||
-      (s.description || '').toLowerCase().includes(search.toLowerCase()) ||
-      (s.category || '').toLowerCase().includes(search.toLowerCase())
+      !prefs.hiddenServices?.includes(s.id) &&
+      (
+        s.title.toLowerCase().includes(search.toLowerCase()) ||
+        (s.description || '').toLowerCase().includes(search.toLowerCase()) ||
+        (s.category || '').toLowerCase().includes(search.toLowerCase())
+      )
     );
-  }, [services, search]);
+  }, [services, search, prefs.hiddenServices]);
 
   const hostNode = nodes.find(n => n.id === 'host');
 
@@ -2107,34 +2274,126 @@ function HomelabBoard({
             </div>
           </div>
 
-          {/* Category Visibility */}
+          {/* Category Visibility & Services Breakdown */}
           <div className="pt-2 border-t border-slate-800/80">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Category Columns</span>
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Category Columns & Services</span>
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
               {orderedCategories.map(cat => {
-                const isHidden = prefs.hiddenCategories.includes(cat);
-                const count = services.filter(s => (s.category?.trim() || 'Services') === cat).length;
+                const isCatHidden = prefs.hiddenCategories.includes(cat);
+                const catServices = services.filter(s => (s.category?.trim() || 'Services') === cat);
+                const isExpanded = expandedCategories[cat] ?? false;
+                const visibleCount = catServices.filter(s => !prefs.hiddenServices?.includes(s.id)).length;
+
                 return (
-                  <button
+                  <div
                     key={cat}
-                    type="button"
-                    onClick={() => toggleCategoryHide(cat)}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
-                      !isHidden
-                        ? 'bg-slate-900 border-slate-700/80 text-white'
-                        : 'bg-slate-950/50 border-slate-800 text-slate-500 opacity-60'
-                    }`}
+                    className="rounded-xl border border-slate-800/80 bg-slate-900/60 overflow-hidden transition-all"
                   >
-                    <div>
-                      <div className="font-semibold">{cat}</div>
-                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">{count} services</div>
+                    {/* Category Row */}
+                    <div className="flex items-center justify-between p-2.5 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleCategoryExpand(cat)}
+                        className="flex items-center gap-2 min-w-0 flex-1 text-left group/cat"
+                      >
+                        <div className="p-1 rounded text-slate-500 group-hover/cat:text-slate-300 transition-colors">
+                          {isExpanded ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-red-400" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className={`font-semibold text-xs transition-colors ${!isCatHidden ? 'text-white' : 'text-slate-500'}`}>
+                            {cat}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                            {visibleCount}/{catServices.length} visible
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Category Hide Checkbox */}
+                      <button
+                        type="button"
+                        onClick={() => toggleCategoryHide(cat)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                          !isCatHidden
+                            ? 'bg-red-600/10 border-red-500/40 text-red-400 hover:bg-red-600/20'
+                            : 'bg-slate-800/40 border-slate-700/60 text-slate-500 hover:text-slate-400'
+                        }`}
+                        title={isCatHidden ? `Show entire ${cat} category` : `Hide entire ${cat} category`}
+                      >
+                        <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${
+                          !isCatHidden ? 'bg-red-600 border-red-500 text-white' : 'border-slate-600 bg-slate-700/50'
+                        }`}>
+                          {!isCatHidden && <Check className="w-2.5 h-2.5 stroke-[2.5]" />}
+                        </div>
+                        <span>{!isCatHidden ? 'Shown' : 'Hidden'}</span>
+                      </button>
                     </div>
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
-                      !isHidden ? 'bg-red-600 border-red-500 text-white' : 'border-slate-700 bg-slate-800/50'
-                    }`}>
-                      {!isHidden && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                    </div>
-                  </button>
+
+                    {/* Expandable Services List */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-800/80 bg-slate-950/40 p-2 space-y-1.5">
+                        {catServices.length === 0 ? (
+                          <div className="text-[11px] text-slate-600 py-1.5 px-2 italic">
+                            No services in this category
+                          </div>
+                        ) : (
+                          catServices.map(s => {
+                            const isSvcHidden = isCatHidden || (prefs.hiddenServices?.includes(s.id) ?? false);
+                            return (
+                              <div
+                                key={s.id}
+                                className={`flex items-center justify-between p-2 rounded-lg border transition-all ${
+                                  !isSvcHidden
+                                    ? 'bg-slate-900/80 border-slate-800/80 text-slate-200'
+                                    : 'bg-slate-950/60 border-slate-800/40 text-slate-500 opacity-60'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0 pr-2">
+                                  <ServiceIcon icon={s.icon} title={s.title} />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-medium truncate">{s.title}</div>
+                                    <div className="text-[9px] font-mono text-slate-500 truncate">
+                                      {s.url.replace(/^https?:\/\//, '')}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  disabled={isCatHidden}
+                                  onClick={() => toggleServiceHide(s.id)}
+                                  className={`px-2 py-1 rounded-md border text-[10px] font-mono flex items-center gap-1 transition-all ${
+                                    isCatHidden
+                                      ? 'opacity-40 cursor-not-allowed border-slate-800 text-slate-600'
+                                      : !isSvcHidden
+                                      ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
+                                      : 'bg-slate-800/40 border-slate-700/60 text-slate-500 hover:text-slate-400'
+                                  }`}
+                                  title={isCatHidden ? 'Category is hidden' : isSvcHidden ? 'Show service' : 'Hide service'}
+                                >
+                                  {!isSvcHidden ? (
+                                    <>
+                                      <Eye className="w-3 h-3 text-emerald-400" />
+                                      <span>Visible</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <EyeOff className="w-3 h-3 text-slate-500" />
+                                      <span>Hidden</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -3702,8 +3961,14 @@ export default function DashboardPage() {
     // Load services from /services/mine (Phase 3 & 5 backend persistence + permissions)
     api.get<Service[]>('/services/mine')
       .then(res => {
-        setServices(res);
-        // Fetch live metrics for all applicable services
+        setServices(current => {
+          return res.map(newS => {
+            const existing = current.find(c => c.id === newS.id);
+            return existing
+              ? { ...newS, liveStat: existing.liveStat, telemetryType: existing.telemetryType }
+              : newS;
+          });
+        });
         const statRequests: Promise<any>[] = [
           api.get<any>('/qbittorrent/stats').catch(() => null),
           api.get<any>('/jellyfin/stats').catch(() => null),
@@ -3781,10 +4046,15 @@ export default function DashboardPage() {
               }
             }
 
+            const nextStat = statText !== undefined ? statText : s.liveStat;
+            const nextTelemetry = telemetryType || s.telemetryType;
+            if (s.liveStat === nextStat && s.telemetryType === nextTelemetry) {
+              return s;
+            }
             return {
               ...s,
-              liveStat: statText !== undefined ? statText : s.liveStat,
-              telemetryType: telemetryType || s.telemetryType,
+              liveStat: nextStat,
+              telemetryType: nextTelemetry,
             };
           }));
         });
