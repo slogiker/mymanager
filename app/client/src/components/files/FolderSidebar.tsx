@@ -34,7 +34,7 @@ interface Props {
 }
 
 function fileIcon(mime: string) {
-  if (mime.startsWith('image/')) return <Image size={13} className="text-cyan-400" />;
+  if (mime.startsWith('image/')) return <Image size={13} className="text-rose-400" />;
   if (mime.startsWith('video/')) return <Video size={13} className="text-purple-400" />;
   if (mime.startsWith('audio/')) return <Music size={13} className="text-pink-400" />;
   if (mime.includes('zip') || mime.includes('tar') || mime.includes('rar')) return <Archive size={13} className="text-yellow-400" />;
@@ -109,8 +109,8 @@ function TreeFolderNode({
         onClick={() => onSelect(folder.id)}
         style={{ paddingLeft: `${level * 14 + 8}px` }}
         className={`group flex items-center gap-1.5 py-1.5 pr-2 rounded-lg cursor-pointer transition-all min-w-0
-          ${isActive ? 'bg-cyan-500/20 text-cyan-300 font-medium' : 'hover:bg-white/5 text-slate-300'}
-          ${isOver ? 'ring-2 ring-cyan-400 bg-cyan-500/10' : ''}`}
+          ${isActive ? 'bg-red-500/20 text-red-300 font-medium' : 'hover:bg-white/5 text-slate-300'}
+          ${isOver ? 'ring-2 ring-red-500 bg-red-500/10' : ''}`}
       >
         {/* Chevron */}
         <button
@@ -143,7 +143,7 @@ function TreeFolderNode({
               if (e.key === 'Escape') { setEditVal(folder.name); setEditing(false); }
             }}
             onClick={e => e.stopPropagation()}
-            className="bg-transparent border-b border-cyan-400 outline-none text-xs flex-1 min-w-0 text-slate-100"
+            className="bg-transparent border-b border-red-400 outline-none text-xs flex-1 min-w-0 text-slate-100"
           />
         ) : (
           <span className="truncate text-xs flex-1 min-w-0" title={folder.name}>
@@ -290,13 +290,13 @@ export default function FolderSidebar({
       {/* Prominent + New Button */}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
-          <button className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium text-xs shadow-lg shadow-cyan-500/20 transition-all">
+          <button className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-medium text-xs shadow-lg shadow-red-600/20 transition-all">
             <Plus size={15} /> <span className="font-semibold">New</span>
           </button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            className="z-50 min-w-[160px] bg-slate-800 border border-slate-700/80 rounded-xl shadow-2xl p-1 text-xs text-slate-200"
+            className="z-50 min-w-[160px] bg-[#111216] border border-white/10 rounded-xl shadow-2xl p-1 text-xs text-slate-200"
             sideOffset={4}
           >
             {onNewFile && (
@@ -304,7 +304,7 @@ export default function FolderSidebar({
                 className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/5 cursor-pointer outline-none"
                 onSelect={onNewFile}
               >
-                <FilePlus size={14} className="text-cyan-400" /> New File
+                <FilePlus size={14} className="text-red-400" /> New File
               </DropdownMenu.Item>
             )}
             {onNewFolder && (
@@ -334,11 +334,11 @@ export default function FolderSidebar({
           ref={setRootRef}
           onClick={() => onSelect(null)}
           className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-all select-none min-w-0
-            ${currentId === null ? 'bg-cyan-500/20 text-cyan-300 font-medium' : 'hover:bg-white/5 text-slate-300'}
-            ${rootIsOver ? 'ring-2 ring-cyan-400 bg-cyan-500/10' : ''}`}
+            ${currentId === null ? 'bg-red-500/20 text-red-300 font-medium' : 'hover:bg-white/5 text-slate-300'}
+            ${rootIsOver ? 'ring-2 ring-red-500 bg-red-500/10' : ''}`}
         >
           {currentId === null
-            ? <FolderOpen size={15} className="text-cyan-400 shrink-0" />
+            ? <FolderOpen size={15} className="text-red-400 shrink-0" />
             : <Folder size={15} className="text-slate-400 shrink-0" />}
           <span className="text-xs font-medium truncate">All Files</span>
         </div>

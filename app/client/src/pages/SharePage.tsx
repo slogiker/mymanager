@@ -69,9 +69,9 @@ export default function SharePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#111216] text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+          <div className="w-8 h-8 rounded-full border-2 border-red-500 border-t-transparent animate-spin" />
           <p className="text-xs text-slate-400">Loading shared content…</p>
         </div>
       </div>
@@ -80,13 +80,13 @@ export default function SharePage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-[#111216] text-white flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-4">
           <AlertTriangle size={32} />
         </div>
         <h1 className="text-2xl font-bold text-slate-100 mb-2">Unavailable Link</h1>
         <p className="text-sm text-slate-400 max-w-sm mb-6">{error || 'This link may have expired or been removed.'}</p>
-        <Link to="/" className="inline-flex items-center gap-2 text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+        <Link to="/" className="inline-flex items-center gap-2 text-xs text-red-400 hover:text-red-300 transition-colors">
           <ArrowLeft size={14} /> Back to mymanager
         </Link>
       </div>
@@ -98,11 +98,11 @@ export default function SharePage() {
   const downloadUrl = `/api/shares/public/${token}/download`;
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white flex flex-col">
+    <div className="min-h-screen bg-[#111216] text-white flex flex-col">
       {/* Top bar */}
-      <header className="px-6 py-4 border-b border-slate-800/80 flex items-center justify-between">
+      <header className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 text-sm font-bold text-slate-200 hover:text-white transition-colors">
-          <span className="w-6 h-6 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xs font-black">
+          <span className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center text-white text-xs font-black shadow-md shadow-red-600/30">
             M
           </span>
           mymanager
@@ -130,7 +130,7 @@ export default function SharePage() {
               <a
                 href={downloadUrl}
                 download={data.file.original_name}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-sm shadow-lg shadow-cyan-500/20 transition-all shrink-0"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-sm shadow-lg shadow-red-600/30 transition-all shrink-0"
               >
                 <Download size={16} /> Download File
               </a>
@@ -187,7 +187,7 @@ export default function SharePage() {
                 <div className="flex flex-col items-center gap-3 text-center py-12 text-slate-500">
                   <File size={48} className="opacity-40" />
                   <p className="text-sm">Preview not available for this file type.</p>
-                  <a href={downloadUrl} className="text-xs text-cyan-400 hover:underline">
+                  <a href={downloadUrl} className="text-xs text-red-400 hover:underline">
                     Download to view on your device
                   </a>
                 </div>
@@ -214,7 +214,7 @@ export default function SharePage() {
 
               <a
                 href={downloadUrl}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-sm shadow-lg shadow-cyan-500/20 transition-all shrink-0"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-sm shadow-lg shadow-red-600/30 transition-all shrink-0"
               >
                 <Download size={16} /> Download All as ZIP
               </a>
@@ -238,7 +238,7 @@ export default function SharePage() {
                     <a
                       href={file.file_path}
                       download={file.original_name}
-                      className="p-2 text-slate-400 hover:text-cyan-300 transition-colors rounded-lg hover:bg-cyan-500/10"
+                      className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/10"
                       title="Download individual file"
                     >
                       <Download size={15} />

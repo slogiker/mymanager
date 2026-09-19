@@ -115,7 +115,7 @@ export default function FileGrid({
     return (
       <button
         onClick={() => onSortChange(by)}
-        className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors ${active ? 'text-cyan-300 bg-cyan-500/10' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
+        className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors ${active ? 'text-red-400 bg-red-500/10 font-medium' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
       >
         <Icon size={11} />
         {SORT_LABELS[by]}
@@ -128,23 +128,19 @@ export default function FileGrid({
       className="relative rounded-xl border border-dashed border-slate-600/50 bg-white/[0.02] hover:bg-white/[0.04] hover:border-slate-500/70 transition-all cursor-pointer select-none flex flex-col items-center justify-center gap-2 group"
       style={{ minHeight: '168px' }}
       onClick={() => setGhostMenuOpen(true)}
-      onDragOver={e => { e.preventDefault(); setDraggingOver(true); }}
-      onDrop={handleDrop}
     >
-      <div className="w-9 h-9 rounded-full bg-white/5 border border-dashed border-slate-600 flex items-center justify-center group-hover:border-slate-400 transition-colors">
-        <Plus size={16} className="text-slate-500 group-hover:text-slate-300 transition-colors" />
+      <div className="w-10 h-10 rounded-xl bg-white/5 group-hover:bg-white/10 flex items-center justify-center text-slate-500 group-hover:text-slate-300 transition-colors">
+        <Plus size={20} />
       </div>
-      <p className="text-xs text-slate-600 group-hover:text-slate-400 transition-colors">Add files</p>
+      <span className="text-xs text-slate-500 group-hover:text-slate-300 transition-colors font-medium">Add file</span>
     </div>
   ) : (
     <div
-      className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-dashed border-slate-700/50 hover:border-slate-600 cursor-pointer transition-all group"
+      className="flex items-center gap-3 px-3 py-2 rounded-lg border border-dashed border-slate-700/50 hover:border-slate-600/70 bg-white/[0.01] hover:bg-white/[0.03] transition-colors cursor-pointer text-xs text-slate-500 hover:text-slate-400 group"
       onClick={() => setGhostMenuOpen(true)}
     >
-      <div className="w-8 h-8 rounded-md border border-dashed border-slate-600 flex items-center justify-center group-hover:border-slate-400 transition-colors">
-        <Plus size={14} className="text-slate-500 group-hover:text-slate-300" />
-      </div>
-      <span className="text-sm text-slate-600 group-hover:text-slate-400 transition-colors">Upload or create files</span>
+      <Plus size={14} className="text-slate-500 group-hover:text-slate-400" />
+      <span>Add file to this folder</span>
     </div>
   );
 
@@ -170,13 +166,13 @@ export default function FileGrid({
       {ghostMenuOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setGhostMenuOpen(false)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl py-2 min-w-[200px]">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#111216] border border-white/10 rounded-2xl shadow-2xl py-2 min-w-[200px]">
             <p className="px-4 pt-1 pb-2 text-xs text-slate-500 font-medium uppercase tracking-wider">Add to folder</p>
             <button
               onClick={() => { setGhostMenuOpen(false); onNewFile(); }}
               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
             >
-              <FilePlus size={15} className="text-cyan-400" /> New file
+              <FilePlus size={15} className="text-red-400" /> New file
             </button>
             <button
               onClick={() => { setGhostMenuOpen(false); inputRef.current?.click(); }}
@@ -217,8 +213,8 @@ export default function FileGrid({
       >
         {/* Drop zone overlay */}
         {draggingOver && (
-          <div className="absolute inset-0 z-30 rounded-xl border-2 border-cyan-400/60 bg-cyan-500/10 flex items-center justify-center pointer-events-none">
-            <div className="flex flex-col items-center gap-2 text-cyan-400">
+          <div className="absolute inset-0 z-30 rounded-xl border-2 border-red-500/60 bg-red-500/10 flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center gap-2 text-red-400">
               <Upload size={36} className="animate-bounce" />
               <p className="text-sm font-medium">Drop to upload to this folder</p>
             </div>

@@ -23,22 +23,22 @@ export default function AdminPage() {
   const tab = searchParams.get('tab') || 'messages';
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
+    <div className="min-h-screen bg-[#111216] text-slate-200">
       <Navbar />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 pt-24 pb-12">
         <div className="mb-6">
           <h1 className="text-3xl font-bold gradient-text">Admin</h1>
           <p className="text-slate-500 text-sm mt-1">Manage your portfolio content</p>
         </div>
-        <nav className="flex flex-wrap gap-1 border-b border-slate-700 mb-6 pb-2">
+        <nav className="flex flex-wrap gap-2 border-b border-slate-800/80 mb-6 pb-3">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setSearchParams({ tab: t.id })}
-              className={`px-4 py-2 rounded-t text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                 tab === t.id
-                  ? 'bg-slate-800 text-cyan-300 ring-1 ring-cyan-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-red-600 text-white shadow-[0_0_20px_-4px_rgba(239,68,68,0.5)]'
+                  : 'bg-[#16181f] text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
               {t.label}

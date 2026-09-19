@@ -44,8 +44,10 @@ router.post('/', optionalAuth, (req, res) => {
       : db.prepare('SELECT id, original_name FROM files WHERE id = ? AND session_id = ?').get(item_id, filter.val);
     if (!file) return res.status(404).json({ error: 'File not found' });
   } else {
-    const folder = db.prepare('SELECT id, name FROM folders WHERE id = ?').get(item_id);
-    if (!folder) return res.status(404).json({ error: 'Folder not found' });
+    const folder = filter.col === 'user_id'
+      ? db.prepare('SELECT id, name FROM folders WHERE id = ? AND user_id = ?').get(item_id, filter.val)
+      : null;
+    if (!folder) return res.status(404).json({ error: 'Folder not found or access denied' });
   }
 
   const id = crypto.randomUUID();
@@ -146,6 +148,7 @@ router.get('/public/:token/download', (req, res) => {
     if (!file) return res.status(404).json({ error: 'File not found' });
 
     const fullPath = path.join(filesDir, file.stored_name);
+    if (!path.resolve(fullPath).startsWith(filesDir)) return res.status(403).json({ error: 'Access denied' });
     if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File on disk missing' });
 
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.original_name)}"`);

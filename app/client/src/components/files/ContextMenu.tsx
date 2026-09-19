@@ -84,7 +84,7 @@ export default function ContextMenu({
     <div
       ref={menuRef}
       style={{ top: posY, left: posX }}
-      className="fixed z-50 w-52 bg-slate-900/95 border border-slate-700/80 rounded-xl shadow-2xl p-1.5 text-xs text-slate-200 backdrop-blur-md select-none"
+      className="fixed z-50 w-52 bg-[#111216]/95 border border-white/10 rounded-xl shadow-2xl p-1.5 text-xs text-slate-200 backdrop-blur-md select-none"
       onClick={e => e.stopPropagation()}
     >
       {/* File Target */}
@@ -95,9 +95,9 @@ export default function ContextMenu({
           </div>
           <button
             onClick={() => { onPreviewFile?.(state.file!); onClose(); }}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/20 hover:text-cyan-200 transition-colors"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-red-500/20 hover:text-red-200 transition-colors"
           >
-            <Eye size={13} className="text-cyan-400" /> Preview / Open
+            <Eye size={13} className="text-red-400" /> Preview / Open
           </button>
           <button
             onClick={() => { onRenameFile?.(state.file!); onClose(); }}
@@ -189,7 +189,7 @@ export default function ContextMenu({
             onClick={() => { onNewFile?.(); onClose(); }}
             className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
           >
-            <FilePlus size={13} className="text-cyan-400" /> New File...
+            <FilePlus size={13} className="text-red-400" /> New File...
           </button>
           <button
             onClick={() => { onNewFolder?.(); onClose(); }}

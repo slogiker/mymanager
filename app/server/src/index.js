@@ -53,7 +53,16 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(analyticsMiddleware);
 
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res, filePath) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    const ext = path.extname(filePath).toLowerCase();
+    if (['.html', '.htm', '.svg', '.xml', '.xhtml', '.shtml'].includes(ext)) {
+      res.setHeader('Content-Security-Policy', "default-src 'none'");
+      res.setHeader('Content-Disposition', 'attachment');
+    }
+  }
+}));
 
 // Tiered rate limiters & API routes
 app.use('/api', apiLimiter);

@@ -19,9 +19,9 @@ export function DroppableBreadcrumbSegment({
     <button
       ref={setNodeRef}
       onClick={onClick}
-      className={`hover:text-cyan-300 transition-colors truncate max-w-[140px] px-1 py-0.5 rounded ${
+      className={`hover:text-red-400 transition-colors truncate max-w-[140px] px-1 py-0.5 rounded ${
         isLast ? 'text-slate-200 font-semibold' : 'text-slate-400'
-      } ${isOver ? 'bg-cyan-500/25 text-cyan-300 ring-2 ring-cyan-400' : ''}`}
+      } ${isOver ? 'bg-red-500/20 text-red-300 ring-2 ring-red-500/50' : ''}`}
       title={name}
     >
       {name}
@@ -58,7 +58,7 @@ export function FileBreadcrumbs({
 
       {/* Terminal Style Breadcrumb Path */}
       <div className="flex items-center gap-2 min-w-0 bg-slate-900/60 border border-slate-800 rounded-lg px-2.5 py-1 text-xs">
-        <Terminal size={12} className="text-cyan-400 shrink-0" />
+        <Terminal size={12} className="text-red-400 shrink-0" />
         <div className="flex items-center gap-1 min-w-0 overflow-x-auto">
           <DroppableBreadcrumbSegment
             id={null}

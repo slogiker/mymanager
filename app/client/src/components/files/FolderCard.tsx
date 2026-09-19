@@ -97,7 +97,7 @@ export default function FolderCard({
         onDrop={handleNativeDrop}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer group select-none
           hover:bg-white/4 border
-          ${highlightOver ? 'border-cyan-500/50 bg-cyan-500/10 ring-2 ring-cyan-500/40' : 'border-transparent'}`}
+          ${highlightOver ? 'border-red-500/50 bg-red-500/10 ring-2 ring-red-500/40' : 'border-transparent'}`}
       >
         <div className="w-8 h-8 rounded-md bg-gradient-to-br from-yellow-500/15 to-amber-500/5 border border-yellow-500/30 flex items-center justify-center shrink-0">
           <Folder size={16} className="text-yellow-400" />
@@ -124,7 +124,7 @@ export default function FolderCard({
           {onDownloadZip && (
             <button
               onClick={() => onDownloadZip(folder.id, folder.name)}
-              className="p-1.5 text-slate-400 hover:text-cyan-400 transition-colors rounded-md hover:bg-cyan-500/10"
+              className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-md hover:bg-white/10"
               title="Download as ZIP"
             >
               <Download size={13} />
@@ -158,8 +158,8 @@ export default function FolderCard({
       onDragLeave={handleNativeDragLeave}
       onDrop={handleNativeDrop}
       className={`group relative rounded-xl border transition-all cursor-pointer select-none overflow-hidden
-        border-slate-700/50 bg-slate-800/40 hover:border-yellow-500/40 hover:bg-slate-800/70
-        ${highlightOver ? 'ring-2 ring-cyan-400 border-cyan-500/60 bg-cyan-500/10 scale-102' : ''}`}
+        border-white/5 bg-[#17181e] hover:border-yellow-500/40 hover:bg-[#1c1e26]
+        ${highlightOver ? 'ring-2 ring-red-500 border-red-500/60 bg-red-500/10 scale-102' : ''}`}
     >
       {/* Pin Badge */}
       {isPinned && (
@@ -185,7 +185,7 @@ export default function FolderCard({
         {onDownloadZip && (
           <button
             onClick={() => onDownloadZip(folder.id, folder.name)}
-            className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-cyan-400 transition-colors"
+            className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-white transition-colors"
             title="Download as ZIP"
           >
             <Download size={11} />

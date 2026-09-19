@@ -77,7 +77,7 @@ export default function Files() {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-[#020617] text-white overflow-hidden relative">
+    <div className="h-screen flex flex-col bg-[#111216] text-slate-200 overflow-hidden relative">
       <Navbar />
 
       {/* Fullscreen drag-over dropzone overlay */}
@@ -206,11 +206,11 @@ export default function Files() {
             {fm.showPreview && (
               <>
                 <div
-                  className="w-1 shrink-0 cursor-col-resize bg-slate-800/60 hover:bg-cyan-500/40 transition-colors relative group"
+                  className="w-1 shrink-0 cursor-col-resize bg-slate-800/60 hover:bg-red-500/40 transition-colors relative group"
                   onMouseDown={fm.startResize}
                 >
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-8 flex flex-col items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="w-0.5 h-4 bg-cyan-400/60 rounded-full" />
+                    <span className="w-0.5 h-4 bg-red-500/60 rounded-full" />
                   </div>
                 </div>
                 <div
@@ -245,7 +245,7 @@ export default function Files() {
                   onCheck={() => {}}
                 />
                 {fm.checkedIds.has(fm.activeFile.id) && fm.checkedIds.size > 1 && (
-                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-cyan-500 border-2 border-slate-900 flex items-center justify-center text-[10px] font-bold text-white z-10">
+                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-600 border-2 border-slate-900 flex items-center justify-center text-[10px] font-bold text-white z-10">
                     {fm.checkedIds.size}
                   </div>
                 )}

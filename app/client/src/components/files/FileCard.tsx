@@ -19,13 +19,13 @@ export interface FileItem {
 function fileTypeStyle(mime: string, name: string): { icon: React.ReactNode; bg: string; accent: string } {
   const ext = name.toLowerCase().split('.').pop() || '';
   if (['stl', 'obj', 'gltf', 'glb', 'step', 'stp', 'f3d', 'ipt', 'iam'].includes(ext)) {
-    return { icon: <Box size={26} />, bg: 'from-blue-500/15 to-cyan-500/5', accent: 'text-blue-400 border-blue-500/30' };
+    return { icon: <Box size={26} />, bg: 'from-blue-500/15 to-indigo-500/5', accent: 'text-blue-400 border-blue-500/30' };
   }
   if (['csv', 'tsv', 'xlsx', 'xls', 'ods'].includes(ext)) {
     return { icon: <Table size={26} />, bg: 'from-emerald-500/15 to-emerald-500/5', accent: 'text-emerald-400 border-emerald-500/30' };
   }
   if (mime.startsWith('image/'))
-    return { icon: <Image size={26} />, bg: 'from-cyan-500/15 to-cyan-500/5', accent: 'text-cyan-400 border-cyan-500/30' };
+    return { icon: <Image size={26} />, bg: 'from-rose-500/15 to-red-500/5', accent: 'text-rose-400 border-rose-500/30' };
   if (mime.startsWith('video/') || ['mov', 'mkv', 'webm', 'avi', 'm4v'].includes(ext))
     return { icon: <Video size={26} />, bg: 'from-purple-500/15 to-purple-500/5', accent: 'text-purple-400 border-purple-500/30' };
   if (mime.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext))
@@ -121,13 +121,13 @@ export default function FileCard({
           }
         }}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-grab active:cursor-grabbing group select-none
-          ${checked ? 'bg-cyan-500/15 border border-cyan-500/40' : selected ? 'bg-cyan-500/10 border border-cyan-500/20' : 'hover:bg-white/4 border border-transparent'}
+          ${checked ? 'bg-red-500/15 border border-red-500/40' : selected ? 'bg-red-500/10 border border-red-500/20' : 'hover:bg-white/4 border border-transparent'}
           ${isDragging ? 'opacity-40' : ''}`}
       >
         {/* Checkbox */}
         <div
           className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-all
-            ${checked ? 'bg-cyan-500 border-cyan-500' : 'border-slate-600 opacity-0 group-hover:opacity-100'}`}
+            ${checked ? 'bg-red-600 border-red-600' : 'border-slate-600 opacity-0 group-hover:opacity-100'}`}
           onClick={e => { e.stopPropagation(); onCheck(file.id, !checked); }}
           onPointerDown={e => e.stopPropagation()}
         >
@@ -155,10 +155,10 @@ export default function FileCard({
               }}
               onClick={e => e.stopPropagation()}
               onPointerDown={e => e.stopPropagation()}
-              className="bg-transparent border-b border-cyan-400 outline-none text-sm text-cyan-300 w-full"
+              className="bg-transparent border-b border-red-400 outline-none text-sm text-red-300 w-full"
             />
           ) : (
-            <p className={`text-sm truncate ${checked || selected ? 'text-cyan-200 font-medium' : 'text-slate-200'}`}>{file.original_name}</p>
+            <p className={`text-sm truncate ${checked || selected ? 'text-red-200 font-medium' : 'text-slate-200'}`}>{file.original_name}</p>
           )}
         </div>
 
@@ -174,7 +174,7 @@ export default function FileCard({
             {isPinned ? <PinOff size={13} /> : <Pin size={13} />}
           </button>
           <a href={file.file_path} download={file.original_name}
-            className="p-1.5 text-slate-400 hover:text-cyan-400 transition-colors rounded-md hover:bg-cyan-500/10">
+            className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-md hover:bg-white/10">
             <Download size={13} />
           </a>
           <button onClick={() => onDelete(file.id)}
@@ -202,16 +202,16 @@ export default function FileCard({
       }}
       className={`group relative rounded-xl border transition-all cursor-grab active:cursor-grabbing select-none overflow-hidden
         ${checked
-          ? 'border-cyan-500/60 bg-cyan-500/15 ring-2 ring-cyan-500/30'
+          ? 'border-red-500/60 bg-red-500/15 ring-2 ring-red-500/30'
           : selected
-          ? 'border-cyan-500/50 bg-cyan-500/10 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-500/20'
-          : 'border-slate-700/50 bg-slate-800/40 hover:border-slate-600 hover:bg-slate-800/70'}
+          ? 'border-red-500/50 bg-red-500/10 shadow-lg shadow-red-500/10 ring-1 ring-red-500/20'
+          : 'border-white/5 bg-[#17181e] hover:border-white/15 hover:bg-[#1c1e26]'}
         ${isDragging ? 'opacity-40 scale-95' : ''}`}
     >
       {/* Checkbox — top left */}
       <div
         className={`absolute top-2 left-2 z-10 w-5 h-5 rounded border flex items-center justify-center transition-all
-          ${checked ? 'opacity-100 bg-cyan-500 border-cyan-500' : 'opacity-0 group-hover:opacity-100 bg-slate-900/80 border-slate-500'}`}
+          ${checked ? 'opacity-100 bg-red-600 border-red-600' : 'opacity-0 group-hover:opacity-100 bg-slate-900/80 border-slate-500'}`}
         onClick={e => { e.stopPropagation(); onCheck(file.id, !checked); }}
         onPointerDown={e => e.stopPropagation()}
       >
@@ -237,7 +237,7 @@ export default function FileCard({
           {isPinned ? <PinOff size={11} /> : <Pin size={11} />}
         </button>
         <a href={file.file_path} download={file.original_name}
-          className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-cyan-400 transition-colors">
+          className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-white transition-colors">
           <Download size={11} />
         </a>
         <button onClick={() => onDelete(file.id)}
@@ -276,10 +276,10 @@ export default function FileCard({
             }}
             onClick={e => e.stopPropagation()}
             onPointerDown={e => e.stopPropagation()}
-            className="bg-transparent border-b border-cyan-400 outline-none text-xs text-cyan-300 w-full"
+            className="bg-transparent border-b border-red-400 outline-none text-xs text-red-300 w-full"
           />
         ) : (
-          <p className={`text-xs font-medium truncate leading-tight ${checked || selected ? 'text-cyan-200 font-semibold' : 'text-slate-200'}`}
+          <p className={`text-xs font-medium truncate leading-tight ${checked || selected ? 'text-red-200 font-semibold' : 'text-slate-200'}`}
             title={file.original_name}>
             {file.original_name}
           </p>

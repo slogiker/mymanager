@@ -43,7 +43,7 @@ export default function CreateFolderModal({ open, onClose, onCreate }: Props) {
           <div className="card p-6">
             <div className="flex items-center justify-between mb-4">
               <Dialog.Title className="text-lg font-semibold flex items-center gap-2">
-                <FolderPlus size={20} className="text-cyan-400" />
+                <FolderPlus size={20} className="text-yellow-400" />
                 New Folder
               </Dialog.Title>
               <button onClick={handleClose} className="text-slate-400 hover:text-white transition-colors">

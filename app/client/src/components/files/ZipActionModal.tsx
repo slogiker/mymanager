@@ -18,7 +18,7 @@ export default function ZipActionModal({ file, onClose, onUploadAsZip, onExtract
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 relative">
+      <div className="w-full max-w-md bg-[#111216] border border-white/10 rounded-2xl shadow-2xl p-6 relative">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 text-slate-500 hover:text-slate-200 transition-colors"
@@ -43,20 +43,20 @@ export default function ZipActionModal({ file, onClose, onUploadAsZip, onExtract
         <div className="flex flex-col gap-2.5">
           <button
             onClick={() => { onExtract(file); onClose(); }}
-            className="flex items-center gap-3 w-full p-3.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-500/40 text-left transition-all group"
+            className="flex items-center gap-3 w-full p-3.5 rounded-xl bg-gradient-to-r from-red-600/20 to-red-500/10 hover:from-red-600/30 hover:to-red-500/20 border border-red-500/40 text-left transition-all group"
           >
-            <div className="w-9 h-9 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-red-500/20 flex items-center justify-center text-red-400 group-hover:scale-105 transition-transform shrink-0">
               <FolderPlus size={18} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-cyan-200">Extract here into folder</p>
+              <p className="text-sm font-semibold text-red-200">Extract here into folder</p>
               <p className="text-[11px] text-slate-400">Creates a new folder and unpacks all files inside</p>
             </div>
           </button>
 
           <button
             onClick={() => { onUploadAsZip(file); onClose(); }}
-            className="flex items-center gap-3 w-full p-3.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-left transition-all group"
+            className="flex items-center gap-3 w-full p-3.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 text-left transition-all group"
           >
             <div className="w-9 h-9 rounded-lg bg-yellow-500/15 flex items-center justify-center text-yellow-400 group-hover:scale-105 transition-transform shrink-0">
               <Archive size={18} />

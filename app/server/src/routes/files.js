@@ -139,9 +139,17 @@ router.post('/create', uploadLimiter, optionalAuth, (req, res) => {
   const { name, folder_id } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
 
-  const ext = path.extname(name.trim());
+  const safeName = path.basename(name.trim());
+  if (!safeName || safeName === '.' || safeName === '..' || safeName.includes('/') || safeName.includes('\\') || safeName.includes('\0')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+
+  const ext = path.extname(safeName).toLowerCase();
   const stored = `${uuidv4()}${ext}`;
   const fullPath = path.join(filesDir, stored);
+  if (!path.resolve(fullPath).startsWith(filesDir)) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
   fs.writeFileSync(fullPath, '', 'utf8');
 
   const mime = ext === '.md' ? 'text/markdown'
@@ -157,7 +165,7 @@ router.post('/create', uploadLimiter, optionalAuth, (req, res) => {
   const result = db.prepare(`
     INSERT INTO files (user_id, session_id, folder_id, original_name, stored_name, file_path, mime_type, size)
     VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-  `).run(req.user?.id ?? null, req.user ? null : sessionId, folder_id || null, name.trim(), stored, `/uploads/files/${stored}`, mime);
+  `).run(req.user?.id ?? null, req.user ? null : sessionId, folder_id || null, safeName, stored, `/uploads/files/${stored}`, mime);
 
   res.status(201).json(db.prepare('SELECT * FROM files WHERE id = ?').get(result.lastInsertRowid));
 });
@@ -170,7 +178,8 @@ router.get('/:id/content', optionalAuth, (req, res) => {
   const file = getFileForOwner(req.params.id, filter);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
-  const fullPath = path.join(__dirname, '../../uploads/files', file.stored_name);
+  const fullPath = path.join(filesDir, file.stored_name);
+  if (!path.resolve(fullPath).startsWith(filesDir)) return res.status(403).json({ error: 'Access denied' });
   if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File not on disk' });
 
   const content = fs.readFileSync(fullPath, 'utf8');
@@ -188,7 +197,8 @@ router.put('/:id/content', optionalAuth, (req, res) => {
   const { content } = req.body;
   if (content === undefined) return res.status(400).json({ error: 'content required' });
 
-  const fullPath = path.join(__dirname, '../../uploads/files', file.stored_name);
+  const fullPath = path.join(filesDir, file.stored_name);
+  if (!path.resolve(fullPath).startsWith(filesDir)) return res.status(403).json({ error: 'Access denied' });
   fs.writeFileSync(fullPath, content, 'utf8');
   const size = Buffer.byteLength(content, 'utf8');
   db.prepare('UPDATE files SET size = ? WHERE id = ?').run(size, file.id);
@@ -234,8 +244,10 @@ router.patch('/:id/move', optionalAuth, (req, res) => {
   if (!file) return res.status(404).json({ error: 'File not found' });
 
   if (folder_id) {
-    const folder = db.prepare('SELECT id FROM folders WHERE id = ?').get(folder_id);
-    if (!folder) return res.status(404).json({ error: 'Folder not found' });
+    const folder = filter.col === 'user_id'
+      ? db.prepare('SELECT id FROM folders WHERE id = ? AND user_id = ?').get(folder_id, filter.val)
+      : db.prepare('SELECT id FROM folders WHERE id = ?').get(folder_id);
+    if (!folder) return res.status(404).json({ error: 'Folder not found or access denied' });
   }
 
   db.prepare('UPDATE files SET folder_id = ? WHERE id = ?').run(folder_id || null, req.params.id);
@@ -285,7 +297,8 @@ router.post('/extract-zip', uploadLimiter, optionalAuth, (req, res) => {
     try {
       const zip = new AdmZip(zipFilePath);
       const zipEntries = zip.getEntries();
-      const baseFolderName = path.basename(req.file.originalname, path.extname(req.file.originalname));
+      const baseRaw = path.basename(req.file.originalname, path.extname(req.file.originalname));
+      const baseFolderName = baseRaw.replace(/[^a-zA-Z0-9._ -]/g, '').trim() || 'extracted';
 
       // Create root extracted folder
       const rootFolderId = uuidv4();
@@ -295,20 +308,28 @@ router.post('/extract-zip', uploadLimiter, optionalAuth, (req, res) => {
       const folderMap = new Map(); // relative path -> folder id
       folderMap.set('', rootFolderId);
 
-      // Create any nested subfolders first
+      // Create any nested subfolders first with strict Zip Slip protection
       zipEntries.forEach(entry => {
+        // Reject entries with path traversal, null bytes, or absolute paths
+        const normalized = path.normalize(entry.entryName);
+        if (normalized.startsWith('..') || path.isAbsolute(entry.entryName) || entry.entryName.includes('\0')) {
+          return;
+        }
+
         if (entry.isDirectory) {
           const cleanPath = entry.entryName.replace(/\/+$/, '');
-          const parts = cleanPath.split('/');
+          const parts = cleanPath.split('/').filter(p => p && p !== '.' && p !== '..');
           let currentParent = rootFolderId;
           let accPath = '';
 
           for (const part of parts) {
-            accPath = accPath ? `${accPath}/${part}` : part;
+            const safePart = path.basename(part);
+            if (!safePart || safePart === '.' || safePart === '..') continue;
+            accPath = accPath ? `${accPath}/${safePart}` : safePart;
             if (!folderMap.has(accPath)) {
               const newFid = uuidv4();
               try {
-                db.prepare('INSERT INTO folders (id, user_id, name, parent_id) VALUES (?, ?, ?, ?)').run(newFid, userId, part, currentParent);
+                db.prepare('INSERT INTO folders (id, user_id, name, parent_id) VALUES (?, ?, ?, ?)').run(newFid, userId, safePart, currentParent);
                 folderMap.set(accPath, newFid);
               } catch {}
             }
@@ -317,16 +338,24 @@ router.post('/extract-zip', uploadLimiter, optionalAuth, (req, res) => {
         }
       });
 
-      // Extract and insert files
+      // Extract and insert files with Zip Slip validation
       const insertedFiles = [];
       zipEntries.forEach(entry => {
+        const normalized = path.normalize(entry.entryName);
+        if (normalized.startsWith('..') || path.isAbsolute(entry.entryName) || entry.entryName.includes('\0')) {
+          return;
+        }
+
         if (!entry.isDirectory) {
           const dirName = path.dirname(entry.entryName);
           const targetFolderId = dirName === '.' ? rootFolderId : (folderMap.get(dirName) || rootFolderId);
           const fileName = path.basename(entry.entryName);
+          if (!fileName || fileName.startsWith('..') || fileName.includes('\0')) return;
+
           const ext = path.extname(fileName);
           const stored = `${uuidv4()}${ext}`;
           const outPath = path.join(filesDir, stored);
+          if (!path.resolve(outPath).startsWith(filesDir)) return;
 
           fs.writeFileSync(outPath, entry.getData());
           const size = entry.header.size;

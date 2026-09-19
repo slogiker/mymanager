@@ -167,10 +167,10 @@ export default function ThreeViewer({ filePath, fileName, previewPath }: Props) 
       )}
 
       {/* Floating Controls */}
-      <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md p-1 rounded-lg border border-slate-700 shadow-xl z-10">
+      <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-[#111216]/90 backdrop-blur-md p-1 rounded-lg border border-white/10 shadow-xl z-10">
         <button
           onClick={resetRotation}
-          className="p-1.5 text-slate-400 hover:text-cyan-300 transition-colors rounded hover:bg-white/5"
+          className="p-1.5 text-slate-400 hover:text-white transition-colors rounded hover:bg-white/5"
           title="Reset orientation"
         >
           <RotateCw size={13} />
@@ -178,7 +178,7 @@ export default function ThreeViewer({ filePath, fileName, previewPath }: Props) 
         <button
           onClick={() => setWireframe(v => !v)}
           className={`p-1.5 rounded transition-colors ${
-            wireframe ? 'text-cyan-400 bg-cyan-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
+            wireframe ? 'text-red-400 bg-red-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
           }`}
           title="Toggle wireframe"
         >
@@ -186,8 +186,8 @@ export default function ThreeViewer({ filePath, fileName, previewPath }: Props) 
         </button>
       </div>
 
-      <div className="absolute bottom-3 left-3 pointer-events-none text-[11px] text-slate-400 bg-slate-900/80 backdrop-blur-sm px-2.5 py-1 rounded-md border border-slate-800">
-        <span className="font-semibold text-cyan-300">{fileName}</span> &middot; Drag to rotate &middot; Scroll to zoom
+      <div className="absolute bottom-3 left-3 pointer-events-none text-[11px] text-slate-400 bg-[#111216]/90 backdrop-blur-sm px-2.5 py-1 rounded-md border border-white/10">
+        <span className="font-semibold text-red-400">{fileName}</span> &middot; Drag to rotate &middot; Scroll to zoom
       </div>
     </div>
   );

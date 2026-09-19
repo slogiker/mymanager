@@ -15,11 +15,11 @@ export default function UploadDrawer() {
   if (queue.length === 0) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 w-96 max-w-[calc(100vw-2.5rem)] bg-slate-900/95 border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-md overflow-hidden transition-all duration-200">
+    <div className="fixed bottom-5 right-5 z-50 w-96 max-w-[calc(100vw-2.5rem)] bg-[#111216]/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-md overflow-hidden transition-all duration-200">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-800/80 border-b border-slate-700/60 select-none">
+      <div className="flex items-center justify-between px-4 py-3 bg-white/[0.04] border-b border-white/10 select-none">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
             {isUploading ? <UploadCloud size={15} className="animate-pulse" /> : <CheckCircle2 size={15} className="text-emerald-400" />}
           </div>
           <div className="min-w-0">
@@ -31,7 +31,7 @@ export default function UploadDrawer() {
             {isUploading && (
               <div className="w-32 bg-slate-700 rounded-full h-1 mt-1 overflow-hidden">
                 <div
-                  className="bg-cyan-400 h-1 rounded-full transition-all duration-300"
+                  className="bg-red-500 h-1 rounded-full transition-all duration-300"
                   style={{ width: `${totalProgress}%` }}
                 />
               </div>
@@ -84,7 +84,7 @@ export default function UploadDrawer() {
                 {item.status === 'uploading' && (
                   <div className="w-full bg-slate-800 rounded-full h-1 overflow-hidden">
                     <div
-                      className="bg-cyan-400 h-1 rounded-full transition-all duration-200"
+                      className="bg-red-500 h-1 rounded-full transition-all duration-200"
                       style={{ width: `${item.progress}%` }}
                     />
                   </div>

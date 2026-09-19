@@ -144,7 +144,7 @@ export default function FullscreenViewer({ file, onClose, onSaved }: Props) {
           {editing && (
             <>
               <button onClick={handleSave} disabled={saving}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-cyan-500/80 hover:bg-cyan-500 text-white rounded-lg transition-colors">
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors">
                 <Save size={12} /> {saving ? 'Saving…' : 'Save'}
               </button>
               <button onClick={() => { setEditValue(content ?? ''); setEditing(false); }}
@@ -229,7 +229,7 @@ export default function FullscreenViewer({ file, onClose, onSaved }: Props) {
 
         {canEdit && editing && (
           <textarea ref={textareaRef} value={editValue} onChange={e => setEditValue(e.target.value)}
-            className="w-full max-w-4xl bg-white/5 border border-white/20 rounded-xl p-6 text-sm text-slate-200 font-mono resize-none outline-none focus:border-cyan-500/50 leading-relaxed"
+            className="w-full max-w-4xl bg-white/5 border border-white/20 rounded-xl p-6 text-sm text-slate-200 font-mono resize-none outline-none focus:border-red-500/50 leading-relaxed"
             style={{ minHeight: 'calc(100vh - 160px)' }} onClick={e => e.stopPropagation()} />
         )}
 

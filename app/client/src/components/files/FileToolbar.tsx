@@ -50,7 +50,7 @@ export function FileToolbar({
         <button
           onClick={onTogglePreview}
           className={`btn btn-outline p-2 ${
-            showPreview ? 'text-cyan-400 border-cyan-500/40 bg-cyan-500/5' : ''
+            showPreview ? 'text-red-400 border-red-500/40 bg-red-500/10' : ''
           }`}
           title="Toggle preview panel"
         >
@@ -98,7 +98,7 @@ export function FileSearchFilterBar({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search files…"
-            className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg pl-8 pr-8 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-colors"
+            className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg pl-8 pr-8 py-1.5 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 transition-colors"
           />
           {searchQuery && (
             <button
@@ -129,7 +129,7 @@ export function FileSearchFilterBar({
             onClick={() => onTypeFilterChange(typeFilter === tf.value ? null : tf.value)}
             className={`text-xs px-2.5 py-1 rounded-md transition-colors whitespace-nowrap ${
               typeFilter === tf.value
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-medium'
+                ? 'bg-red-500/20 text-red-300 border border-red-500/40 font-medium'
                 : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
             }`}
           >

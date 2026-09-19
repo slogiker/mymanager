@@ -345,7 +345,7 @@ export default function PreviewPanel({ file, onClose, onSaved }: Props) {
                   ref={textareaRef}
                   value={editValue}
                   onChange={handleTextareaInput}
-                  className="w-full flex-1 min-h-[400px] bg-slate-900/90 border border-slate-600 rounded-lg p-3 text-xs text-slate-200 font-mono resize-none outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 leading-relaxed"
+                  className="w-full flex-1 min-h-[400px] bg-slate-900/90 border border-slate-600 rounded-lg p-3 text-xs text-slate-200 font-mono resize-none outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 leading-relaxed"
                   placeholder="Start typing…"
                 />
               )}

@@ -47,10 +47,10 @@ export default function NewFileModal({ open, onClose, onCreate }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#111216] border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <FilePlus size={16} className="text-cyan-400" />
+            <FilePlus size={16} className="text-red-400" />
             <h3 className="text-sm font-semibold text-slate-100">New File</h3>
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors">
@@ -63,7 +63,7 @@ export default function NewFileModal({ open, onClose, onCreate }: Props) {
             <button
               key={p.ext}
               onClick={() => applyPreset(p.ext)}
-              className="text-xs px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors border border-slate-700/50"
+              className="text-xs px-2.5 py-1 rounded-md bg-white/[0.04] text-slate-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/30 transition-colors border border-white/10"
             >
               {p.label}
             </button>
