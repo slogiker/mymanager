@@ -90,14 +90,22 @@ if (IS_PROD) {
 
   app.use(express.static(clientDist));
 
-  app.get('*', (req, res) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return;
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
     const profile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
     const baseTitle = `${profile?.name || 'Daniel'} — ${profile?.title || 'Full Stack Developer'}`;
     const baseDesc = profile?.bio || 'I build useful things for fun.';
     res.send(injectMetaTags(indexHtml, { title: baseTitle, description: baseDesc }));
   });
 }
+
+// 404 handler for API and uploads
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
+app.use('/uploads', (req, res) => {
+  res.status(404).json({ error: 'File not found' });
+});
 
 // Centralized error handling with information disclosure protection (CWE-209)
 app.use((err, req, res, _next) => {

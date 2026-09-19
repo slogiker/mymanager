@@ -1773,7 +1773,7 @@ function HomelabBoard({
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={orderedCategories} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
               {orderedCategories.map((cat) => {
                 if (prefs.hiddenCategories.includes(cat)) return null;
                 const items = filteredServices.filter(s => (s.category?.trim() || 'Services') === cat);
