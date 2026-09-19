@@ -187,8 +187,6 @@ export default function DashboardPage() {
               } else if (piRes?.online === false) {
                 statText = 'Offline';
               }
-            } else if (title.includes('nextcloud')) {
-              statText = 'Media Pool: 8.7 TB free';
             }
 
             const nextStat = statText !== undefined ? statText : s.liveStat;
@@ -210,17 +208,6 @@ export default function DashboardPage() {
     api.get<ServerNode[]>('/system/nodes')
       .then(res => {
         setNodes(res);
-        const ncNode = res?.find(n => n.id.includes('41') || n.name.toLowerCase().includes('nextcloud'));
-        if (ncNode?.disk?.free) {
-          setServices(currentServices => currentServices.map(s => {
-            if (s.title.toLowerCase().includes('nextcloud')) {
-              const stat = `Media Pool: ${ncNode.disk?.free} free`;
-              if (s.liveStat === stat) return s;
-              return { ...s, liveStat: stat };
-            }
-            return s;
-          }));
-        }
       })
       .catch(() => {})
       .finally(() => setLoadingNodes(false));
