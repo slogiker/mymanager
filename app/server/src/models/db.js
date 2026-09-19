@@ -237,8 +237,17 @@ db.exec(`
     expires_at TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
-  CREATE INDEX IF NOT EXISTS idx_shares_token ON shares(token);
-  CREATE INDEX IF NOT EXISTS idx_shares_item ON shares(type, item_id);
+  CREATE TABLE IF NOT EXISTS item_permissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_type TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    permission TEXT NOT NULL DEFAULT 'viewer',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(item_type, item_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_item_permissions_lookup ON item_permissions(item_type, item_id);
+  CREATE INDEX IF NOT EXISTS idx_item_permissions_user ON item_permissions(user_id);
 
   CREATE TABLE IF NOT EXISTS user_service_prefs (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -283,6 +292,15 @@ db.exec(`
 const usersCols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
 if (!usersCols.includes('preferences')) {
   db.exec('ALTER TABLE users ADD COLUMN preferences TEXT');
+}
+
+// Migrate: add permission and is_public to shares
+const sharesCols = db.prepare("PRAGMA table_info(shares)").all().map(c => c.name);
+if (!sharesCols.includes('permission')) {
+  db.exec("ALTER TABLE shares ADD COLUMN permission TEXT DEFAULT 'viewer'");
+}
+if (!sharesCols.includes('is_public')) {
+  db.exec("ALTER TABLE shares ADD COLUMN is_public INTEGER DEFAULT 1");
 }
 
 function seed() {
