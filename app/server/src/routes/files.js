@@ -7,6 +7,7 @@ const db = require('../models/db');
 const { optionalAuth, verifyToken } = require('../middleware/auth');
 const { requireOwner } = require('../middleware/owner');
 const { uploadLimiter } = require('../middleware/rateLimit');
+const { parseDocument } = require('../utils/documentParser');
 
 const router = express.Router();
 
@@ -95,7 +96,42 @@ router.post('/', uploadLimiter, optionalAuth, (req, res) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    const folderId = req.body.folder_id || null;
+    let folderId = req.body.folder_id || null;
+    const relativePath = req.body.relative_path;
+
+    if (relativePath && typeof relativePath === 'string') {
+      const cleanPath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '').replace(/^[\\\/]/, '');
+      const parts = cleanPath.split(/[\\\/]/);
+      const dirParts = parts.slice(0, -1);
+
+      let currentParent = folderId;
+      for (const dirName of dirParts) {
+        if (!dirName || dirName === '.' || dirName === '..') continue;
+        let existing;
+        if (req.user) {
+          existing = currentParent
+            ? db.prepare('SELECT id FROM folders WHERE user_id = ? AND name = ? AND parent_id = ?').get(req.user.id, dirName, currentParent)
+            : db.prepare('SELECT id FROM folders WHERE user_id = ? AND name = ? AND parent_id IS NULL').get(req.user.id, dirName);
+        } else {
+          existing = currentParent
+            ? db.prepare('SELECT id FROM folders WHERE session_id = ? AND name = ? AND parent_id = ?').get(sessionId, dirName, currentParent)
+            : db.prepare('SELECT id FROM folders WHERE session_id = ? AND name = ? AND parent_id IS NULL').get(sessionId, dirName);
+        }
+
+        if (existing) {
+          currentParent = existing.id;
+        } else {
+          const newFolderId = uuidv4();
+          if (req.user) {
+            db.prepare('INSERT INTO folders (id, user_id, name, parent_id) VALUES (?, ?, ?, ?)').run(newFolderId, req.user.id, dirName, currentParent);
+          } else {
+            db.prepare('INSERT INTO folders (id, session_id, name, parent_id) VALUES (?, ?, ?, ?)').run(newFolderId, sessionId, dirName, currentParent);
+          }
+          currentParent = newFolderId;
+        }
+      }
+      folderId = currentParent;
+    }
     let previewPath = null;
     let previewType = null;
     const ext = path.extname(req.file.originalname).toLowerCase();
@@ -186,6 +222,25 @@ router.get('/:id/content', optionalAuth, (req, res) => {
   res.json({ content });
 });
 
+// Read document content (.docx, .odt, .pptx, .odp, .doc)
+router.get('/:id/document-content', optionalAuth, (req, res) => {
+  const filter = getOwnerFilter(req);
+  if (!filter) return res.status(401).json({ error: 'Not authenticated' });
+
+  const file = getFileForOwner(req.params.id, filter);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  const fullPath = path.join(filesDir, file.stored_name);
+  if (!path.resolve(fullPath).startsWith(filesDir)) return res.status(403).json({ error: 'Access denied' });
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File not on disk' });
+
+  const result = parseDocument(fullPath, file.original_name);
+  if (result.error) {
+    return res.status(400).json({ error: result.error });
+  }
+  res.json(result);
+});
+
 // Write text file content
 router.put('/:id/content', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
@@ -216,6 +271,55 @@ router.patch('/:id/pin', optionalAuth, (req, res) => {
 
   db.prepare('UPDATE files SET pinned = ? WHERE id = ?').run(file.pinned ? 0 : 1, file.id);
   res.json(db.prepare('SELECT * FROM files WHERE id = ?').get(file.id));
+});
+
+// Duplicate file
+router.post('/:id/duplicate', optionalAuth, (req, res) => {
+  const filter = getOwnerFilter(req);
+  if (!filter) return res.status(401).json({ error: 'Not authenticated' });
+
+  const file = getFileForOwner(req.params.id, filter);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  const srcPath = path.join(filesDir, file.stored_name);
+  if (!fs.existsSync(srcPath)) return res.status(404).json({ error: 'Source file missing' });
+
+  const ext = path.extname(file.original_name);
+  const base = path.basename(file.original_name, ext);
+  const newName = `${base} (copy)${ext}`;
+  const newStored = `${uuidv4()}${ext}`;
+  const destPath = path.join(filesDir, newStored);
+
+  fs.copyFileSync(srcPath, destPath);
+
+  let newPreviewPath = null;
+  if (file.preview_path) {
+    const previewFileName = path.basename(file.preview_path);
+    const srcThumb = path.join(filesDir, previewFileName);
+    if (fs.existsSync(srcThumb)) {
+      const newThumbName = `thumb_${uuidv4()}${path.extname(previewFileName)}`;
+      fs.copyFileSync(srcThumb, path.join(filesDir, newThumbName));
+      newPreviewPath = `/uploads/files/${newThumbName}`;
+    }
+  }
+
+  const result = db.prepare(`
+    INSERT INTO files (user_id, session_id, folder_id, original_name, stored_name, file_path, mime_type, size, preview_path, preview_type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    file.user_id,
+    file.session_id,
+    file.folder_id,
+    newName,
+    newStored,
+    `/uploads/files/${newStored}`,
+    file.mime_type,
+    file.size,
+    newPreviewPath,
+    file.preview_type
+  );
+
+  res.status(201).json(db.prepare('SELECT * FROM files WHERE id = ?').get(result.lastInsertRowid));
 });
 
 // Rename file

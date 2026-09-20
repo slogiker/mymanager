@@ -90,31 +90,42 @@ app.use('/api/jellyseerr', require('./routes/jellyseerr'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/speedtest', require('./routes/speedtest'));
 
-if (IS_PROD) {
-  const fs = require('fs');
-  const { injectMetaTags } = require('./utils/seoInjector');
-  const db = require('./models/db');
-  const clientDist = path.join(__dirname, '../../client/dist');
-  const indexHtml = fs.readFileSync(path.join(clientDist, 'index.html'), 'utf8');
-
-  app.use(express.static(clientDist));
-
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
-    const profile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
-    const baseTitle = `${profile?.name || 'Daniel'} — ${profile?.title || 'Full Stack Developer'}`;
-    const baseDesc = profile?.bio || 'I build useful things for fun.';
-    res.send(injectMetaTags(indexHtml, { title: baseTitle, description: baseDesc }));
-  });
-}
-
-// 404 handler for API and uploads
+// Catch-all 404 handler for unmatched /api/* requests (scoped to /api prefix so it does not swallow SPA routes)
 app.use('/api', (req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
+  res.status(404).json({ error: 'Not found' });
 });
+
+// Catch-all 404 handler for unmatched /uploads/* requests
 app.use('/uploads', (req, res) => {
   res.status(404).json({ error: 'File not found' });
 });
+
+// Serve built frontend (static assets + history-mode fallback to index.html)
+const fs = require('fs');
+const clientDist = path.join(__dirname, '../../client/dist');
+const indexHtmlPath = path.join(clientDist, 'index.html');
+
+if (IS_PROD || fs.existsSync(indexHtmlPath)) {
+  if (fs.existsSync(indexHtmlPath)) {
+    const { injectMetaTags } = require('./utils/seoInjector');
+    const db = require('./models/db');
+    const indexHtml = fs.readFileSync(indexHtmlPath, 'utf8');
+
+    app.use(express.static(clientDist));
+
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+      try {
+        const profile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
+        const baseTitle = `${profile?.name || 'Daniel'} — ${profile?.title || 'Full Stack Developer'}`;
+        const baseDesc = profile?.bio || 'I build useful things for fun.';
+        res.send(injectMetaTags(indexHtml, { title: baseTitle, description: baseDesc }));
+      } catch {
+        res.sendFile(indexHtmlPath);
+      }
+    });
+  }
+}
 
 // Centralized error handling with information disclosure protection (CWE-209)
 app.use((err, req, res, _next) => {

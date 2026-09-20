@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Download, Edit2, Save, XCircle, Eye, Code, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, Download, Edit2, Save, XCircle, Eye, Code, ZoomIn, ZoomOut, Share2 } from 'lucide-react';
 import { marked } from 'marked';
 import { api } from '../../lib/api';
 import type { FileItem } from './FileCard';
 import ThreeViewer from './ThreeViewer';
+import DocumentViewer, { type DocumentData } from './DocumentViewer';
 
 interface Props {
   file: FileItem;
   onClose: () => void;
   onSaved: (id: number, size: number) => void;
+  onShare?: (file: FileItem) => void;
 }
 
 function isEditable(mime: string, name: string) {
@@ -28,7 +30,23 @@ function is3DFile(name: string) {
   return ['.stl', '.obj', '.gltf', '.glb', '.step', '.stp', '.f3d', '.ipt', '.iam'].some(e => name.toLowerCase().endsWith(e));
 }
 
-export default function FullscreenViewer({ file, onClose, onSaved }: Props) {
+function isOfficeDoc(name: string) {
+  return ['.docx', '.doc', '.odt', '.rtf'].some(e => name.toLowerCase().endsWith(e));
+}
+
+function isPresentation(name: string) {
+  return ['.pptx', '.odp'].some(e => name.toLowerCase().endsWith(e));
+}
+
+function isSpreadsheet(name: string) {
+  return ['.csv', '.tsv', '.xlsx', '.xls', '.ods'].some(e => name.toLowerCase().endsWith(e));
+}
+
+function isEpub(name: string) {
+  return name.toLowerCase().endsWith('.epub');
+}
+
+export default function FullscreenViewer({ file, onClose, onSaved, onShare }: Props) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -36,6 +54,8 @@ export default function FullscreenViewer({ file, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [renderView, setRenderView] = useState<'preview' | 'code'>('preview');
   const [imgZoom, setImgZoom] = useState(1);
+  const [docData, setDocData] = useState<DocumentData | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isImg = (file.mime_type ?? '').startsWith('image/');
@@ -43,6 +63,10 @@ export default function FullscreenViewer({ file, onClose, onSaved }: Props) {
   const isAud = (file.mime_type ?? '').startsWith('audio/');
   const isPdf = file.mime_type === 'application/pdf' || file.original_name.toLowerCase().endsWith('.pdf');
   const is3D = is3DFile(file.original_name);
+  const isOffice = isOfficeDoc(file.original_name);
+  const isPresent = isPresentation(file.original_name);
+  const isSheet = isSpreadsheet(file.original_name);
+  const isBook = isEpub(file.original_name);
   const isMd = file.original_name.toLowerCase().endsWith('.md') || file.original_name.toLowerCase().endsWith('.mdx');
   const isHtml = file.original_name.toLowerCase().endsWith('.html') || file.original_name.toLowerCase().endsWith('.htm');
   const canEdit = isEditable(file.mime_type ?? '', file.original_name);
@@ -73,13 +97,20 @@ export default function FullscreenViewer({ file, onClose, onSaved }: Props) {
   }, [isImg]);
 
   useEffect(() => {
-    if (!canEdit) return;
-    setLoading(true);
-    api.get<{ content: string }>(`/files/${file.id}/content`)
-      .then(d => { setContent(d.content); setEditValue(d.content); })
-      .catch(() => setContent(null))
-      .finally(() => setLoading(false));
-  }, [file.id, canEdit]);
+    if (canEdit) {
+      setLoading(true);
+      api.get<{ content: string }>(`/files/${file.id}/content`)
+        .then(d => { setContent(d.content); setEditValue(d.content); })
+        .catch(() => setContent(null))
+        .finally(() => setLoading(false));
+    } else if (isOffice || isPresent || isSheet || isBook) {
+      setLoadingDoc(true);
+      api.get<DocumentData>(`/files/${file.id}/document-content`)
+        .then(d => setDocData(d))
+        .catch(err => setDocData({ type: 'document', format: 'error', error: err?.message || 'Failed to load preview' }))
+        .finally(() => setLoadingDoc(false));
+    }
+  }, [file.id, canEdit, isOffice, isPresent, isSheet, isBook]);
 
   useEffect(() => { if (editing) textareaRef.current?.focus(); }, [editing]);
 
@@ -153,8 +184,18 @@ export default function FullscreenViewer({ file, onClose, onSaved }: Props) {
               </button>
             </>
           )}
+          {onShare && (
+            <button
+              onClick={() => onShare(file)}
+              className="p-2 text-white/50 hover:text-purple-400 transition-colors"
+              title="Share file"
+            >
+              <Share2 size={16} />
+            </button>
+          )}
           <a href={file.file_path} download={file.original_name}
-            className="p-2 text-white/50 hover:text-white transition-colors">
+            className="p-2 text-white/50 hover:text-white transition-colors"
+            title="Download file">
             <Download size={16} />
           </a>
           <button onClick={onClose} className="p-2 text-white/50 hover:text-white transition-colors">
@@ -204,8 +245,24 @@ export default function FullscreenViewer({ file, onClose, onSaved }: Props) {
         )}
 
         {isPdf && (
-          <embed src={file.file_path} type="application/pdf"
-            className="w-full rounded-lg" style={{ height: 'calc(100vh - 120px)' }} onClick={e => e.stopPropagation()} />
+          <iframe
+            src={file.file_path}
+            className="w-full rounded-lg bg-white"
+            style={{ height: 'calc(100vh - 120px)' }}
+            title={file.original_name}
+            onClick={e => e.stopPropagation()}
+          />
+        )}
+
+        {(isOffice || isPresent || isSheet || isBook) && (
+          <div className="w-full max-w-6xl h-[calc(100vh-140px)]" onClick={e => e.stopPropagation()}>
+            <DocumentViewer
+              data={docData}
+              loading={loadingDoc}
+              fileName={file.original_name}
+              fullscreen
+            />
+          </div>
         )}
 
         {canEdit && !loading && content !== null && !editing && (
@@ -237,7 +294,7 @@ export default function FullscreenViewer({ file, onClose, onSaved }: Props) {
           <div className="text-white/40 text-sm">Loading…</div>
         )}
 
-        {!canEdit && !isImg && !isVid && !isAud && !isPdf && !is3D && (
+        {!canEdit && !isImg && !isVid && !isAud && !isPdf && !is3D && !isOffice && !isPresent && !isSheet && !isBook && (
           <div className="flex flex-col items-center gap-4 pt-20 text-white/30" onClick={e => e.stopPropagation()}>
             <span className="text-6xl">📄</span>
             <p>No preview for this file type</p>

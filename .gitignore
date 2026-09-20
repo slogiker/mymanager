@@ -9,3 +9,4 @@ app/server/data/
 *.db
 *.sqlite
 *.log
+data/

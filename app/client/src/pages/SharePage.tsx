@@ -19,6 +19,8 @@ import {
   Eye
 } from 'lucide-react';
 import { marked } from 'marked';
+import DocumentViewer, { type DocumentData } from '../components/files/DocumentViewer';
+import { FileIcon } from '../components/files/fileIcons';
 
 interface SharedFile {
   id: number;
@@ -57,6 +59,14 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isOfficeDoc(name: string) {
+  return ['.docx', '.doc', '.odt'].some(e => name.toLowerCase().endsWith(e));
+}
+
+function isPresentation(name: string) {
+  return ['.pptx', '.odp'].some(e => name.toLowerCase().endsWith(e));
+}
+
 export default function SharePage() {
   const { token } = useParams<{ token: string }>();
   const [data, setData] = useState<ShareResponse | null>(null);
@@ -69,6 +79,10 @@ export default function SharePage() {
   const [editingContent, setEditingContent] = useState<string>('');
   const [isEditing, setIsEditing] = useState(false);
   const [savingContent, setSavingContent] = useState(false);
+
+  // Document & presentation state
+  const [docData, setDocData] = useState<DocumentData | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
 
   // Folder upload state
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -124,6 +138,19 @@ export default function SharePage() {
               setEditingContent(txt);
             })
             .catch(() => {});
+        }
+
+        if (
+          d.type === 'file' &&
+          d.file &&
+          (isOfficeDoc(d.file.original_name) || isPresentation(d.file.original_name))
+        ) {
+          setLoadingDoc(true);
+          fetch(`/api/shares/public/${token}/document-content`)
+            .then(r => r.json())
+            .then(doc => setDocData(doc))
+            .catch(err => setDocData({ type: 'document', format: 'error', error: err?.message || 'Failed to load document' }))
+            .finally(() => setLoadingDoc(false));
         }
       })
       .catch(err => setError(err.message))
@@ -231,7 +258,7 @@ export default function SharePage() {
           {/* Item details card */}
           <div className="p-3.5 bg-white/[0.03] border border-white/10 rounded-xl mb-6 flex items-center gap-3 text-left">
             <div className="w-10 h-10 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 flex items-center justify-center text-base shrink-0">
-              {expiredData.type === 'folder' ? <Folder size={20} /> : <File size={20} />}
+              {expiredData.type === 'folder' ? <Folder size={20} /> : <FileIcon fileName={expiredData.item_name} size={20} />}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-slate-200 truncate">{expiredData.item_name}</p>
@@ -331,11 +358,16 @@ export default function SharePage() {
         {isFile && data.file && (
           <div className="flex flex-col flex-1 gap-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-              <div className="min-w-0">
-                <h1 className="text-xl md:text-2xl font-bold text-slate-100 truncate">{data.file.original_name}</h1>
-                <p className="text-xs text-slate-400 mt-1">
-                  {formatSize(data.file.size)} &middot; Shared via mymanager
-                </p>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
+                  <FileIcon fileName={data.file.original_name} mimeType={data.file.mime_type} size={24} />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-slate-100 truncate">{data.file.original_name}</h1>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {formatSize(data.file.size)} &middot; Shared via mymanager
+                  </p>
+                </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
@@ -414,7 +446,22 @@ export default function SharePage() {
                   )}
 
                   {data.file.mime_type === 'application/pdf' && (
-                    <embed src={data.file.file_path} type="application/pdf" className="w-full h-[600px] rounded-lg" />
+                    <iframe
+                      src={data.file.file_path}
+                      className="w-full h-[650px] rounded-lg bg-white border border-slate-700"
+                      title={data.file.original_name}
+                    />
+                  )}
+
+                  {(isOfficeDoc(data.file.original_name) || isPresentation(data.file.original_name)) && (
+                    <div className="w-full">
+                      <DocumentViewer
+                        data={docData}
+                        loading={loadingDoc}
+                        fileName={data.file.original_name}
+                        fullscreen
+                      />
+                    </div>
                   )}
 
                   {data.file.original_name.endsWith('.md') && fileContent !== null && (
@@ -436,7 +483,7 @@ export default function SharePage() {
                     data.file.mime_type !== 'application/pdf' &&
                     fileContent === null && (
                       <div className="flex flex-col items-center gap-3 text-center py-12 text-slate-500">
-                        <File size={48} className="opacity-40" />
+                        <FileIcon fileName={data.file.original_name} mimeType={data.file.mime_type} size={48} className="opacity-60" />
                         <p className="text-sm">Preview not available for this file type.</p>
                         <a href={downloadUrl} className="text-xs text-red-400 hover:underline">
                           Download to view on your device
@@ -497,7 +544,7 @@ export default function SharePage() {
                 data.files?.map(file => (
                   <div key={file.id} className="flex items-center justify-between gap-3 p-4 hover:bg-white/[0.02] transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
-                      <File size={16} className="text-slate-500 shrink-0" />
+                      <FileIcon fileName={file.original_name} mimeType={file.mime_type} size={16} className="shrink-0" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-200 truncate">{file.original_name}</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">{formatSize(file.size)}</p>

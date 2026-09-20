@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Folder, Download, Trash2, Pin, PinOff } from 'lucide-react';
+import { Folder, Download, Trash2, Pin, PinOff, Share2 } from 'lucide-react';
 import { useDroppable, useDndMonitor } from '@dnd-kit/core';
 
 export interface FolderItem {
@@ -17,6 +17,7 @@ interface Props {
   onDropFiles?: (files: File[], folderId: string) => void;
   onContextMenu?: (e: React.MouseEvent, folder: FolderItem) => void;
   onPinToggle?: (id: string) => void;
+  onShare?: (folder: FolderItem) => void;
   onDownloadZip?: (id: string, name: string) => void;
   onDelete?: (id: string) => void;
 }
@@ -28,6 +29,7 @@ export default function FolderCard({
   onDropFiles,
   onContextMenu,
   onPinToggle,
+  onShare,
   onDownloadZip,
   onDelete,
 }: Props) {
@@ -121,6 +123,15 @@ export default function FolderCard({
               {isPinned ? <PinOff size={13} /> : <Pin size={13} />}
             </button>
           )}
+          {onShare && (
+            <button
+              onClick={() => onShare(folder)}
+              className="p-1.5 text-slate-400 hover:text-purple-400 transition-colors rounded-md hover:bg-purple-500/10"
+              title="Share folder"
+            >
+              <Share2 size={13} />
+            </button>
+          )}
           {onDownloadZip && (
             <button
               onClick={() => onDownloadZip(folder.id, folder.name)}
@@ -180,6 +191,15 @@ export default function FolderCard({
             title={isPinned ? 'Unpin folder' : 'Pin folder'}
           >
             {isPinned ? <PinOff size={11} /> : <Pin size={11} />}
+          </button>
+        )}
+        {onShare && (
+          <button
+            onClick={() => onShare(folder)}
+            className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-purple-400 transition-colors"
+            title="Share folder"
+          >
+            <Share2 size={11} />
           </button>
         )}
         {onDownloadZip && (

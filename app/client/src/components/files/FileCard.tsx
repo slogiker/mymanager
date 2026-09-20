@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Download, Trash2, FileText, Image, Video, Music, FileCode, Archive, File, Pin, PinOff, Box, Table } from 'lucide-react';
+import { Download, Trash2, Pin, PinOff, Share2 } from 'lucide-react';
+import { getFileTypeStyle } from './fileIcons';
 
 export interface FileItem {
   id: number;
@@ -14,29 +15,6 @@ export interface FileItem {
   created_at: string;
   preview_path?: string;
   preview_type?: string;
-}
-
-function fileTypeStyle(mime: string, name: string): { icon: React.ReactNode; bg: string; accent: string } {
-  const ext = name.toLowerCase().split('.').pop() || '';
-  if (['stl', 'obj', 'gltf', 'glb', 'step', 'stp', 'f3d', 'ipt', 'iam'].includes(ext)) {
-    return { icon: <Box size={26} />, bg: 'from-blue-500/15 to-indigo-500/5', accent: 'text-blue-400 border-blue-500/30' };
-  }
-  if (['csv', 'tsv', 'xlsx', 'xls', 'ods'].includes(ext)) {
-    return { icon: <Table size={26} />, bg: 'from-emerald-500/15 to-emerald-500/5', accent: 'text-emerald-400 border-emerald-500/30' };
-  }
-  if (mime.startsWith('image/'))
-    return { icon: <Image size={26} />, bg: 'from-rose-500/15 to-red-500/5', accent: 'text-rose-400 border-rose-500/30' };
-  if (mime.startsWith('video/') || ['mov', 'mkv', 'webm', 'avi', 'm4v'].includes(ext))
-    return { icon: <Video size={26} />, bg: 'from-purple-500/15 to-purple-500/5', accent: 'text-purple-400 border-purple-500/30' };
-  if (mime.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext))
-    return { icon: <Music size={26} />, bg: 'from-pink-500/15 to-pink-500/5', accent: 'text-pink-400 border-pink-500/30' };
-  if (mime.includes('zip') || mime.includes('tar') || mime.includes('gzip') || mime.includes('rar') || mime.includes('7z') || ['zip', 'tar', 'gz', 'rar', '7z'].includes(ext))
-    return { icon: <Archive size={26} />, bg: 'from-yellow-500/15 to-yellow-500/5', accent: 'text-yellow-400 border-yellow-500/30' };
-  if (mime.includes('javascript') || mime.includes('typescript') || mime.includes('json') || mime.includes('html') || mime.includes('css') || mime.includes('xml') || ['py', 'sh', 'c', 'cpp', 'rs', 'go', 'ts', 'js'].includes(ext))
-    return { icon: <FileCode size={26} />, bg: 'from-green-500/15 to-green-500/5', accent: 'text-green-400 border-green-500/30' };
-  if (mime.startsWith('text/') || ['txt', 'md', 'mdx', 'log'].includes(ext))
-    return { icon: <FileText size={26} />, bg: 'from-slate-500/15 to-slate-500/5', accent: 'text-slate-400 border-slate-500/30' };
-  return { icon: <File size={26} />, bg: 'from-slate-500/10 to-slate-500/5', accent: 'text-slate-500 border-slate-600/30' };
 }
 
 export function formatSize(bytes: number) {
@@ -59,6 +37,7 @@ interface Props {
   onDoubleClick: (id: number) => void;
   onDelete: (id: number) => void;
   onPin: (id: number) => void;
+  onShare?: (file: FileItem) => void;
   onCheck: (id: number, checked: boolean) => void;
   onContextMenu?: (e: React.MouseEvent, file: FileItem) => void;
   onRename?: (id: number, name: string) => Promise<void>;
@@ -73,6 +52,7 @@ export default function FileCard({
   onDoubleClick,
   onDelete,
   onPin,
+  onShare,
   onCheck,
   onContextMenu,
   onRename,
@@ -173,8 +153,18 @@ export default function FileCard({
             title={isPinned ? 'Unpin' : 'Pin'}>
             {isPinned ? <PinOff size={13} /> : <Pin size={13} />}
           </button>
+          {onShare && (
+            <button
+              onClick={() => onShare(file)}
+              className="p-1.5 text-slate-400 hover:text-purple-400 transition-colors rounded-md hover:bg-purple-500/10"
+              title="Share file"
+            >
+              <Share2 size={13} />
+            </button>
+          )}
           <a href={file.file_path} download={file.original_name}
-            className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-md hover:bg-white/10">
+            className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-md hover:bg-white/10"
+            title="Download file">
             <Download size={13} />
           </a>
           <button onClick={() => onDelete(file.id)}
@@ -236,8 +226,18 @@ export default function FileCard({
           title={isPinned ? 'Unpin' : 'Pin'}>
           {isPinned ? <PinOff size={11} /> : <Pin size={11} />}
         </button>
+        {onShare && (
+          <button
+            onClick={() => onShare(file)}
+            className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-purple-400 transition-colors"
+            title="Share file"
+          >
+            <Share2 size={11} />
+          </button>
+        )}
         <a href={file.file_path} download={file.original_name}
-          className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-white transition-colors">
+          className="p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-md text-slate-400 hover:text-white transition-colors"
+          title="Download file">
           <Download size={11} />
         </a>
         <button onClick={() => onDelete(file.id)}

@@ -287,6 +287,17 @@ export function useFilesManager() {
     } catch {}
   }
 
+  async function handleDuplicateFile(file: FileItem) {
+    try {
+      const duplicated = await api.post<FileItem>(`/files/${file.id}/duplicate`, {});
+      setFiles((prev) => [duplicated, ...prev]);
+      setAllFiles((prev) => [duplicated, ...prev]);
+      setSelectedId(duplicated.id);
+    } catch (e: unknown) {
+      alert((e as { message?: string })?.message || 'Duplicate failed');
+    }
+  }
+
   async function handlePinToggle(id: number) {
     try {
       const updated = await api.patch<FileItem>(`/files/${id}/pin`, {});
@@ -512,6 +523,8 @@ export function useFilesManager() {
     handleRenameFile,
     handleDeleteFolder,
     handleDeleteFile,
+    handleDuplicateFile,
+    loadFiles,
     handlePinToggle,
     handlePinFolderToggle,
     handleDownloadFolderZip,

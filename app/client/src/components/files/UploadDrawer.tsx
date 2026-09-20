@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronUp, X, CheckCircle2, AlertCircle, Loader2, Ban, File, UploadCloud } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp, X, CheckCircle2, AlertCircle, Loader2, Ban, UploadCloud } from 'lucide-react';
 import { useUpload } from '../../context/UploadContext';
+import { FileIcon } from './fileIcons';
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -11,6 +12,16 @@ function formatSize(bytes: number) {
 export default function UploadDrawer() {
   const { queue, isUploading, activeCount, completedCount, totalProgress, cancelItem, cancelAll, clearCompleted } = useUpload();
   const [minimized, setMinimized] = useState(false);
+
+  // Auto-dismiss completed upload report after 2.5 seconds
+  useEffect(() => {
+    if (!isUploading && queue.length > 0 && queue.every(q => q.status === 'completed' || q.status === 'cancelled')) {
+      const timer = setTimeout(() => {
+        clearCompleted();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isUploading, queue, clearCompleted]);
 
   if (queue.length === 0) return null;
 
@@ -72,7 +83,7 @@ export default function UploadDrawer() {
         <div className="max-h-72 overflow-y-auto divide-y divide-slate-800/60 p-1">
           {queue.map(item => (
             <div key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-white/[0.02] rounded-lg transition-colors">
-              <File size={16} className="text-slate-500 shrink-0" />
+              <FileIcon fileName={item.name} size={16} className="shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between text-xs mb-1 gap-2">
                   <span className="text-slate-200 truncate font-medium" title={item.name}>{item.name}</span>

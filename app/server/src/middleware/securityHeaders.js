@@ -26,9 +26,10 @@ function securityHeaders(req, res, next) {
 
   // Content Security Policy — tight baseline
   // connect-src allows ws:/wss: for Socket.io terminal feature
+  // object-src 'self' and frame-src allow PDF viewer and embedded document previews
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; frame-ancestors 'self'"
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; object-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'"
   );
 
   next();

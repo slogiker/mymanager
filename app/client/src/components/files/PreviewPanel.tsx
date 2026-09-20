@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Edit2, Save, XCircle, Download, Code, Eye, FileText, Image, Video, Music, Archive, FileCode, File, Maximize2, Folder, Box, Table } from 'lucide-react';
+import { X, Edit2, Save, XCircle, Download, Code, Eye, FileText, Image, Video, Music, Archive, FileCode, File, Maximize2, Folder, Box, Table, ExternalLink, Share2 } from 'lucide-react';
 import { marked } from 'marked';
 import { api } from '../../lib/api';
 import type { FileItem } from './FileCard';
+import { FileIcon } from './fileIcons';
 import ThreeViewer from './ThreeViewer';
+import DocumentViewer, { type DocumentData } from './DocumentViewer';
 
 interface Props {
   file: FileItem | null;
   onClose: () => void;
   onSaved: (id: number, size: number) => void;
+  onShare?: (file: FileItem) => void;
 }
 
 interface ArchiveEntry {
@@ -56,7 +59,19 @@ function isSpreadsheet(name: string) {
   return ['.csv', '.tsv', '.xlsx', '.xls', '.ods'].some(e => name.toLowerCase().endsWith(e));
 }
 
-export default function PreviewPanel({ file, onClose, onSaved }: Props) {
+function isOfficeDoc(name: string) {
+  return ['.docx', '.doc', '.odt', '.rtf'].some(e => name.toLowerCase().endsWith(e));
+}
+
+function isPresentation(name: string) {
+  return ['.pptx', '.odp'].some(e => name.toLowerCase().endsWith(e));
+}
+
+function isEpub(name: string) {
+  return name.toLowerCase().endsWith('.epub');
+}
+
+export default function PreviewPanel({ file, onClose, onSaved, onShare }: Props) {
   const [content, setContent] = useState<string | null>(null);
   const [loadingContent, setLoadingContent] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -66,6 +81,8 @@ export default function PreviewPanel({ file, onClose, onSaved }: Props) {
   const [lightbox, setLightbox] = useState(false);
   const [archiveEntries, setArchiveEntries] = useState<ArchiveEntry[]>([]);
   const [loadingArchive, setLoadingArchive] = useState(false);
+  const [docData, setDocData] = useState<DocumentData | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -81,6 +98,7 @@ export default function PreviewPanel({ file, onClose, onSaved }: Props) {
       setContent(null);
       setEditing(false);
       setArchiveEntries([]);
+      setDocData(null);
       return;
     }
 
@@ -88,14 +106,22 @@ export default function PreviewPanel({ file, onClose, onSaved }: Props) {
     setEditing(false);
     setRenderView('preview');
     setArchiveEntries([]);
+    setDocData(null);
 
-    if (isEditable(file.mime_type ?? '', file.original_name)) {
+    const name = file.original_name;
+    if (isEditable(file.mime_type ?? '', name)) {
       setLoadingContent(true);
       api.get<{ content: string }>(`/files/${file.id}/content`)
         .then(d => { setContent(d.content); setEditValue(d.content); })
         .catch(() => setContent(null))
         .finally(() => setLoadingContent(false));
-    } else if (isArchive(file.original_name)) {
+    } else if (isOfficeDoc(name) || isPresentation(name) || isSpreadsheet(name) || isEpub(name)) {
+      setLoadingDoc(true);
+      api.get<DocumentData>(`/files/${file.id}/document-content`)
+        .then(d => setDocData(d))
+        .catch(err => setDocData({ type: 'document', format: 'error', error: err?.message || 'Failed to load preview' }))
+        .finally(() => setLoadingDoc(false));
+    } else if (isArchive(name)) {
       setLoadingArchive(true);
       api.get<{ entries: ArchiveEntry[] }>(`/files/${file.id}/archive-contents`)
         .then(d => setArchiveEntries(d.entries || []))
@@ -151,6 +177,9 @@ export default function PreviewPanel({ file, onClose, onSaved }: Props) {
   const isArch = isArchive(file.original_name);
   const is3D = is3DFile(file.original_name);
   const isSheet = isSpreadsheet(file.original_name);
+  const isOffice = isOfficeDoc(file.original_name);
+  const isPresent = isPresentation(file.original_name);
+  const isBook = isEpub(file.original_name);
 
   return (
     <>
@@ -172,6 +201,15 @@ export default function PreviewPanel({ file, onClose, onSaved }: Props) {
 
         {/* Action bar */}
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {onShare && (
+            <button
+              onClick={() => onShare(file)}
+              className="btn btn-outline text-xs py-1 px-2.5 flex items-center gap-1.5 text-purple-400 hover:text-purple-300 hover:border-purple-500/50"
+              title="Share file"
+            >
+              <Share2 size={11} /> Share
+            </button>
+          )}
           <a href={file.file_path} download={file.original_name}
             className="btn btn-outline text-xs py-1 px-2.5 flex items-center gap-1.5">
             <Download size={11} /> Download
@@ -255,7 +293,7 @@ export default function PreviewPanel({ file, onClose, onSaved }: Props) {
                   {archiveEntries.map((e, i) => (
                     <div key={i} className="flex items-center justify-between py-1.5 px-2 text-xs hover:bg-white/[0.02]">
                       <span className="flex items-center gap-2 truncate text-slate-300">
-                        {e.isDirectory ? <Folder size={13} className="text-yellow-400 shrink-0" /> : <File size={13} className="text-slate-400 shrink-0" />}
+                        {e.isDirectory ? <Folder size={13} className="text-yellow-400 shrink-0" /> : <FileIcon fileName={e.entryName} size={13} className="shrink-0" />}
                         <span className="truncate" title={e.entryName}>{e.entryName}</span>
                       </span>
                       {!e.isDirectory && (
@@ -285,26 +323,38 @@ export default function PreviewPanel({ file, onClose, onSaved }: Props) {
             </div>
           )}
 
-          {/* PDF */}
+          {/* PDF Viewer */}
           {isPdf && (
-            <embed
-              src={file.file_path}
-              type="application/pdf"
-              className="w-full rounded-lg border border-slate-700/50 flex-1 min-h-[480px]"
-            />
+            <div className="flex-1 flex flex-col min-h-[480px]">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs text-slate-400 shrink-0">
+                <span className="flex items-center gap-1.5 font-medium text-red-400">
+                  <FileText size={14} /> PDF Document
+                </span>
+                <a
+                  href={file.file_path}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-[11px] text-slate-300 hover:text-white px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 transition-colors"
+                >
+                  <ExternalLink size={12} /> Open in new tab
+                </a>
+              </div>
+              <iframe
+                src={file.file_path}
+                className="w-full flex-1 rounded-lg border border-slate-700/50 bg-white min-h-[450px]"
+                title={file.original_name}
+              />
+            </div>
           )}
 
-          {/* Spreadsheets & Tables */}
-          {isSheet && (
-            <div className="flex flex-col items-center justify-center p-8 bg-slate-900/40 border border-slate-700/50 rounded-lg text-center gap-3">
-              <Table size={40} className="text-emerald-400 opacity-70" />
-              <div>
-                <p className="text-sm font-semibold text-slate-200">{file.original_name}</p>
-                <p className="text-xs text-slate-500 mt-0.5">Spreadsheet Data File</p>
-              </div>
-              <a href={file.file_path} download={file.original_name} className="btn btn-outline text-xs mt-2">
-                <Download size={12} className="mr-1.5" /> Download Spreadsheet
-              </a>
+          {/* Office Documents, Presentations, Spreadsheets & E-books */}
+          {(isOffice || isPresent || isSheet || isBook) && (
+            <div className="flex-1 min-h-[400px]">
+              <DocumentViewer
+                data={docData}
+                loading={loadingDoc}
+                fileName={file.original_name}
+              />
             </div>
           )}
 

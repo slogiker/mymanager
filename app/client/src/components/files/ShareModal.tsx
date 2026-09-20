@@ -16,6 +16,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { FileIcon } from './fileIcons';
 
 interface UserCandidate {
   id: number;
@@ -272,7 +273,7 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
         {/* Modal Header */}
         <div className="flex items-start gap-3 mb-5">
           <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
-            {type === 'folder' ? <Folder size={20} /> : <FileText size={20} />}
+            {type === 'folder' ? <Folder size={20} /> : <FileIcon fileName={itemName} size={20} />}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">

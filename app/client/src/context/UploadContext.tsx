@@ -121,6 +121,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         const form = new FormData();
         form.append('file', file);
         if (folderId) form.append('folder_id', folderId);
+        if (file.webkitRelativePath) form.append('relative_path', file.webkitRelativePath);
 
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'uploading' } : q));
         xhr.open('POST', '/api/files', true);

@@ -5,6 +5,7 @@ const fs = require('fs');
 const AdmZip = require('adm-zip');
 const db = require('../models/db');
 const { optionalAuth } = require('../middleware/auth');
+const { parseDocument } = require('../utils/documentParser');
 
 const router = express.Router();
 
@@ -314,6 +315,28 @@ router.get('/public/:token/download', (req, res) => {
   }
 
   res.status(400).json({ error: 'Invalid share type' });
+});
+
+// Public: get parsed document content (.docx, .odt, .pptx, .odp, .doc)
+router.get('/public/:token/document-content', (req, res) => {
+  const share = db.prepare('SELECT * FROM shares WHERE token = ?').get(req.params.token);
+  if (!share) return res.status(404).json({ error: 'Share link not found or invalid' });
+  if (share.expires_at && new Date(share.expires_at) < new Date()) {
+    return res.status(410).json({ error: 'This share link has expired', expired: true });
+  }
+  if (share.type !== 'file') return res.status(400).json({ error: 'Only files have document content' });
+
+  const file = db.prepare('SELECT * FROM files WHERE id = ?').get(share.item_id);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  const filesDir = path.join(__dirname, '../../uploads/files');
+  const fullPath = path.join(filesDir, file.stored_name);
+  if (!path.resolve(fullPath).startsWith(filesDir)) return res.status(403).json({ error: 'Access denied' });
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File on disk missing' });
+
+  const result = parseDocument(fullPath, file.original_name);
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json(result);
 });
 
 // Public: editor update file content

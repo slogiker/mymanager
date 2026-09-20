@@ -9,7 +9,7 @@ export default function FloatingAccessibilityButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed left-6 bottom-6 z-40 p-3.5 rounded-full bg-red-600 hover:bg-red-500 border border-red-500/80 shadow-[0_0_25px_-5px_rgba(239,68,68,0.5)] text-white hover:scale-105 active:scale-95 transition-all duration-300 group focus:outline-none focus:ring-4 focus:ring-red-500/30"
+        className="fixed right-6 bottom-6 z-40 p-3.5 rounded-full bg-red-600 hover:bg-red-500 border border-red-500/80 shadow-[0_0_25px_-5px_rgba(239,68,68,0.5)] text-white hover:scale-105 active:scale-95 transition-all duration-300 group focus:outline-none focus:ring-4 focus:ring-red-500/30"
         aria-label="Open accessibility settings"
         title="Accessibility Settings"
       >

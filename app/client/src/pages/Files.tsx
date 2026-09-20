@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -12,7 +12,6 @@ import FileCard from '../components/files/FileCard';
 import PreviewPanel from '../components/files/PreviewPanel';
 import FullscreenViewer from '../components/files/FullscreenViewer';
 import CreateFolderModal from '../components/files/CreateFolderModal';
-import NewFileModal from '../components/files/NewFileModal';
 import ContextMenu, { type ContextMenuState } from '../components/files/ContextMenu';
 import ZipActionModal from '../components/files/ZipActionModal';
 import ShareModal from '../components/files/ShareModal';
@@ -22,11 +21,9 @@ import { useFilesManager } from '../components/files/useFilesManager';
 import { FileBreadcrumbs } from '../components/files/FileBreadcrumbs';
 import { FileToolbar, FileSearchFilterBar } from '../components/files/FileToolbar';
 import { MultiSelectActionBar } from '../components/files/MultiSelectActionBar';
-import { FileDropOverlay } from '../components/files/FileDropOverlay';
 
 export default function Files() {
   const fm = useFilesManager();
-  const [windowDragOver, setWindowDragOver] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [shareModal, setShareModal] = useState<{
     open: boolean;
@@ -42,46 +39,12 @@ export default function Files() {
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-
-  // Fullscreen window drop listener
-  useEffect(() => {
-    let dragCounter = 0;
-    function onDragEnter(e: DragEvent) {
-      if (e.dataTransfer?.types.includes('Files')) {
-        dragCounter++;
-        setWindowDragOver(true);
-      }
-    }
-    function onDragLeave(e: DragEvent) {
-      if (e.dataTransfer?.types.includes('Files')) {
-        dragCounter--;
-        if (dragCounter <= 0) {
-          dragCounter = 0;
-          setWindowDragOver(false);
-        }
-      }
-    }
-    function onDrop() {
-      dragCounter = 0;
-      setWindowDragOver(false);
-    }
-    window.addEventListener('dragenter', onDragEnter);
-    window.addEventListener('dragleave', onDragLeave);
-    window.addEventListener('drop', onDrop);
-    return () => {
-      window.removeEventListener('dragenter', onDragEnter);
-      window.removeEventListener('dragleave', onDragLeave);
-      window.removeEventListener('drop', onDrop);
-    };
-  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-[#111216] text-slate-200 overflow-hidden relative">
       <Navbar />
-
-      {/* Fullscreen drag-over dropzone overlay */}
-      <FileDropOverlay active={windowDragOver} currentPathString={fm.currentPathString} />
 
       <div className="flex flex-col flex-1 min-h-0 pt-20">
         {/* Topbar */}
@@ -183,6 +146,12 @@ export default function Files() {
                   onPin={fm.handlePinToggle}
                   onCheck={fm.handleCheck}
                   onNewFile={() => fm.setCreatingFile(true)}
+                  isCreatingFile={fm.creatingFile}
+                  onCreateFile={async (name) => {
+                    await fm.handleCreateFile(name);
+                    fm.setCreatingFile(false);
+                  }}
+                  onCancelCreateFile={() => fm.setCreatingFile(false)}
                   onFolderOpen={fm.navigateToFolder}
                   onZipDropped={(file) => fm.setZipModalFile(file)}
                   onContextMenuFile={(e, f) => {
@@ -224,6 +193,9 @@ export default function Files() {
                       fm.setShowPreview(false);
                     }}
                     onSaved={fm.handlePreviewSaved}
+                    onShare={(f) =>
+                      setShareModal({ open: true, type: 'file', id: f.id, name: f.original_name })
+                    }
                   />
                 </div>
               </>
@@ -260,6 +232,9 @@ export default function Files() {
             file={fm.fullscreenFile}
             onClose={() => fm.setFullscreenId(null)}
             onSaved={fm.handlePreviewSaved}
+            onShare={(f) =>
+              setShareModal({ open: true, type: 'file', id: f.id, name: f.original_name })
+            }
           />
         )}
 
@@ -280,11 +255,6 @@ export default function Files() {
           onClose={() => fm.setCreatingFolder(false)}
           onCreate={fm.handleCreateFolder}
         />
-        <NewFileModal
-          open={fm.creatingFile}
-          onClose={() => fm.setCreatingFile(false)}
-          onCreate={fm.handleCreateFile}
-        />
 
         <ZipActionModal
           file={fm.zipModalFile}
@@ -296,6 +266,7 @@ export default function Files() {
         <ContextMenu
           state={contextMenu}
           onClose={() => setContextMenu(null)}
+          currentPathString={fm.currentPathString}
           onPreviewFile={(f) => {
             fm.setSelectedId(f.id);
             fm.setShowPreview(true);
@@ -307,6 +278,7 @@ export default function Files() {
           onShareFile={(f) =>
             setShareModal({ open: true, type: 'file', id: f.id, name: f.original_name })
           }
+          onDuplicateFile={fm.handleDuplicateFile}
           onPinFile={fm.handlePinToggle}
           onDeleteFile={fm.handleDeleteFile}
           onOpenFolder={fm.navigateToFolder}
@@ -323,7 +295,9 @@ export default function Files() {
           onNewFile={() => fm.setCreatingFile(true)}
           onNewFolder={() => fm.setCreatingFolder(true)}
           onUploadClick={() => fileInputRef.current?.click()}
-          onUploadFolderClick={() => fileInputRef.current?.click()}
+          onUploadFolderClick={() => folderInputRef.current?.click()}
+          onSelectAll={() => fm.setCheckedIds(new Set(fm.files.map((f) => f.id)))}
+          onRefresh={() => fm.loadFiles(fm.currentFolderId)}
         />
 
         <ShareModal
@@ -334,11 +308,27 @@ export default function Files() {
           onClose={() => setShareModal((prev) => ({ ...prev, open: false }))}
         />
 
+        {/* Hidden inputs for single/multiple files & folders */}
         <input
           ref={fileInputRef}
           type="file"
           multiple
           className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) {
+              fm.handleUpload(Array.from(e.target.files), fm.currentFolderId);
+            }
+            e.target.value = '';
+          }}
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          // @ts-ignore
+          webkitdirectory=""
+          directory=""
           onChange={(e) => {
             if (e.target.files?.length) {
               fm.handleUpload(Array.from(e.target.files), fm.currentFolderId);

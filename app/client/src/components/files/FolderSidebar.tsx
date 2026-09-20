@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Folder, FolderOpen, MoreVertical, Pencil, Trash2, Pin, PinOff,
-  FileText, Image, Video, Music, FileCode, Archive, File,
-  ChevronRight, ChevronDown, Plus, FilePlus, FolderPlus, Download, Upload
+  ChevronRight, ChevronDown, Plus, FilePlus, FolderPlus, Download, Upload, Share2
 } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useDroppable } from '@dnd-kit/core';
 import type { FileItem } from './FileCard';
+import { FileIcon } from './fileIcons';
 
 export interface FolderItem {
   id: string;
@@ -27,22 +27,14 @@ interface Props {
   onPinnedFileClick: (file: FileItem) => void;
   onPinToggle: (id: number) => void;
   onPinFolderToggle?: (id: string) => void;
+  onShareFile?: (file: FileItem) => void;
+  onShareFolder?: (folder: FolderItem) => void;
   onDownloadFolderZip?: (id: string, name: string) => void;
   onNewFile?: () => void;
   onNewFolder?: () => void;
   onUploadFilesClick?: () => void;
 }
 
-function fileIcon(mime: string) {
-  if (mime.startsWith('image/')) return <Image size={13} className="text-rose-400" />;
-  if (mime.startsWith('video/')) return <Video size={13} className="text-purple-400" />;
-  if (mime.startsWith('audio/')) return <Music size={13} className="text-pink-400" />;
-  if (mime.includes('zip') || mime.includes('tar') || mime.includes('rar')) return <Archive size={13} className="text-yellow-400" />;
-  if (mime.includes('javascript') || mime.includes('typescript') || mime.includes('json') || mime.includes('html') || mime.includes('css'))
-    return <FileCode size={13} className="text-green-400" />;
-  if (mime.startsWith('text/')) return <FileText size={13} className="text-slate-400" />;
-  return <File size={13} className="text-slate-500" />;
-}
 
 // Build path prefix for pinned subfolder (e.g. "Projects / Subfolder")
 function getFolderFullPath(folderId: string, folderMap: Map<string, FolderItem>): string {
@@ -407,7 +399,7 @@ export default function FolderSidebar({
               onClick={() => onPinnedFileClick(f)}
               className="group flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors select-none min-w-0"
             >
-              <span className="shrink-0">{fileIcon(f.mime_type ?? '')}</span>
+              <FileIcon fileName={f.original_name} mimeType={f.mime_type} size={13} className="shrink-0" />
               <span className="truncate text-xs text-slate-400 group-hover:text-slate-200 transition-colors flex-1 min-w-0" title={f.original_name}>
                 {f.original_name}
               </span>
