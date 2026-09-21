@@ -1,5 +1,5 @@
 const DEFAULT = {
-  title: 'Daniel — Full Stack Developer',
+  title: 'Daniel - Full Stack Developer',
   description: 'I build useful things for fun.',
   url: 'https://slogiker.si',
 };

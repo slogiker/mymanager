@@ -186,7 +186,7 @@ export function MultiServerNodesWidget({
                   {showTemp ? (
                     <div>
                       <span className="text-slate-500 block">TEMP</span>
-                      <span className="text-amber-400 font-bold">{node.temperature || '—'}</span>
+                      <span className="text-amber-400 font-bold">{node.temperature || '-'}</span>
                     </div>
                   ) : (!showDisk && !showNet) ? <div /> : null}
                   {showDisk && (
@@ -201,7 +201,7 @@ export function MultiServerNodesWidget({
                     <div className={(!showCpu && !showRam && !showTemp && !showDisk) ? 'col-span-2' : ''}>
                       <span className="text-slate-500 block truncate">NETWORK</span>
                       <span className="text-cyan-400 font-bold truncate block" title={`${node.network?.down || ''} · ${node.network?.up || ''}`}>
-                        {node.network?.down || '—'}
+                        {node.network?.down || '-'}
                       </span>
                     </div>
                   )}

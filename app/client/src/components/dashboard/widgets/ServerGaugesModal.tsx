@@ -59,8 +59,14 @@ export function ServerGaugesModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-2xl rounded-2xl bg-[#16181f] border border-slate-800 shadow-2xl p-6 space-y-5 max-h-[85vh] flex flex-col">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in cursor-pointer"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl bg-[#16181f] border border-slate-800 shadow-2xl p-6 space-y-5 max-h-[85vh] flex flex-col cursor-default"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20">

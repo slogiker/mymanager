@@ -188,9 +188,11 @@ export interface ClipboardItem {
   content: string | null;
   file_path: string | null;
   file_name: string | null;
+  filename?: string | null;
   file_size: number | null;
   mime_type: string | null;
   is_pinned: boolean;
+  pinned?: number | boolean;
   expires_at: string | null;
   created_at: string;
 }

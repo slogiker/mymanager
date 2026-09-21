@@ -25,7 +25,7 @@ export function formatSize(bytes: number) {
 
 function ext(name: string) {
   const parts = name.split('.');
-  return parts.length > 1 ? parts.pop()!.toUpperCase() : '—';
+  return parts.length > 1 ? parts.pop()!.toUpperCase() : '-';
 }
 
 interface Props {
@@ -83,7 +83,7 @@ export default function FileCard({
   const isImg = file.mime_type?.startsWith('image/');
   const thumbnailSrc = isImg ? file.file_path : file.preview_path ? file.preview_path : null;
   const isPinned = Boolean(file.pinned);
-  const { icon, bg, accent } = fileTypeStyle(file.mime_type ?? '', file.original_name);
+  const { icon, bg, accent } = getFileTypeStyle(file.mime_type ?? '', file.original_name);
 
   if (view === 'list') {
     return (
@@ -198,7 +198,7 @@ export default function FileCard({
           : 'border-white/5 bg-[#17181e] hover:border-white/15 hover:bg-[#1c1e26]'}
         ${isDragging ? 'opacity-40 scale-95' : ''}`}
     >
-      {/* Checkbox — top left */}
+      {/* Checkbox - top left */}
       <div
         className={`absolute top-2 left-2 z-10 w-5 h-5 rounded border flex items-center justify-center transition-all
           ${checked ? 'opacity-100 bg-red-600 border-red-600' : 'opacity-0 group-hover:opacity-100 bg-slate-900/80 border-slate-500'}`}

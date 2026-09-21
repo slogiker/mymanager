@@ -17,8 +17,14 @@ export default function ZipActionModal({ file, onClose, onUploadAsZip, onExtract
   if (!file) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#111216] border border-white/10 rounded-2xl shadow-2xl p-6 relative">
+    <div
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md bg-[#111216] border border-white/10 rounded-2xl shadow-2xl p-6 relative cursor-default"
+        onClick={e => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 text-slate-500 hover:text-slate-200 transition-colors"

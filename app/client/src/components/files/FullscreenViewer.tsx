@@ -204,7 +204,7 @@ export default function FullscreenViewer({ file, onClose, onSaved, onShare }: Pr
         </div>
       </div>
 
-      {/* Content — clicking void closes */}
+      {/* Content - clicking void closes */}
       <div
         className="flex-1 min-h-0 overflow-auto flex items-center justify-center p-6"
         onClick={handleBackdropClick}

@@ -47,7 +47,7 @@ export function TimeWidget({ uptime }: TimeWidgetProps) {
       </div>
       <div className="pt-3 border-t border-slate-800/50 flex items-center justify-between text-[11px] font-mono text-slate-500">
         <span>Host Uptime</span>
-        <span className="text-slate-300 font-semibold">{uptime || '—'}</span>
+        <span className="text-slate-300 font-semibold">{uptime || '-'}</span>
       </div>
     </div>
   );

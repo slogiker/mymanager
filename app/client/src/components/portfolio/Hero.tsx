@@ -49,7 +49,7 @@ export default function Hero() {
           </h1>
         </div>
 
-        {/* Description — delayed entrance */}
+        {/* Description - delayed entrance */}
         <div
           className="transition-all duration-1000 ease-out delay-200"
           style={{
@@ -62,7 +62,7 @@ export default function Hero() {
           </p>
         </div>
 
-        {/* Actions — delayed entrance */}
+        {/* Actions - delayed entrance */}
         <div
           className="transition-all duration-1000 ease-out delay-500"
           style={{

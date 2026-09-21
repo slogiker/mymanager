@@ -11,9 +11,10 @@ import {
   ChevronDown,
   User,
   Folder,
-  FileText,
   AlertCircle,
-  UserPlus
+  UserPlus,
+  Radio,
+  ClipboardCopy,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { FileIcon } from './fileIcons';
@@ -58,7 +59,7 @@ interface ShareRecord {
 
 interface Props {
   open: boolean;
-  type: 'file' | 'folder';
+  type: 'file' | 'folder' | 'clip';
   itemId: string | number;
   itemName: string;
   onClose: () => void;
@@ -95,11 +96,24 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [addingUser, setAddingUser] = useState(false);
 
+  // Website note broadcast state (for clips)
+  const [broadcasting, setBroadcasting] = useState(false);
+  const [broadcastMsg, setBroadcastMsg] = useState<string | null>(null);
+
   // Status & Error
   const [error, setError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on click outside
+  // Close on Escape key
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // Close user dropdown on click outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -114,7 +128,6 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      // Load public shares
       const sharesData = await api.get<ShareRecord[]>(`/shares/item/${type}/${itemId}`);
       if (sharesData && sharesData.length > 0) {
         setActiveShare(sharesData[0]);
@@ -128,7 +141,6 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
     }
 
     try {
-      // Load people with access
       const permData = await api.get<{ owner: ItemOwner | null; permissions: ItemPermission[] }>(
         `/shares/permissions/${type}/${itemId}`
       );
@@ -141,7 +153,6 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
 
     setLoadingUsers(true);
     try {
-      // Load registered users candidates
       const usersData = await api.get<UserCandidate[]>('/shares/users');
       setUsersList(usersData || []);
     } catch {
@@ -156,6 +167,7 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
       setSelectedUser(null);
       setSelectedRole('viewer');
       setCopied(false);
+      setBroadcastMsg(null);
       loadData();
     }
   }, [open, loadData]);
@@ -239,6 +251,24 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
     } catch {}
   }
 
+  // Broadcast note to all users
+  async function handleBroadcastToUsers() {
+    setBroadcasting(true);
+    setBroadcastMsg(null);
+    try {
+      const res = await api.post<{ message: string; shared_count: number }>(
+        `/clipboard/${itemId}/share-to-users`
+      );
+      setBroadcastMsg(res.message || `Shared to ${res.shared_count} user(s)`);
+      setTimeout(() => setBroadcastMsg(null), 4000);
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Failed to broadcast clip';
+      setError(msg);
+    } finally {
+      setBroadcasting(false);
+    }
+  }
+
   function copyLink(token?: string) {
     const t = token || activeShare?.token;
     if (!t) return;
@@ -257,15 +287,19 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer animate-fade-in"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-lg bg-[#111216] border border-white/10 rounded-2xl shadow-2xl p-6 relative"
+        className="w-full max-w-lg bg-[#111216] border border-white/10 rounded-2xl shadow-2xl p-6 relative max-h-[92vh] overflow-y-auto cursor-default"
         onClick={e => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 text-slate-500 hover:text-slate-200 transition-colors"
+          title="Close"
         >
           <X size={16} />
         </button>
@@ -273,7 +307,13 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
         {/* Modal Header */}
         <div className="flex items-start gap-3 mb-5">
           <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
-            {type === 'folder' ? <Folder size={20} /> : <FileIcon fileName={itemName} size={20} />}
+            {type === 'folder' ? (
+              <Folder size={20} />
+            ) : type === 'clip' ? (
+              <ClipboardCopy size={20} />
+            ) : (
+              <FileIcon fileName={itemName} size={20} />
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -284,7 +324,7 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
                 {type}
               </span>
             </div>
-            <p className="text-xs text-slate-400">Google Drive-style sharing and permissions</p>
+            <p className="text-xs text-slate-400">Share and manage access permissions</p>
           </div>
         </div>
 
@@ -295,7 +335,31 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
           </div>
         )}
 
-        {/* 1. Add People Input (Google Drive style) */}
+        {/* Optional Broadcast Option for Clipboard Notes */}
+        {type === 'clip' && (
+          <div className="mb-5 p-3 rounded-xl bg-red-500/[0.04] border border-red-500/20 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
+                <Radio size={14} className="text-red-400" />
+                <span>Broadcast to All Users</span>
+              </div>
+              <button
+                onClick={handleBroadcastToUsers}
+                disabled={broadcasting}
+                className="px-3 py-1.5 rounded-lg bg-red-600/80 hover:bg-red-600 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+              >
+                {broadcasting ? 'Broadcasting…' : "Push to Everyone's Notes"}
+              </button>
+            </div>
+            {broadcastMsg && (
+              <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+                <Check size={12} /> {broadcastMsg}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* 1. Add People Input */}
         <div className="mb-5">
           <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
             <UserPlus size={13} className="text-red-400" /> Add people
@@ -428,15 +492,19 @@ export default function ShareModal({ open, type, itemId, itemName, onClose }: Pr
         <div className="bg-white/[0.03] border border-white/10 rounded-xl p-4 mb-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${
-                accessMode === 'public' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-              }`}>
+              <div
+                className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${
+                  accessMode === 'public' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                }`}
+              >
                 {accessMode === 'public' ? <Globe size={16} /> : <Lock size={16} />}
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-200">General access</p>
                 <p className="text-[11px] text-slate-400">
-                  {accessMode === 'public' ? 'Anyone with the link can access' : 'Only people with access can open with link'}
+                  {accessMode === 'public'
+                    ? 'Anyone with the link can access'
+                    : 'Only people with access can open with link'}
                 </p>
               </div>
             </div>

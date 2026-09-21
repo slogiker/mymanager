@@ -47,7 +47,7 @@ function RequireAuth({ children, ownerOnly = false }: { children: ReactNode; own
 /**
  * Renders routes only after auth state has resolved.
  * Kept as a separate component so LanguageProvider and UploadProvider
- * (defined in App below) always stay mounted — they must never unmount
+ * (defined in App below) always stay mounted - they must never unmount
  * during the loading→resolved transition or providers lose their state.
  */
 function AppRoutes() {
@@ -72,7 +72,7 @@ function AppRoutes() {
         <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/clipboard" element={<RequireAuth><ClipboardPage /></RequireAuth>} />
-        {/* /files requires auth — unauthenticated users go to /login */}
+        {/* /files requires auth - unauthenticated users go to /login */}
         <Route path="/files" element={<RequireAuth><FilesPage /></RequireAuth>} />
         <Route path="/share/:token" element={<SharePage />} />
         <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />

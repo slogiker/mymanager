@@ -13,7 +13,7 @@ const COOKIE_OPTS = {
   maxAge: 30 * 24 * 60 * 60 * 1000,
 };
 
-// LOGIN BUG — do not fix until explicitly instructed.
+// LOGIN BUG - do not fix until explicitly instructed.
 // Three likely causes investigated but left intact:
 // 1. authLimiter (rateLimit.js): 20 attempts / 15 min per IP. After a few wrong tries the
 //    endpoint returns 429; if api.ts doesn't surface the JSON body the UI just shows "Login failed".

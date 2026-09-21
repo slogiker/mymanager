@@ -21,10 +21,10 @@ function securityHeaders(req, res, next) {
   // Mask Express server identification
   res.removeHeader('X-Powered-By');
 
-  // HSTS — enforce HTTPS for 2 years (safe: NPM terminates TLS in front of this app)
+  // HSTS - enforce HTTPS for 2 years (safe: NPM terminates TLS in front of this app)
   res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
 
-  // Content Security Policy — tight baseline
+  // Content Security Policy - tight baseline
   // connect-src allows ws:/wss: for Socket.io terminal feature
   // object-src 'self' and frame-src allow PDF viewer and embedded document previews
   res.setHeader(

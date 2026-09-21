@@ -107,7 +107,7 @@ export default function FolderCard({
         <div className="flex-1 min-w-0">
           <p className="text-sm truncate text-slate-200">{folder.name}</p>
         </div>
-        <span className="text-xs text-slate-500 shrink-0 w-16 text-right">—</span>
+        <span className="text-xs text-slate-500 shrink-0 w-16 text-right">-</span>
         <span className="text-xs text-slate-500 shrink-0 w-24 text-right hidden sm:block">
           {new Date(folder.created_at).toLocaleDateString()}
         </span>

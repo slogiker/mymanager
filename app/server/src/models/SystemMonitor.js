@@ -234,11 +234,11 @@ class SystemMonitor {
       });
       socket.on('error', () => {
         socket.destroy();
-        resolve({ status: 'offline', latency: '—', port });
+        resolve({ status: 'offline', latency: '-', port });
       });
       socket.on('timeout', () => {
         socket.destroy();
-        resolve({ status: 'timeout', latency: '—', port });
+        resolve({ status: 'timeout', latency: '-', port });
       });
       socket.connect(port, host);
     });
@@ -360,7 +360,7 @@ class SystemMonitor {
       ip: '192.168.1.136',
       role: 'Compute / Pironman 5',
       status: 'offline',
-      latency: '—',
+      latency: '-',
     };
 
     try {

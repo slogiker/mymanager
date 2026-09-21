@@ -215,7 +215,7 @@ export function JellyfinInspectorModal({
                           <tr key={idx} className="hover:bg-slate-800/30">
                             <td className="px-3 py-2 font-semibold text-white">{r.UserName || r.userName || 'User'}</td>
                             <td className="px-3 py-2 text-slate-400">{r.PlayCount || r.playCount || 0} plays</td>
-                            <td className="px-3 py-2 text-right text-purple-400 font-bold">{r.TotalTime || r.totalTime || '—'}</td>
+                            <td className="px-3 py-2 text-right text-purple-400 font-bold">{r.TotalTime || r.totalTime || '-'}</td>
                           </tr>
                         ))}
                       </tbody>

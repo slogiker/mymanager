@@ -42,6 +42,11 @@ router.get('/permissions/:type/:id', optionalAuth, (req, res) => {
     if (file && file.user_id) {
       itemOwner = db.prepare('SELECT id, name, username, email FROM users WHERE id = ?').get(file.user_id);
     }
+  } else if (type === 'clip' || type === 'clipboard') {
+    const clip = db.prepare('SELECT user_id FROM clipboard_items WHERE id = ?').get(id);
+    if (clip && clip.user_id) {
+      itemOwner = db.prepare('SELECT id, name, username, email FROM users WHERE id = ?').get(clip.user_id);
+    }
   } else {
     const folder = db.prepare('SELECT user_id FROM folders WHERE id = ?').get(id);
     if (folder && folder.user_id) {
@@ -72,6 +77,11 @@ router.post('/permissions/:type/:id', optionalAuth, (req, res) => {
   if (type === 'file') {
     const file = getFileForOwner(id, filter);
     isOwner = !!file;
+  } else if (type === 'clip' || type === 'clipboard') {
+    const clip = filter.col === 'user_id'
+      ? db.prepare('SELECT id FROM clipboard_items WHERE id = ? AND user_id = ?').get(id, filter.val)
+      : db.prepare('SELECT id FROM clipboard_items WHERE id = ? AND session_id = ?').get(id, filter.val);
+    isOwner = !!clip;
   } else {
     const folder = filter.col === 'user_id'
       ? db.prepare('SELECT id FROM folders WHERE id = ? AND user_id = ?').get(id, filter.val)
@@ -130,7 +140,7 @@ function calculateExpiry(preset) {
 router.post('/', optionalAuth, (req, res) => {
   const { type, item_id, expires_in, permission = 'viewer', is_public = 1 } = req.body;
   if (!type || !item_id) return res.status(400).json({ error: 'type and item_id required' });
-  if (!['file', 'folder'].includes(type)) return res.status(400).json({ error: 'type must be file or folder' });
+  if (!['file', 'folder', 'clip', 'clipboard'].includes(type)) return res.status(400).json({ error: 'type must be file, folder, or clip' });
 
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
@@ -141,6 +151,11 @@ router.post('/', optionalAuth, (req, res) => {
       ? db.prepare('SELECT id, original_name FROM files WHERE id = ? AND user_id = ?').get(item_id, filter.val)
       : db.prepare('SELECT id, original_name FROM files WHERE id = ? AND session_id = ?').get(item_id, filter.val);
     if (!file) return res.status(404).json({ error: 'File not found' });
+  } else if (type === 'clip' || type === 'clipboard') {
+    const clip = filter.col === 'user_id'
+      ? db.prepare('SELECT id, title, content FROM clipboard_items WHERE id = ? AND user_id = ?').get(item_id, filter.val)
+      : db.prepare('SELECT id, title, content FROM clipboard_items WHERE id = ? AND session_id = ?').get(item_id, filter.val);
+    if (!clip) return res.status(404).json({ error: 'Clipboard item not found' });
   } else {
     const folder = filter.col === 'user_id'
       ? db.prepare('SELECT id, name FROM folders WHERE id = ? AND user_id = ?').get(item_id, filter.val)
@@ -158,6 +173,7 @@ router.post('/', optionalAuth, (req, res) => {
     INSERT INTO shares (id, user_id, session_id, type, item_id, token, permission, is_public, expires_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
+    id,
     req.user?.id ?? null,
     req.user ? null : filter.val,
     type,
@@ -215,6 +231,9 @@ router.get('/public/:token', (req, res) => {
     if (share.type === 'file') {
       const f = db.prepare('SELECT original_name FROM files WHERE id = ?').get(share.item_id);
       if (f) itemName = f.original_name;
+    } else if (share.type === 'clip' || share.type === 'clipboard') {
+      const c = db.prepare('SELECT title FROM clipboard_items WHERE id = ?').get(share.item_id);
+      if (c) itemName = c.title || 'Shared snippet';
     } else {
       const f = db.prepare('SELECT name FROM folders WHERE id = ?').get(share.item_id);
       if (f) itemName = f.name;
@@ -225,6 +244,18 @@ router.get('/public/:token', (req, res) => {
       expires_at: share.expires_at,
       item_name: itemName,
       type: share.type
+    });
+  }
+
+  if (share.type === 'clip' || share.type === 'clipboard') {
+    const clip = db.prepare('SELECT id, type, title, content, language, filename, file_path, mime_type, created_at FROM clipboard_items WHERE id = ?').get(share.item_id);
+    if (!clip) return res.status(404).json({ error: 'Shared clipboard item no longer exists' });
+    return res.json({
+      type: 'clip',
+      clip,
+      permission: share.permission || 'viewer',
+      expires_at: share.expires_at,
+      is_public: share.is_public ?? 1
     });
   }
 

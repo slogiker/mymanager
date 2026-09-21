@@ -311,8 +311,8 @@ export function UsersTab({ defaultSubTab = 'accounts' }: UsersTabProps) {
                       <td className="p-3 font-mono font-medium text-slate-200">
                         @{u.username}
                       </td>
-                      <td className="p-3 text-slate-400">{u.name || '—'}</td>
-                      <td className="p-3 font-mono text-slate-400">{u.email || '—'}</td>
+                      <td className="p-3 text-slate-400">{u.name || '-'}</td>
+                      <td className="p-3 font-mono text-slate-400">{u.email || '-'}</td>
                       <td className="p-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
                           u.role === 'owner' 

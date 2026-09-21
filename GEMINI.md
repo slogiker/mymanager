@@ -10,3 +10,6 @@
   3. Propose or run a background terminal command (`xdg-open`, `google-chrome`, or `firefox`) to open it immediately in the user's browser.
   4. Run the command asynchronously so it doesn't block the workspace terminal.
   5. Ensure the file remains in the scratch directory to be cleaned up or retained as temporary data.
+
+## ✍️ Typography & Formatting Rules
+- **Never use long em dashes (`—`) anywhere** in titles, UI text, documentation, comments, commit messages, or responses. Always use regular hyphens (`-`), colons (`:`), or commas instead.

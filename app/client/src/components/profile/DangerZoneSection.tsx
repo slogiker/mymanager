@@ -80,8 +80,14 @@ export function DangerZoneSection({ user, onAccountDeleted }: DangerZoneSectionP
 
       {/* Delete Account Confirmation Modal */}
       {deleteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-[#16181f] p-6 shadow-2xl space-y-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm cursor-pointer"
+          onClick={() => setDeleteModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-red-500/40 bg-[#16181f] p-6 shadow-2xl space-y-4 cursor-default"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center gap-2.5 text-red-400 font-bold text-base">
               <AlertTriangle className="w-5 h-5" />
               Delete Account Confirmation

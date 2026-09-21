@@ -111,13 +111,13 @@ if (IS_PROD || fs.existsSync(indexHtmlPath)) {
     const db = require('./models/db');
     const indexHtml = fs.readFileSync(indexHtmlPath, 'utf8');
 
-    app.use(express.static(clientDist));
+    app.use(express.static(clientDist, { index: false }));
 
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
       try {
         const profile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
-        const baseTitle = `${profile?.name || 'Daniel'} — ${profile?.title || 'Full Stack Developer'}`;
+        const baseTitle = `${profile?.name || 'Daniel'} - ${profile?.title || 'Full Stack Developer'}`;
         const baseDesc = profile?.bio || 'I build useful things for fun.';
         res.send(injectMetaTags(indexHtml, { title: baseTitle, description: baseDesc }));
       } catch {
@@ -145,7 +145,7 @@ app.use((err, req, res, _next) => {
   });
 });
 
-// Socket.io — SSH terminal (owner only)
+// Socket.io - SSH terminal (owner only)
 const io = new Server(server, {
   cors: {
     origin: IS_PROD ? false : 'http://localhost:5173',
@@ -178,61 +178,21 @@ io.on('connection', (socket) => {
 
   let conn = null;
 
-  socket.on('ssh-connect', ({ host, port, username, password } = {}) => {
-    conn = new SSHClient();
+  socket.on('ssh-connect', ({ host, port, username } = {}) => {
+    const targetHost = host || process.env.SSH_HOST || 'ssh.slogiker.si';
+    console.warn(`[SECURITY] Blocked SSH shell login attempt to ${targetHost} from user ${socket.user?.username || 'unknown'}`);
 
-    const sshHost = host || process.env.SSH_HOST || 'ssh.slogiker.si';
-    const sshPort = parseInt(port || process.env.SSH_PORT || '2222');
-    const sshUser = username || process.env.SSH_USERNAME || 'slogiker';
-    const sshPass = password || process.env.OWNER_PASSWORD;
-
-    conn.on('ready', () => {
-      console.log(`SSH Connection established to ${sshUser}@${sshHost}:${sshPort}`);
-      socket.emit('data', '\r\n\x1b[32m*** SSH Connected ***\x1b[0m\r\n');
-      conn.shell((err, stream) => {
-        if (err) {
-          console.error('Shell execution error:', err);
-          socket.emit('data', `\r\n\x1b[31mShell error: ${err.message}\x1b[0m\r\n`);
-          return;
-        }
-        socket.on('data', d => stream.write(d));
-        socket.on('resize', ({ rows, cols }) => stream.setWindow(rows, cols, 480, 640));
-        stream.on('data', d => socket.emit('data', d));
-        stream.stderr.on('data', d => socket.emit('data', d));
-        stream.on('close', () => {
-          conn.end();
-          socket.emit('data', '\r\n\x1b[33m*** SSH Session Ended ***\x1b[0m\r\n');
-        });
-      });
-    });
-
-    conn.on('keyboard-interactive', (name, instructions, instructionsLang, prompts, finish) => {
-      if (prompts.length > 0 && prompts[0].prompt.toLowerCase().includes('password')) {
-        finish([sshPass]);
-      } else {
-        finish([]);
-      }
-    });
-
-    conn.on('error', err => {
-      console.error(`SSH Connection Error to ${sshUser}@${sshHost}:${sshPort}:`, err);
-      socket.emit('data', `\r\n\x1b[31mSSH Error: ${err.message}\x1b[0m\r\n`);
-    });
-
-    try {
-      conn.connect({
-        host: sshHost,
-        port: sshPort,
-        username: sshUser,
-        password: sshPass,
-        readyTimeout: 10000,
-        tryKeyboard: true, // Try keyboard-interactive authentication fallback
-        hostVerifier: () => true, // Accept any server host key fingerprint automatically
-      });
-    } catch (e) {
-      console.error('SSH Connection Call failed:', e);
-      socket.emit('data', `\r\n\x1b[31mSSH Init Error: ${e.message}\x1b[0m\r\n`);
-    }
+    // Shell login is disabled for security hardening
+    socket.emit('data', 
+      '\r\n\x1b[1;33m[SECURITY POLICY]\x1b[0m \x1b[1;31mSSH Shell Access Disabled\x1b[0m\r\n' +
+      '\x1b[90m───────────────────────────────────────────────────────────────────\x1b[0m\r\n' +
+      'Interactive remote shell execution is temporarily disabled for security\r\n' +
+      'hardening while authentication and sandboxing models are being finalized.\r\n' +
+      '\x1b[90m───────────────────────────────────────────────────────────────────\x1b[0m\r\n' +
+      '\x1b[33mConnection target:\x1b[0m ' + targetHost + '\r\n' +
+      '\x1b[31mStatus: Connection rejected by security policy.\x1b[0m\r\n\r\n'
+    );
+    socket.emit('disabled', { reason: 'SSH shell login is disabled for security reasons.' });
   });
 
   socket.on('disconnect', () => { if (conn) conn.end(); });

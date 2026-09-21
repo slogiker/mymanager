@@ -91,7 +91,7 @@ export function NetworkDiagnosticsSection({
               <div className="text-xs text-slate-400 mt-0.5">
                 {vpnData?.connected
                   ? 'Full internal homelab access (.home.arpa services unlocked)'
-                  : 'Remote access active — internal .home.arpa services are protected & locked'}
+                  : 'Remote access active: internal .home.arpa services are protected & locked'}
               </div>
             </div>
           </div>

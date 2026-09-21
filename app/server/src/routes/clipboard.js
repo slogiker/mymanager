@@ -139,4 +139,62 @@ router.delete('/', optionalAuth, (req, res) => {
   res.json({ message: 'Cleared' });
 });
 
+// Share a clipboard item to website users (so it shows in everyone's notes/clipboard with notification)
+router.post('/:id/share-to-users', optionalAuth, (req, res) => {
+  const filter = getOwnerFilter(req);
+  if (!filter) return res.status(401).json({ error: 'Not authenticated' });
+
+  const clip = filter.col === 'user_id'
+    ? db.prepare('SELECT * FROM clipboard_items WHERE id = ? AND user_id = ?').get(req.params.id, filter.val)
+    : db.prepare('SELECT * FROM clipboard_items WHERE id = ? AND session_id = ?').get(req.params.id, filter.val);
+  if (!clip) return res.status(404).json({ error: 'Clipboard item not found' });
+
+  const senderName = req.user?.username || req.user?.name || 'Someone';
+  const { targetUserIds = [] } = req.body;
+
+  // Fetch target users
+  const users = Array.isArray(targetUserIds) && targetUserIds.length > 0
+    ? db.prepare(`SELECT id, username, name FROM users WHERE id IN (${targetUserIds.map(() => '?').join(',')})`).all(...targetUserIds)
+    : db.prepare('SELECT id, username, name FROM users WHERE id != ?').all(req.user?.id || 0);
+
+  const titlePrefix = `[Shared by ${senderName}] `;
+  const title = clip.title ? (clip.title.startsWith('[Shared') ? clip.title : `${titlePrefix}${clip.title}`) : `${titlePrefix}Snippet`;
+
+  const insertStmt = db.prepare(`
+    INSERT INTO clipboard_items (user_id, session_id, type, content, language, title, filename, file_path, mime_type, pinned, created_at, updated_at)
+    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))
+  `);
+
+  for (const u of users) {
+    insertStmt.run(
+      u.id,
+      clip.type,
+      clip.content,
+      clip.language,
+      title,
+      clip.filename,
+      clip.file_path,
+      clip.mime_type
+    );
+  }
+
+  // Insert notification in messages table
+  try {
+    const itemLabel = clip.title || (clip.content ? (clip.content.length > 30 ? clip.content.slice(0, 30) + '…' : clip.content) : 'Clipboard Item');
+    db.prepare(`
+      INSERT INTO messages (name, email, subject, content, ip_address)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      senderName,
+      req.user?.email || 'system@slogiker.si',
+      `Shared Note from ${senderName}`,
+      `"${itemLabel}" was shared to your clipboard and notes by ${senderName}.`,
+      req.ip || '127.0.0.1'
+    );
+  } catch {}
+
+  res.json({ success: true, count: users.length, message: `Shared with ${users.length} user(s)` });
+});
+
 module.exports = router;
+

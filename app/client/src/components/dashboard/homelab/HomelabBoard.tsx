@@ -192,7 +192,7 @@ export function HomelabBoard({
       setTestResult({
         status: 'offline',
         error: (e as Error).message || 'Connection test failed',
-        latency: '—',
+        latency: '-',
       });
     } finally {
       setTestingUrl(false);

@@ -66,7 +66,7 @@ export default function ContactForm() {
             transition: 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         >
-          {/* Left side — info */}
+          {/* Left side - info */}
           <div>
             <span className="text-[11px] font-semibold tracking-[0.2em] uppercase text-slate-600">
               {t('contact_tag')}
@@ -100,7 +100,7 @@ export default function ContactForm() {
             </div>
           </div>
 
-          {/* Right side — form */}
+          {/* Right side - form */}
           <div>
             {state === 'success' ? (
               <div className="text-center py-16">

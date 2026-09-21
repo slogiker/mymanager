@@ -243,8 +243,24 @@ export default function DashboardPage() {
       syncUserPreferencesFromBackend(user.id);
     }
     loadAll();
-    const interval = setInterval(loadAll, 10000);
-    return () => clearInterval(interval);
+
+    // Fast polling for cluster telemetry & network node metrics (every 2.5 seconds)
+    const telemetryInterval = setInterval(() => {
+      api.get<ServerNode[]>('/system/nodes')
+        .then(res => setNodes(res))
+        .catch(() => {});
+      api.get<SystemStats>('/system/stats')
+        .then(res => { if (res) setStats(res); })
+        .catch(() => {});
+    }, 2500);
+
+    // General dashboard refresh
+    const interval = setInterval(loadAll, 6000);
+
+    return () => {
+      clearInterval(telemetryInterval);
+      clearInterval(interval);
+    };
   }, [user?.id]);
 
   const selectTab = (nextTab: string) => {
@@ -370,7 +386,7 @@ export default function DashboardPage() {
                 title={
                   vpnStatus.connected
                     ? `Connected to Homelab (${vpnStatus.isVpn ? 'WireGuard VPN' : 'Home LAN'} · ${vpnStatus.ip})`
-                    : `External Connection (${vpnStatus.ip}) — Local .home.arpa services locked`
+                    : `External Connection (${vpnStatus.ip}) - Local .home.arpa services locked`
                 }
               >
                 {vpnStatus.connected ? (

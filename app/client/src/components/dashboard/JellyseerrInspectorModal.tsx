@@ -60,7 +60,7 @@ function getStatusBadge(status: number) {
 }
 
 function formatDate(dateStr: string): string {
-  if (!dateStr) return '—';
+  if (!dateStr) return '-';
   try {
     const d = new Date(dateStr);
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });

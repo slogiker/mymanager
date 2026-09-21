@@ -2,18 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { Eye, EyeOff, Wifi, WifiOff, Loader2, X, Unplug } from 'lucide-react';
+import { Eye, EyeOff, Wifi, WifiOff, Loader2, X, Unplug, ShieldAlert, Lock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/layout/Navbar';
 import '@xterm/xterm/css/xterm.css';
 
-type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'disabled';
 
 const STATUS_CONFIG: Record<ConnectionStatus, { label: string; dot: string; badge: string }> = {
-  disconnected: { label: 'Disconnected',  dot: 'bg-slate-600',   badge: 'text-slate-400 bg-slate-800/60 border-slate-700/50' },
-  connecting:   { label: 'Connecting…',   dot: 'bg-yellow-400 animate-pulse', badge: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' },
-  connected:    { label: 'Connected',     dot: 'bg-emerald-400', badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
-  error:        { label: 'Error',         dot: 'bg-red-500',     badge: 'text-red-400 bg-red-500/10 border-red-500/30' },
+  disconnected: { label: 'Disconnected',        dot: 'bg-slate-600',   badge: 'text-slate-400 bg-slate-800/60 border-slate-700/50' },
+  connecting:   { label: 'Connecting…',         dot: 'bg-yellow-400 animate-pulse', badge: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' },
+  connected:    { label: 'Connected',           dot: 'bg-emerald-400', badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+  error:        { label: 'Error',               dot: 'bg-red-500',     badge: 'text-red-400 bg-red-500/10 border-red-500/30' },
+  disabled:     { label: 'Disabled (Security)', dot: 'bg-amber-400',   badge: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
 };
 
 export default function TerminalPage() {
@@ -100,13 +101,19 @@ export default function TerminalPage() {
 
       socket.on('data', (data: string | ArrayBuffer) => {
         term.write(typeof data === 'string' ? data : new Uint8Array(data as ArrayBuffer));
-        if (status !== 'connected') setStatus('connected');
+      });
+
+      socket.on('disabled', () => {
+        setStatus('disabled');
       });
 
       socket.on('disconnect', () => setStatus('disconnected'));
       socket.on('connect_error', () => setStatus('error'));
 
-      term.onData(d => socket.emit('data', d));
+      term.onData(d => {
+        // Block input if shell access is disabled for security
+        socket.emit('data', d);
+      });
 
       const handleResize = () => {
         fit.fit();
@@ -157,6 +164,17 @@ export default function TerminalPage() {
 
               {/* Form card */}
               <div className="bg-[#111318] border border-slate-800/60 rounded-2xl p-6 shadow-2xl shadow-black/60">
+                {/* Security Advisory Notice */}
+                <div className="mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-3 text-left">
+                  <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-200/90 leading-relaxed">
+                    <p className="font-semibold text-amber-300">Remote Shell Execution Disabled</p>
+                    <p className="mt-0.5 text-amber-300/70">
+                      Direct shell execution is temporarily disabled for security reasons while authentication and sandboxing models are being finalized.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="col-span-2">
                     <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Host</label>
@@ -164,7 +182,7 @@ export default function TerminalPage() {
                       type="text"
                       value={host}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setHost(e.target.value)}
-                      className="w-full bg-[#0a0b0f] border border-slate-700/60 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 transition-all"
+                      className="w-full bg-[#0a0b0f] border border-slate-700/60 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all"
                       placeholder="ssh.slogiker.si"
                     />
                   </div>
@@ -174,7 +192,7 @@ export default function TerminalPage() {
                       type="text"
                       value={port}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPort(e.target.value)}
-                      className="w-full bg-[#0a0b0f] border border-slate-700/60 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 transition-all"
+                      className="w-full bg-[#0a0b0f] border border-slate-700/60 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all"
                       placeholder="2222"
                     />
                   </div>
@@ -185,7 +203,7 @@ export default function TerminalPage() {
                     type="text"
                     value={username}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
-                    className="w-full bg-[#0a0b0f] border border-slate-700/60 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 transition-all"
+                    className="w-full bg-[#0a0b0f] border border-slate-700/60 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all"
                     placeholder="slogiker"
                   />
                 </div>
@@ -197,7 +215,7 @@ export default function TerminalPage() {
                       value={password}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                       onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && connect()}
-                      className="w-full bg-[#0a0b0f] border border-slate-700/60 rounded-lg px-3 py-2 pr-10 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 transition-all"
+                      className="w-full bg-[#0a0b0f] border border-slate-700/60 rounded-lg px-3 py-2 pr-10 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all"
                       placeholder="SSH password"
                       autoFocus
                     />
@@ -214,10 +232,10 @@ export default function TerminalPage() {
 
                 <button
                   onClick={connect}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-500 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-red-600/25"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-600/90 hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-amber-600/20"
                 >
-                  <Wifi size={15} />
-                  Connect
+                  <ShieldAlert size={15} />
+                  Connect (Disabled for Security)
                 </button>
 
                 <p className="text-center text-[11px] text-slate-600 mt-3">
@@ -228,7 +246,7 @@ export default function TerminalPage() {
           </div>
         )}
 
-        {/* Terminal chrome — top status bar */}
+        {/* Terminal chrome - top status bar */}
         {!showPrompt && (
           <div
             className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-slate-800/60 bg-[#0d0e13]"
@@ -267,7 +285,7 @@ export default function TerminalPage() {
           </div>
         )}
 
-        {/* xterm.js canvas — fills remaining space */}
+        {/* xterm.js canvas - fills remaining space */}
         <div
           ref={termRef}
           className={`flex-1 min-h-0 ${showPrompt ? 'hidden' : 'block'}`}

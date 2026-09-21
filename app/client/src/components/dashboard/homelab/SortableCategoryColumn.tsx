@@ -334,7 +334,7 @@ export function SortableCategoryColumn({
         colSpan === 2 ? 'col-span-1 md:col-span-2' : 'col-span-1'
       }`}
     >
-      {/* Category Header — Clean, open, invisible box */}
+      {/* Category Header - Clean, open, invisible box */}
       <div className="flex items-center justify-between pb-1 px-1">
         <div className="flex items-center gap-2 min-w-0">
           <button

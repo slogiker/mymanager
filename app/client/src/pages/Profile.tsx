@@ -70,7 +70,7 @@ export default function ProfilePage() {
       if (res.connected) {
         setVpnSuccess(`Connected successfully via ${res.isVpn ? 'WireGuard VPN' : 'Home LAN'} (${res.ip})`);
       } else {
-        setVpnSuccess(`External IP detected (${res.ip || 'WAN'}) — internal services locked`);
+        setVpnSuccess(`External IP detected (${res.ip || 'WAN'}) - internal services locked`);
       }
       setTimeout(() => setVpnSuccess(''), 4000);
     } catch (err: any) {
