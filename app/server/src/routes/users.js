@@ -12,7 +12,7 @@ router.get('/', verifyToken, requireOwner, (req, res) => {
   res.json(users);
 });
 
-router.post('/', verifyToken, requireOwner, (req, res) => {
+router.post('/', verifyToken, requireOwner, async (req, res) => {
   const { name, username, email, role = 'user', password } = req.body;
   if (!username || !username.trim()) {
     return res.status(400).json({ error: 'Username is required' });
@@ -26,7 +26,7 @@ router.post('/', verifyToken, requireOwner, (req, res) => {
   if (exists) return res.status(409).json({ error: 'Username or email already taken' });
 
   const plainPassword = password && password.trim().length >= 6 ? password.trim() : randomBytes(6).toString('hex');
-  const hash = bcrypt.hashSync(plainPassword, 10);
+  const hash = await bcrypt.hash(plainPassword, 12);
   const mustChange = password && password.trim().length >= 6 ? 0 : 1;
 
   const result = db.prepare(`
@@ -54,12 +54,12 @@ router.patch('/:id', verifyToken, requireOwner, (req, res) => {
   res.json(db.prepare('SELECT id, name, username, email, role, created_at FROM users WHERE id = ?').get(req.params.id));
 });
 
-router.post('/:id/reset-password', verifyToken, requireOwner, (req, res) => {
-  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id);
+router.post('/:id/reset-password', verifyToken, requireOwner, async (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const otp = randomBytes(6).toString('hex');
-  const hash = bcrypt.hashSync(otp, 10);
+  const hash = await bcrypt.hash(otp, 12);
   db.prepare("UPDATE users SET password_hash=?, must_change_password=1, updated_at=datetime('now') WHERE id=?").run(hash, req.params.id);
 
   res.json({ oneTimePassword: otp });

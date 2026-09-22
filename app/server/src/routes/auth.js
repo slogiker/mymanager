@@ -25,14 +25,14 @@ const COOKIE_OPTS = {
 //    Login.tsx:12 checks !user.must_change_password which is undefined → falsy, bypassing the
 //    /change-password redirect on the client even when the DB flag is 1. Then /auth/me returns
 //    the real flag and causes a re-render loop on protected pages.
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username.trim().toLowerCase());
   if (!user) return res.status(401).json({ error: 'Invalid username or password' });
 
-  const match = bcrypt.compareSync(password, user.password_hash);
+  const match = await bcrypt.compare(password, user.password_hash);
   if (!match) return res.status(401).json({ error: 'Invalid username or password' });
 
   const payload = {
@@ -58,7 +58,7 @@ router.post('/login', (req, res) => {
   });
 });
 
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   const { name, username, email, password, confirmPassword } = req.body;
   if (!name || !username || !email || !password) return res.status(400).json({ error: 'All fields required' });
   if (password !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
@@ -67,7 +67,7 @@ router.post('/register', (req, res) => {
   const exists = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username.toLowerCase(), email.toLowerCase());
   if (exists) return res.status(409).json({ error: 'Username or email already taken' });
 
-  const hash = bcrypt.hashSync(password, 10);
+  const hash = await bcrypt.hash(password, 12);
   const result = db.prepare(`
     INSERT INTO users (name, username, email, password_hash, role)
     VALUES (?, ?, ?, ?, 'user')
@@ -80,7 +80,7 @@ router.post('/register', (req, res) => {
   res.status(201).json({ user: payload, mustChangePassword: false });
 });
 
-router.post('/change-password', verifyToken, (req, res) => {
+router.post('/change-password', verifyToken, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Both fields required' });
   if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
@@ -88,10 +88,10 @@ router.post('/change-password', verifyToken, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const match = bcrypt.compareSync(currentPassword, user.password_hash);
+  const match = await bcrypt.compare(currentPassword, user.password_hash);
   if (!match) return res.status(401).json({ error: 'Current password is incorrect' });
 
-  const hash = bcrypt.hashSync(newPassword, 10);
+  const hash = await bcrypt.hash(newPassword, 12);
   db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = datetime(\'now\') WHERE id = ?').run(hash, user.id);
 
   res.json({ message: 'Password changed successfully' });

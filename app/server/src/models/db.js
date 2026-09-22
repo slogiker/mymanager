@@ -315,19 +315,20 @@ function seed() {
   const ownerExists = db.prepare("SELECT id FROM users WHERE role = 'owner'").get();
   if (!ownerExists) {
     const otp = randomBytes(8).toString('hex');
-    const hash = bcrypt.hashSync(otp, 10);
-    db.prepare(`
-      INSERT INTO users (name, username, email, password_hash, role, must_change_password)
-      VALUES (?, ?, ?, ?, 'owner', 1)
-    `).run('Daniel', 'slogiker', 'plibersek.daniel@gmail.com', hash);
+    bcrypt.hash(otp, 12).then((hash) => {
+      db.prepare(`
+        INSERT INTO users (name, username, email, password_hash, role, must_change_password)
+        VALUES (?, ?, ?, ?, 'owner', 1)
+      `).run('Daniel', 'slogiker', 'plibersek.daniel@gmail.com', hash);
 
-    console.log('\n╔══════════════════════════════════════╗');
-    console.log('║         OWNER ACCOUNT CREATED        ║');
-    console.log('╠══════════════════════════════════════╣');
-    console.log(`║  Username : slogiker                 ║`);
-    console.log(`║  Password : ${otp}  ║`);
-    console.log('║  (Change password on first login)    ║');
-    console.log('╚══════════════════════════════════════╝\n');
+      console.log('\n╔══════════════════════════════════════╗');
+      console.log('║         OWNER ACCOUNT CREATED        ║');
+      console.log('╠══════════════════════════════════════╣');
+      console.log(`║  Username : slogiker                 ║`);
+      console.log(`║  Password : ${otp}  ║`);
+      console.log('║  (Change password on first login)    ║');
+      console.log('╚══════════════════════════════════════╝\n');
+    }).catch(err => console.error('Failed to hash owner seed password:', err));
   }
 
   const servicesCount = db.prepare('SELECT COUNT(*) as c FROM services').get();
