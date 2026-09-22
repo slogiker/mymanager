@@ -19,7 +19,13 @@ COPY . .
 # Build React client
 RUN npm run build --workspace=mymanager-client
 
-EXPOSE 3000
+# Ensure directories exist and chown to node user
+RUN mkdir -p /mymanager/app/server/data /mymanager/app/server/uploads && \
+    chown -R node:node /mymanager
+
+USER node
+
+EXPOSE 7293
 
 ENV NODE_ENV=production
 

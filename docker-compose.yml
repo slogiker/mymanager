@@ -2,36 +2,15 @@ services:
   dashboard:
     build: .
     ports:
-      - "31847:7293"
+      - "127.0.0.1:31847:7293"
     volumes:
       - ./app/server/data:/mymanager/app/server/data
       - ./app/server/uploads:/mymanager/app/server/uploads
-      - /home/slogiker/.ssh:/root/.ssh:ro
     env_file:
-      - .env
+      - app/server/.env
     environment:
       - NODE_ENV=production
       - PORT=7293
-      - JWT_SECRET=${JWT_SECRET:-REMOVED-in-production}
-      - SSH_HOST=${SSH_HOST:-ssh.slogiker.si}
-      - SSH_PORT=${SSH_PORT:-2222}
-      - SSH_USERNAME=${SSH_USERNAME:-slogiker}
-      - OWNER_PASSWORD=${OWNER_PASSWORD:-}
-      - QBIT_URL=${QBIT_URL:-http://192.168.1.41:8090}
-      - QBIT_USER=${QBIT_USER:-}
-      - QBIT_PASS=${QBIT_PASS:-}
-      - PIHOLE_URL=${PIHOLE_URL:-http://192.168.1.112:8081}
-      - PIHOLE_API_TOKEN=${PIHOLE_API_TOKEN:-}
-      - JELLYFIN_URL=${JELLYFIN_URL:-http://jellyfin.slogiker.si}
-      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY:-}
-      - JELLYSEERR_URL=${JELLYSEERR_URL:-http://jellyseerr.slogiker.si}
-      - JELLYSEERR_API_KEY=${JELLYSEERR_API_KEY:-}
-      - WG_SSH_HOST=${WG_SSH_HOST:-192.168.1.112}
-      - WG_SSH_PORT=${WG_SSH_PORT:-22}
-      - WG_SSH_USER=${WG_SSH_USER:-wg-monitor}
-      - WG_SSH_KEY_PATH=${WG_SSH_KEY_PATH:-}
-      - WG_SSH_KEY=${WG_SSH_KEY:-}
-      - SPEEDTEST_INTERVAL_HOURS=${SPEEDTEST_INTERVAL_HOURS:-6}
     restart: always
     extra_hosts:
       - "host.docker.internal:host-gateway"
