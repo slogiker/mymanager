@@ -118,6 +118,25 @@ router.delete('/permissions/:type/:id/:userId', optionalAuth, (req, res) => {
   const filter = getOwnerFilter(req);
   if (!filter) return res.status(401).json({ error: 'Not authenticated' });
 
+  let isOwner = false;
+  if (type === 'file') {
+    const file = getFileForOwner(id, filter);
+    isOwner = !!file;
+  } else if (type === 'clip' || type === 'clipboard') {
+    const clip = filter.col === 'user_id'
+      ? db.prepare('SELECT id FROM clipboard_items WHERE id = ? AND user_id = ?').get(id, filter.val)
+      : db.prepare('SELECT id FROM clipboard_items WHERE id = ? AND session_id = ?').get(id, filter.val);
+    isOwner = !!clip;
+  } else {
+    const folder = filter.col === 'user_id'
+      ? db.prepare('SELECT id FROM folders WHERE id = ? AND user_id = ?').get(id, filter.val)
+      : null;
+    isOwner = !!folder;
+  }
+  if (!isOwner && req.user?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only item owner can manage permissions' });
+  }
+
   db.prepare('DELETE FROM item_permissions WHERE item_type = ? AND item_id = ? AND user_id = ?').run(type, String(id), userId);
   res.json({ message: 'Permission removed' });
 });

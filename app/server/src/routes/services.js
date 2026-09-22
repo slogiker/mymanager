@@ -157,7 +157,11 @@ router.patch('/user-preferences', verifyToken, (req, res) => {
 });
 
 router.get('/', verifyToken, async (req, res) => {
-  const rows = db.prepare('SELECT * FROM services ORDER BY display_order ASC').all();
+  const isOwner = req.user?.role === 'owner';
+  const rows = isOwner
+    ? db.prepare('SELECT * FROM services ORDER BY display_order ASC').all()
+    : db.prepare('SELECT * FROM services WHERE is_private = 0 ORDER BY display_order ASC').all();
+
   const withStatus = await Promise.all(rows.map(async s => ({
     ...s,
     is_private: s.is_private === 1,
