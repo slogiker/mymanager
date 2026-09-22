@@ -35,19 +35,20 @@ import {
   syncUserPreferencesFromBackend,
   UserPreferences,
 } from '../lib/userPreferences';
-import { WireguardInspectorModal } from '../components/dashboard/WireguardInspectorModal';
-import { PiholeInspectorModal } from '../components/dashboard/PiholeInspectorModal';
-import { QbittorrentInspectorModal } from '../components/dashboard/QbittorrentInspectorModal';
-import { JellyfinInspectorModal } from '../components/dashboard/JellyfinInspectorModal';
-import { JellyseerrInspectorModal } from '../components/dashboard/JellyseerrInspectorModal';
-import { HomelabBoard } from '../components/dashboard/homelab';
-import {
-  AnalyticsTab,
-  MessagesTab,
-  ProjectsTab,
-  SkillsTab,
-  UsersTab,
-} from '../components/dashboard/tabs';
+import { lazy, Suspense } from 'react';
+
+const HomelabBoard = lazy(() => import('../components/dashboard/homelab').then(m => ({ default: m.HomelabBoard })));
+const WireguardInspectorModal = lazy(() => import('../components/dashboard/WireguardInspectorModal').then(m => ({ default: m.WireguardInspectorModal })));
+const PiholeInspectorModal = lazy(() => import('../components/dashboard/PiholeInspectorModal').then(m => ({ default: m.PiholeInspectorModal })));
+const QbittorrentInspectorModal = lazy(() => import('../components/dashboard/QbittorrentInspectorModal').then(m => ({ default: m.QbittorrentInspectorModal })));
+const JellyfinInspectorModal = lazy(() => import('../components/dashboard/JellyfinInspectorModal').then(m => ({ default: m.JellyfinInspectorModal })));
+const JellyseerrInspectorModal = lazy(() => import('../components/dashboard/JellyseerrInspectorModal').then(m => ({ default: m.JellyseerrInspectorModal })));
+
+const AnalyticsTab = lazy(() => import('../components/dashboard/tabs').then(m => ({ default: m.AnalyticsTab })));
+const MessagesTab = lazy(() => import('../components/dashboard/tabs').then(m => ({ default: m.MessagesTab })));
+const ProjectsTab = lazy(() => import('../components/dashboard/tabs').then(m => ({ default: m.ProjectsTab })));
+const SkillsTab = lazy(() => import('../components/dashboard/tabs').then(m => ({ default: m.SkillsTab })));
+const UsersTab = lazy(() => import('../components/dashboard/tabs').then(m => ({ default: m.UsersTab })));
 
 /* -------------------------------------------------------------
    Admin Views Configuration
@@ -439,73 +440,75 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Board View */}
-        {tab === 'board' && (
-          <HomelabBoard
-            services={services}
-            nodes={nodes}
-            loadingNodes={loadingNodes}
-            speedtest={speedtest}
-            vpnConnected={vpnStatus?.connected}
-            onRunSpeedtest={handleRunSpeedtest}
-            isRunningSpeedtest={runningSpeedtest}
-            onUpdateCardLayout={handleUpdateCardLayout}
-            onOpenInspector={(type) => setActiveInspector(type)}
+        <Suspense fallback={<div className="p-12 text-center text-slate-500 flex items-center justify-center gap-3"><div className="w-5 h-5 border-2 border-slate-700 border-t-red-500 rounded-full animate-spin" /><span>Loading view...</span></div>}>
+          {/* Board View */}
+          {tab === 'board' && (
+            <HomelabBoard
+              services={services}
+              nodes={nodes}
+              loadingNodes={loadingNodes}
+              speedtest={speedtest}
+              vpnConnected={vpnStatus?.connected}
+              onRunSpeedtest={handleRunSpeedtest}
+              isRunningSpeedtest={runningSpeedtest}
+              onUpdateCardLayout={handleUpdateCardLayout}
+              onOpenInspector={(type) => setActiveInspector(type)}
+              onRefresh={loadAll}
+            />
+          )}
+
+          {/* Telemetry Inspector Modals (Phase 6) */}
+          <WireguardInspectorModal
+            open={activeInspector === 'wireguard'}
+            onClose={() => setActiveInspector(null)}
+            data={wgStats}
+            loading={loading}
             onRefresh={loadAll}
           />
-        )}
 
-        {/* Telemetry Inspector Modals (Phase 6) */}
-        <WireguardInspectorModal
-          open={activeInspector === 'wireguard'}
-          onClose={() => setActiveInspector(null)}
-          data={wgStats}
-          loading={loading}
-          onRefresh={loadAll}
-        />
+          <PiholeInspectorModal
+            open={activeInspector === 'pihole'}
+            onClose={() => setActiveInspector(null)}
+            data={piholeStats}
+            loading={loading}
+            onRefresh={loadAll}
+          />
 
-        <PiholeInspectorModal
-          open={activeInspector === 'pihole'}
-          onClose={() => setActiveInspector(null)}
-          data={piholeStats}
-          loading={loading}
-          onRefresh={loadAll}
-        />
+          <QbittorrentInspectorModal
+            open={activeInspector === 'qbittorrent'}
+            onClose={() => setActiveInspector(null)}
+            data={qbitStats}
+            loading={loading}
+            onRefresh={loadAll}
+          />
 
-        <QbittorrentInspectorModal
-          open={activeInspector === 'qbittorrent'}
-          onClose={() => setActiveInspector(null)}
-          data={qbitStats}
-          loading={loading}
-          onRefresh={loadAll}
-        />
+          <JellyfinInspectorModal
+            open={activeInspector === 'jellyfin'}
+            onClose={() => setActiveInspector(null)}
+            data={jellyfinStats}
+            isOwner={user?.role === 'owner'}
+            loading={loading}
+            onRefresh={loadAll}
+          />
 
-        <JellyfinInspectorModal
-          open={activeInspector === 'jellyfin'}
-          onClose={() => setActiveInspector(null)}
-          data={jellyfinStats}
-          isOwner={user?.role === 'owner'}
-          loading={loading}
-          onRefresh={loadAll}
-        />
+          <JellyseerrInspectorModal
+            open={activeInspector === 'jellyseerr'}
+            onClose={() => setActiveInspector(null)}
+            data={jellyseerrStats}
+            isOwner={user?.role === 'owner'}
+            loading={loading}
+            onRefresh={loadAll}
+          />
 
-        <JellyseerrInspectorModal
-          open={activeInspector === 'jellyseerr'}
-          onClose={() => setActiveInspector(null)}
-          data={jellyseerrStats}
-          isOwner={user?.role === 'owner'}
-          loading={loading}
-          onRefresh={loadAll}
-        />
-
-        {/* Secondary Management Views */}
-        {tab === 'analytics' && <AnalyticsTab />}
-        {tab === 'messages' && <MessagesTab />}
-        {tab === 'projects' && <ProjectsTab />}
-        {tab === 'skills' && <SkillsTab />}
-        {(tab === 'users' || tab === 'permissions' || tab === 'features') && (
-          <UsersTab defaultSubTab={tab === 'permissions' ? 'permissions' : tab === 'features' ? 'features' : 'accounts'} />
-        )}
+          {/* Secondary Management Views */}
+          {tab === 'analytics' && <AnalyticsTab />}
+          {tab === 'messages' && <MessagesTab />}
+          {tab === 'projects' && <ProjectsTab />}
+          {tab === 'skills' && <SkillsTab />}
+          {(tab === 'users' || tab === 'permissions' || tab === 'features') && (
+            <UsersTab defaultSubTab={tab === 'permissions' ? 'permissions' : tab === 'features' ? 'features' : 'accounts'} />
+          )}
+        </Suspense>
       </main>
     </div>
   );

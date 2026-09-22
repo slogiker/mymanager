@@ -110,6 +110,12 @@ app.use('/uploads', (req, res) => {
   res.status(404).json({ error: 'File not found' });
 });
 
+// Robots.txt
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.send('User-agent: *\nDisallow: /files\nDisallow: /dashboard\nDisallow: /api\nAllow: /\n');
+});
+
 // Serve built frontend (static assets + history-mode fallback to index.html)
 const fs = require('fs');
 const clientDist = path.join(__dirname, '../../client/dist');
@@ -125,11 +131,16 @@ if (IS_PROD || fs.existsSync(indexHtmlPath)) {
 
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+      const isLanding = req.path === '/' || req.path === '';
       try {
         const profile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
         const baseTitle = `${profile?.name || 'Daniel'} - ${profile?.title || 'Full Stack Developer'}`;
         const baseDesc = profile?.bio || 'I build useful things for fun.';
-        res.send(injectMetaTags(indexHtml, { title: baseTitle, description: baseDesc }));
+        res.send(injectMetaTags(indexHtml, {
+          title: baseTitle,
+          description: baseDesc,
+          noindex: !isLanding,
+        }));
       } catch {
         res.sendFile(indexHtmlPath);
       }

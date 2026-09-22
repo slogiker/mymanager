@@ -1,4 +1,4 @@
-import { lazy, Suspense, ReactNode } from 'react';
+import { lazy, Suspense, useEffect, ReactNode } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { LanguageProvider } from './context/LanguageContext';
@@ -38,7 +38,7 @@ function PageLoader() {
 function RequireAuth({ children, ownerOnly = false }: { children: ReactNode; ownerOnly?: boolean }) {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/" replace />;
   if (Boolean(user.must_change_password)) return <Navigate to="/change-password" replace />;
   if (ownerOnly && user.role !== 'owner') return <Navigate to="/" replace />;
   return <>{children}</>;
@@ -54,10 +54,30 @@ function AppRoutes() {
   const { user, loading } = useAuth();
   const location = useLocation();
 
+  // Dynamically set noindex on non-landing pages
+  useEffect(() => {
+    let meta = document.querySelector('meta[name="robots"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'robots');
+      document.head.appendChild(meta);
+    }
+    if (location.pathname === '/') {
+      meta.setAttribute('content', 'index, follow');
+    } else {
+      meta.setAttribute('content', 'noindex, nofollow');
+    }
+  }, [location.pathname]);
+
   // Block all route rendering until /auth/me has responded.
   // Without this, lazy-loaded pages would briefly render (Suspense resolves
   // from cache) before auth is known, causing a flash then a redirect.
   if (loading) return <PageLoader />;
+
+  // Anonymous users can only access the landing page, /login, and policy pages
+  if (!user && !['/', '/login', '/privacy', '/cookies'].includes(location.pathname)) {
+    return <Navigate to="/" replace />;
+  }
 
   const allowedWithoutPasswordChange = ['/change-password', '/login', '/privacy', '/cookies'];
   if (user && Boolean(user.must_change_password) && !allowedWithoutPasswordChange.includes(location.pathname)) {

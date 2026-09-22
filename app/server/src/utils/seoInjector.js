@@ -8,7 +8,7 @@ function escapeHtml(str = '') {
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function injectMetaTags(html, { title, description, image, url } = {}) {
+function injectMetaTags(html, { title, description, image, url, noindex = false } = {}) {
   const t = escapeHtml(title || DEFAULT.title);
   const d = escapeHtml(description || DEFAULT.description);
   const u = escapeHtml(url || DEFAULT.url);
@@ -23,7 +23,7 @@ function injectMetaTags(html, { title, description, image, url } = {}) {
     <meta property="og:type" content="website">${img ? `\n    <meta property="og:image" content="${img}">` : ''}
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${t}">
-    <meta name="twitter:description" content="${d}">${img ? `\n    <meta name="twitter:image" content="${img}">` : ''}`;
+    <meta name="twitter:description" content="${d}">${img ? `\n    <meta name="twitter:image" content="${img}">` : ''}${noindex ? `\n    <meta name="robots" content="noindex, nofollow">` : ''}`;
 
   return html.replace('<!-- SEO_META_PLACEHOLDER -->', tags);
 }
