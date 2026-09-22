@@ -36,10 +36,13 @@ function PrivacyEN() {
       <p>If you create an account or log in, we store your <strong>username</strong> and a <strong>hashed password</strong>. A session token is stored in an HTTP-only cookie. This is processed on the legal basis of <strong>contract performance</strong> (Art. 6(1)(b) GDPR).</p>
 
       <h3>2.3 Analytics</h3>
-      <p>We collect basic, anonymous page visit data (page URL, timestamp, referrer, user agent) stored on our own server. No third-party analytics services are used. An analytics session cookie is set. This processing is based on <strong>legitimate interest</strong> (Art. 6(1)(f) GDPR) to understand site usage.</p>
+      <p>We collect basic, anonymous page visit data (page URL, timestamp, referrer, user agent) stored on our own self-hosted server. No third-party analytics services are used. Analytics is completely cookieless: <strong>no analytics tracking cookies are set</strong>. IP addresses are truncated upon write (the last octet of IPv4 addresses is zeroed out, and IPv6 addresses are truncated to /64). This processing is based on <strong>legitimate interest</strong> (Art. 6(1)(f) GDPR) to monitor site stability and performance.</p>
 
-      <h3>2.4 Local Storage</h3>
-      <p>We store your <strong>language preference</strong> and <strong>text size preference</strong> in your browser's local storage. This data never leaves your device.</p>
+      <h3>2.4 Self-Hosted Fonts & Assets</h3>
+      <p>All typography and fonts (Inter) are self-hosted directly from our own server. No connections or requests are made to external font delivery networks (such as Google Fonts).</p>
+
+      <h3>2.5 Local Storage</h3>
+      <p>We store your <strong>language preference</strong> and accessibility preferences in your browser local storage. This data remains on your device and is never transmitted to our servers.</p>
 
       <h2>3. Cookies</h2>
       <p>See our <a href="/cookies">Cookie Policy</a> for a detailed breakdown of cookies used on this site.</p>
@@ -48,11 +51,12 @@ function PrivacyEN() {
       <ul>
         <li><strong>Contact messages</strong> are retained until manually deleted by the data controller, or upon your request.</li>
         <li><strong>Authentication tokens</strong> expire after the session or as configured (typically 7 days).</li>
-        <li><strong>Analytics data</strong> is retained for up to 12 months.</li>
+        <li><strong>Analytics data</strong> is retained for up to 12 months with truncated IP addresses.</li>
+        <li><strong>Server disk logs</strong> are automatically purged after 30 days.</li>
       </ul>
 
-      <h2>5. Data Sharing</h2>
-      <p>We do <strong>not</strong> share, sell, or transfer your personal data to third parties. All data is stored on our self-hosted infrastructure within the EU.</p>
+      <h2>5. Data Processors & Infrastructure</h2>
+      <p>All application data is stored on self-hosted infrastructure within the EU. We do not sell or rent personal data. For edge network routing, DDoS mitigation, and SSL/TLS termination, we use <strong>Cloudflare, Inc.</strong> as a data processor pursuant to standard contractual clauses under GDPR Art. 28.</p>
 
       <h2>6. Your Rights (GDPR)</h2>
       <p>Under the GDPR, you have the right to:</p>
@@ -76,7 +80,7 @@ function PrivacyEN() {
       </p>
 
       <h2>8. Security</h2>
-      <p>We implement appropriate technical and organisational measures to protect your personal data, including HTTPS encryption, hashed passwords, HTTP-only cookies, and self-hosted infrastructure.</p>
+      <p>We implement appropriate technical and organisational measures to protect your personal data, including HTTPS encryption, hashed passwords (bcrypt cost 12), HTTP-only cookies, and self-hosted infrastructure.</p>
 
       <h2>9. Changes</h2>
       <p>We may update this policy from time to time. The "last updated" date at the top reflects the most recent revision.</p>
@@ -104,10 +108,13 @@ function PrivacySL() {
       <p>Če se registrirate ali prijavite, shranimo vaše <strong>uporabniško ime</strong> in <strong>zgoščeno geslo</strong>. Žeton seje se shrani v HTTP-only piškotek. Obdelava temelji na <strong>izvajanju pogodbe</strong> (čl. 6(1)(b) GDPR).</p>
 
       <h3>2.3 Analitika</h3>
-      <p>Zbiramo osnovne, anonimne podatke o obiskih strani (URL, časovni žig, referrer, uporabniški agent), shranjene na našem lastnem strežniku. Ne uporabljamo analitičnih storitev tretjih oseb. Nastavljen je piškotek analitične seje. Obdelava temelji na <strong>zakonitem interesu</strong> (čl. 6(1)(f) GDPR).</p>
+      <p>Zbiramo osnovne, anonimne podatke o obiskih strani (URL, časovni žig, napotitelj, uporabniški agent), shranjene na našem lastnem strežniku. Ne uporabljamo analitičnih storitev tretjih oseb. Analitika je popolnoma brezpiškotna: <strong>noben analitični piškotek se ne nastavi</strong>. IP naslovi so ob zapisu skrajšani (zadnji oktet pri IPv4 se ponastavi na 0, pri IPv6 se naslov skrajša na /64). Obdelava temelji na <strong>zakonitem interesu</strong> (čl. 6(1)(f) GDPR) za spremljanje delovanja spletnega mesta.</p>
 
-      <h3>2.4 Lokalna shramba</h3>
-      <p>V lokalni shrambi brskalnika shranimo vaše <strong>jezikovne nastavitve</strong> in <strong>nastavitve velikosti besedila</strong>. Ti podatki nikoli ne zapustijo vaše naprave.</p>
+      <h3>2.4 Lastno gostovane pisave in viri</h3>
+      <p>Vse pisave (Inter) gostujemo neposredno na lastnem strežniku. Do zunanjih strežnikov za pisave (kot je Google Fonts) se ne izvajajo nobene zahteve.</p>
+
+      <h3>2.5 Lokalna shramba</h3>
+      <p>V lokalni shrambi brskalnika shranimo vaše <strong>jezikovne nastavitve</strong> in nastavitve dostopnosti. Ti podatki ostanejo na vaši napravi in se ne prenašajo na naše strežnike.</p>
 
       <h2>3. Piškotki</h2>
       <p>Za podroben pregled piškotkov obiščite našo <a href="/cookies">Politiko piškotkov</a>.</p>
@@ -116,11 +123,12 @@ function PrivacySL() {
       <ul>
         <li><strong>Kontaktna sporočila</strong> se hranijo do ročnega izbrisa s strani upravljavca ali na vašo zahtevo.</li>
         <li><strong>Avtentikacijski žetoni</strong> potečejo po seji ali po nastavljenem roku (običajno 7 dni).</li>
-        <li><strong>Analitični podatki</strong> se hranijo do 12 mesecev.</li>
+        <li><strong>Analitični podatki</strong> se hranijo do 12 mesecev s skrajšanimi IP naslovi.</li>
+        <li><strong>Dnevniški zapisi strežnika na disku</strong> se samodejno izbrišejo po 30 dneh.</li>
       </ul>
 
-      <h2>5. Deljenje podatkov</h2>
-      <p>Vaših osebnih podatkov <strong>ne</strong> delimo, prodajamo ali prenašamo tretjim osebam. Vsi podatki so shranjeni na naši lastni infrastrukturi znotraj EU.</p>
+      <h2>5. Obdelovalci podatkov in infrastruktura</h2>
+      <p>Vsi podatki so shranjeni na lastni infrastrukturi znotraj EU. Vaših osebnih podatkov ne prodajamo. Za usmerjanje omrežnega prometa, zaščito pred DDoS napadi in zaključevanje SSL/TLS šifriranja kot obdelovalca podatkov uporabljamo družbo <strong>Cloudflare, Inc.</strong> v skladu z zahtevami 28. člena GDPR.</p>
 
       <h2>6. Vaše pravice (GDPR)</h2>
       <p>V skladu z GDPR imate pravico do:</p>
@@ -144,7 +152,7 @@ function PrivacySL() {
       </p>
 
       <h2>8. Varnost</h2>
-      <p>Izvajamo ustrezne tehnične in organizacijske ukrepe za zaščito vaših osebnih podatkov, vključno s šifriranjem HTTPS, zgoščenimi gesli, HTTP-only piškotki in lastno infrastrukturo.</p>
+      <p>Izvajamo ustrezne tehnične in organizacijske ukrepe za zaščito vaših osebnih podatkov, vključno s šifriranjem HTTPS, zgoščenimi gesli (bcrypt cost 12), HTTP-only piškotki in lastno infrastrukturo.</p>
 
       <h2>9. Spremembe</h2>
       <p>To politiko lahko občasno posodobimo. Datum "zadnje posodobitve" na vrhu odraža zadnjo spremembo.</p>

@@ -1,12 +1,11 @@
 const { UAParser } = require('ua-parser-js');
 const geoip = require('geoip-lite');
-const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
 
 const SKIP_PATHS = ['/api/', '/uploads/', '/socket.io/', '/_vite', '/@', '/node_modules/'];
 const BOT_PATTERNS = /bot|crawler|spider|scraper|curl|wget|python|java\/|go-http|axios/i;
 
-const { getClientIp } = require('../utils/ipHelper');
+const { getClientIp, anonymizeIp } = require('../utils/ipHelper');
 
 function analyticsMiddleware(req, res, next) {
   if (SKIP_PATHS.some(p => req.path.startsWith(p))) return next();
@@ -17,18 +16,12 @@ function analyticsMiddleware(req, res, next) {
     const ua = req.headers['user-agent'] || '';
     const isBot = BOT_PATTERNS.test(ua);
 
-    let sessionId = req.cookies?.analytics_session;
-    if (!sessionId) {
-      sessionId = uuidv4();
-      res.cookie('analytics_session', sessionId, {
-        maxAge: 30 * 60 * 1000,
-        httpOnly: true,
-        sameSite: 'lax',
-      });
-    }
+    // No tracking cookie: privacy-first cookieless analytics
+    const sessionId = null;
 
     const ip = getClientIp(req);
     const geo = geoip.lookup(ip) || {};
+    const storedIp = anonymizeIp(ip);
     const parser = new UAParser(ua);
     const browser = parser.getBrowser();
     const os = parser.getOS();
@@ -55,7 +48,7 @@ function analyticsMiddleware(req, res, next) {
         language, is_bot, user_id
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      sessionId, ip,
+      sessionId, storedIp,
       geo.country || null, geo.country || null, geo.city || null, geo.region || null,
       geo.timezone || null,
       req.path, req.method,

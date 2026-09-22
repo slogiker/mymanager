@@ -38,24 +38,13 @@ function CookiesEN() {
           </thead>
           <tbody>
             <tr><td><code>token</code></td><td>Authentication session (JWT). Set only when you log in. HTTP-only, secure.</td><td>7 days</td></tr>
-            <tr><td><code>clip_session</code></td><td>Session identifier for clipboard and file sharing features. HTTP-only.</td><td>7 days</td></tr>
             <tr><td><code>cookie_consent</code></td><td>Stores your cookie consent preference.</td><td>365 days</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3>Analytics Cookies</h3>
-      <p>These cookies help us understand how visitors interact with the site. They are only set <strong>after you give consent</strong>.</p>
-      <div className="overflow-x-auto">
-        <table>
-          <thead>
-            <tr><th>Cookie</th><th>Purpose</th><th>Duration</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>analytics_session</code></td><td>Anonymous session identifier for self-hosted page visit analytics. No data is shared with third parties.</td><td>Session</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <h3>Analytics (Cookieless)</h3>
+      <p>Our website analytics are completely cookieless and self-hosted. <strong>No analytics cookies are set</strong>, and no personal tracking cookies are placed on your device.</p>
 
       <h3>Local Storage (Not Cookies)</h3>
       <p>The following data is stored in your browser's local storage and never sent to our servers:</p>
@@ -105,24 +94,13 @@ function CookiesSL() {
           </thead>
           <tbody>
             <tr><td><code>token</code></td><td>Avtentikacijska seja (JWT). Nastavi se samo ob prijavi. HTTP-only, varno.</td><td>7 dni</td></tr>
-            <tr><td><code>clip_session</code></td><td>Identifikator seje za odložišče in deljenje datotek. HTTP-only.</td><td>7 dni</td></tr>
             <tr><td><code>cookie_consent</code></td><td>Shranjuje vašo privolitev za piškotke.</td><td>365 dni</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3>Analitični piškotki</h3>
-      <p>Ti piškotki nam pomagajo razumeti, kako obiskovalci uporabljajo stran. Nastavijo se <strong>šele po vaši privolitvi</strong>.</p>
-      <div className="overflow-x-auto">
-        <table>
-          <thead>
-            <tr><th>Piškotek</th><th>Namen</th><th>Trajanje</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>analytics_session</code></td><td>Anonimni identifikator seje za lastno analitiko obiskov. Podatki se ne delijo s tretjimi osebami.</td><td>Seja</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <h3>Analitika (brezpiškotna)</h3>
+      <p>Naša analitika obiskov je povsem brezpiškotna in gostuje na lastnem strežniku. <strong>Nobeni analitični piškotki se ne nastavljajo</strong>, na vašo napravo pa ne nameščamo nobenih sledilnih piškotkov.</p>
 
       <h3>Lokalna shramba (niso piškotki)</h3>
       <p>Naslednji podatki se shranjujejo v lokalni shrambi brskalnika in se nikoli ne pošljejo na naše strežnike:</p>

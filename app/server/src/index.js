@@ -246,6 +246,9 @@ if (process.env.TERMINAL_ENABLED === 'true') {
   });
 }
 
+const { startLogPurgeJob } = require('./utils/logPurge');
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  startLogPurgeJob();
 });

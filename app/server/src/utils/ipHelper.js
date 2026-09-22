@@ -36,8 +36,29 @@ function getClientIp(req) {
   return socketIp;
 }
 
+function anonymizeIp(ip) {
+  if (!ip) return null;
+  const cleaned = cleanIp(ip);
+  if (cleaned.includes('.')) {
+    const parts = cleaned.split('.');
+    if (parts.length === 4) {
+      return `${parts[0]}.${parts[1]}.${parts[2]}.0`;
+    }
+    return cleaned;
+  }
+  if (cleaned.includes(':')) {
+    const parts = cleaned.split(':');
+    if (parts.length >= 4) {
+      return `${parts[0]}:${parts[1]}:${parts[2]}:${parts[3]}::`;
+    }
+    return cleaned;
+  }
+  return cleaned;
+}
+
 module.exports = {
   cleanIp,
   isTrustedProxy,
   getClientIp,
+  anonymizeIp,
 };
