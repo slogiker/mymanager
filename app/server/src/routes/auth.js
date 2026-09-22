@@ -45,8 +45,14 @@ router.post('/login', (req, res) => {
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
   res.cookie('token', token, COOKIE_OPTS);
 
+  const flags = {
+    files_enabled: process.env.FILES_ENABLED === 'true',
+    terminal_enabled: process.env.TERMINAL_ENABLED === 'true',
+  };
+
   res.json({
-    user: payload,
+    user: { ...payload, flags },
+    flags,
     mustChangePassword: user.must_change_password === 1,
     must_change_password: user.must_change_password === 1,
   });
@@ -142,7 +148,11 @@ router.post('/logout', (req, res) => {
 router.get('/me', verifyToken, (req, res) => {
   const user = db.prepare('SELECT id, name, username, email, role, must_change_password, created_at FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json(user);
+  const flags = {
+    files_enabled: process.env.FILES_ENABLED === 'true',
+    terminal_enabled: process.env.TERMINAL_ENABLED === 'true',
+  };
+  res.json({ ...user, flags });
 });
 
 router.patch('/me', verifyToken, (req, res) => {

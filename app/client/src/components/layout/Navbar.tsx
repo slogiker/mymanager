@@ -160,7 +160,7 @@ export default function Navbar() {
                     {t('nav_dashboard')}
                   </Link>
                 )}
-                {user.role === 'owner' && location.pathname !== '/terminal' && (
+                {Boolean(user.flags?.terminal_enabled) && user.role === 'owner' && location.pathname !== '/terminal' && (
                   <Link to="/terminal" className="text-sm font-medium px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/[0.03] transition-colors">
                     {t('nav_terminal')}
                   </Link>
@@ -269,7 +269,7 @@ export default function Navbar() {
                 <LayoutDashboard size={15} className="text-slate-500" />
                 {t('nav_dashboard')}
               </Link>
-              {user.role === 'owner' && (
+              {Boolean(user.flags?.terminal_enabled) && user.role === 'owner' && (
                 <Link
                   to="/terminal"
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors"
@@ -278,13 +278,15 @@ export default function Navbar() {
                   {t('nav_terminal')}
                 </Link>
               )}
-              <Link
-                to="/files"
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors"
-              >
-                <FolderOpen size={15} className="text-slate-500" />
-                {t('nav_files')}
-              </Link>
+              {Boolean(user.flags?.files_enabled) && (
+                <Link
+                  to="/files"
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors"
+                >
+                  <FolderOpen size={15} className="text-slate-500" />
+                  {t('nav_files')}
+                </Link>
+              )}
               <Link
                 to="/profile"
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors"

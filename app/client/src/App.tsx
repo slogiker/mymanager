@@ -72,11 +72,16 @@ function AppRoutes() {
         <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/clipboard" element={<RequireAuth><ClipboardPage /></RequireAuth>} />
-        {/* /files requires auth - unauthenticated users go to /login */}
-        <Route path="/files" element={<RequireAuth><FilesPage /></RequireAuth>} />
-        <Route path="/share/:token" element={<SharePage />} />
+        {Boolean(user?.flags?.files_enabled) && (
+          <>
+            <Route path="/files" element={<RequireAuth><FilesPage /></RequireAuth>} />
+            <Route path="/share/:token" element={<SharePage />} />
+          </>
+        )}
         <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
-        <Route path="/terminal" element={<RequireAuth ownerOnly><TerminalPage /></RequireAuth>} />
+        {Boolean(user?.flags?.terminal_enabled) && (
+          <Route path="/terminal" element={<RequireAuth ownerOnly><TerminalPage /></RequireAuth>} />
+        )}
         <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/cookies" element={<CookiePolicyPage />} />

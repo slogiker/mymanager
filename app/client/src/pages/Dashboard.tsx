@@ -411,20 +411,24 @@ export default function DashboardPage() {
                 ← Back to Board
               </button>
             )}
-            <Link
-              to="/terminal"
-              className="p-2 text-slate-400 hover:text-white rounded-xl bg-[#16181f] border border-slate-800 transition-colors"
-              title="SSH Web Terminal"
-            >
-              <TermIcon className="w-4 h-4" />
-            </Link>
-            <Link
-              to="/files"
-              className="p-2 text-slate-400 hover:text-white rounded-xl bg-[#16181f] border border-slate-800 transition-colors"
-              title="File Browser"
-            >
-              <Folder className="w-4 h-4" />
-            </Link>
+            {Boolean(user?.flags?.terminal_enabled) && (
+              <Link
+                to="/terminal"
+                className="p-2 text-slate-400 hover:text-white rounded-xl bg-[#16181f] border border-slate-800 transition-colors"
+                title="SSH Web Terminal"
+              >
+                <TermIcon className="w-4 h-4" />
+              </Link>
+            )}
+            {Boolean(user?.flags?.files_enabled) && (
+              <Link
+                to="/files"
+                className="p-2 text-slate-400 hover:text-white rounded-xl bg-[#16181f] border border-slate-800 transition-colors"
+                title="File Browser"
+              >
+                <Folder className="w-4 h-4" />
+              </Link>
+            )}
             <Link
               to="/profile"
               className="p-2 text-slate-400 hover:text-white rounded-xl bg-[#16181f] border border-slate-800 transition-colors"

@@ -6,6 +6,10 @@ export interface User {
   role: 'owner' | 'user';
   must_change_password: number | boolean;
   created_at: string;
+  flags?: {
+    files_enabled?: boolean;
+    terminal_enabled?: boolean;
+  };
 }
 
 export interface Profile {

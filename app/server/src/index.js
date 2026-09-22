@@ -54,16 +54,18 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(analyticsMiddleware);
 
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
-  setHeaders: (res, filePath) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    const ext = path.extname(filePath).toLowerCase();
-    if (['.html', '.htm', '.svg', '.xml', '.xhtml', '.shtml'].includes(ext)) {
-      res.setHeader('Content-Security-Policy', "default-src 'none'");
-      res.setHeader('Content-Disposition', 'attachment');
+if (process.env.FILES_ENABLED === 'true') {
+  app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+    setHeaders: (res, filePath) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      const ext = path.extname(filePath).toLowerCase();
+      if (['.html', '.htm', '.svg', '.xml', '.xhtml', '.shtml'].includes(ext)) {
+        res.setHeader('Content-Security-Policy', "default-src 'none'");
+        res.setHeader('Content-Disposition', 'attachment');
+      }
     }
-  }
-}));
+  }));
+}
 
 // Tiered rate limiters & API routes
 app.use('/api', apiLimiter);
@@ -80,9 +82,13 @@ app.use('/api/system', require('./routes/system'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/clipboard', require('./routes/clipboard'));
-app.use('/api/files', require('./routes/files'));
-app.use('/api/folders', require('./routes/folders'));
-app.use('/api/shares', require('./routes/shares'));
+
+if (process.env.FILES_ENABLED === 'true') {
+  app.use('/api/files', require('./routes/files'));
+  app.use('/api/folders', require('./routes/folders'));
+  app.use('/api/shares', require('./routes/shares'));
+}
+
 app.use('/api/skills', require('./routes/skills'));
 app.use('/api/vpn-status', require('./routes/vpn'));
 app.use('/api/qbittorrent', require('./routes/qbittorrent'));
@@ -147,57 +153,59 @@ app.use((err, req, res, _next) => {
 });
 
 // Socket.io - SSH terminal (owner only)
-const io = new Server(server, {
-  cors: {
-    origin: IS_PROD ? false : 'http://localhost:5173',
-    credentials: true,
-  },
-});
-
-io.on('connection', (socket) => {
-  let token = socket.handshake.auth?.token;
-  if (!token && socket.handshake.headers.cookie) {
-    const tokenCookie = socket.handshake.headers.cookie
-      .split('; ')
-      .find((r) => r.trim().startsWith('token='));
-    if (tokenCookie) {
-      token = decodeURIComponent(tokenCookie.split('=')[1]);
-    }
-  }
-
-  if (!token) {
-    console.log('Terminal connection rejected: No auth token found.');
-    return socket.disconnect(true);
-  }
-
-  let user;
-  try { user = jwt.verify(token, JWT_SECRET); } catch { return socket.disconnect(true); }
-  if (user.role !== 'owner') {
-    socket.emit('data', '\r\n\x1b[31m*** Unauthorized: Owner access required ***\x1b[0m\r\n');
-    return socket.disconnect(true);
-  }
-
-  let conn = null;
-
-  socket.on('ssh-connect', ({ host, port, username } = {}) => {
-    const targetHost = host || process.env.SSH_HOST || 'ssh.slogiker.si';
-    console.warn(`[SECURITY] Blocked SSH shell login attempt to ${targetHost} from user ${socket.user?.username || 'unknown'}`);
-
-    // Shell login is disabled for security hardening
-    socket.emit('data', 
-      '\r\n\x1b[1;33m[SECURITY POLICY]\x1b[0m \x1b[1;31mSSH Shell Access Disabled\x1b[0m\r\n' +
-      '\x1b[90m───────────────────────────────────────────────────────────────────\x1b[0m\r\n' +
-      'Interactive remote shell execution is temporarily disabled for security\r\n' +
-      'hardening while authentication and sandboxing models are being finalized.\r\n' +
-      '\x1b[90m───────────────────────────────────────────────────────────────────\x1b[0m\r\n' +
-      '\x1b[33mConnection target:\x1b[0m ' + targetHost + '\r\n' +
-      '\x1b[31mStatus: Connection rejected by security policy.\x1b[0m\r\n\r\n'
-    );
-    socket.emit('disabled', { reason: 'SSH shell login is disabled for security reasons.' });
+if (process.env.TERMINAL_ENABLED === 'true') {
+  const io = new Server(server, {
+    cors: {
+      origin: IS_PROD ? false : 'http://localhost:5173',
+      credentials: true,
+    },
   });
 
-  socket.on('disconnect', () => { if (conn) conn.end(); });
-});
+  io.on('connection', (socket) => {
+    let token = socket.handshake.auth?.token;
+    if (!token && socket.handshake.headers.cookie) {
+      const tokenCookie = socket.handshake.headers.cookie
+        .split('; ')
+        .find((r) => r.trim().startsWith('token='));
+      if (tokenCookie) {
+        token = decodeURIComponent(tokenCookie.split('=')[1]);
+      }
+    }
+
+    if (!token) {
+      console.log('Terminal connection rejected: No auth token found.');
+      return socket.disconnect(true);
+    }
+
+    let user;
+    try { user = jwt.verify(token, JWT_SECRET); } catch { return socket.disconnect(true); }
+    if (user.role !== 'owner') {
+      socket.emit('data', '\r\n\x1b[31m*** Unauthorized: Owner access required ***\x1b[0m\r\n');
+      return socket.disconnect(true);
+    }
+
+    let conn = null;
+
+    socket.on('ssh-connect', ({ host, port, username } = {}) => {
+      const targetHost = host || process.env.SSH_HOST || 'ssh.slogiker.si';
+      console.warn(`[SECURITY] Blocked SSH shell login attempt to ${targetHost} from user ${socket.user?.username || 'unknown'}`);
+
+      // Shell login is disabled for security hardening
+      socket.emit('data', 
+        '\r\n\x1b[1;33m[SECURITY POLICY]\x1b[0m \x1b[1;31mSSH Shell Access Disabled\x1b[0m\r\n' +
+        '\x1b[90m───────────────────────────────────────────────────────────────────\x1b[0m\r\n' +
+        'Interactive remote shell execution is temporarily disabled for security\r\n' +
+        'hardening while authentication and sandboxing models are being finalized.\r\n' +
+        '\x1b[90m───────────────────────────────────────────────────────────────────\x1b[0m\r\n' +
+        '\x1b[33mConnection target:\x1b[0m ' + targetHost + '\r\n' +
+        '\x1b[31mStatus: Connection rejected by security policy.\x1b[0m\r\n\r\n'
+      );
+      socket.emit('disabled', { reason: 'SSH shell login is disabled for security reasons.' });
+    });
+
+    socket.on('disconnect', () => { if (conn) conn.end(); });
+  });
+}
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);

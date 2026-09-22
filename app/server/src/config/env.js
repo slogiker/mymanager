@@ -19,6 +19,10 @@ const envSchema = z.object({
   NODE_ENV: z.string().optional().default('development'),
   DB_PATH: z.string().optional(),
 
+  // Feature Flags (default false)
+  FILES_ENABLED: z.string().optional().default('false'),
+  TERMINAL_ENABLED: z.string().optional().default('false'),
+
   // Host SSH
   SSH_HOST: z.string().optional(),
   SSH_PORT: z.string().optional(),
