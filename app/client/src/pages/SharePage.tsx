@@ -21,6 +21,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import DocumentViewer, { type DocumentData } from '../components/files/DocumentViewer';
 import { FileIcon } from '../components/files/fileIcons';
 
@@ -586,7 +587,7 @@ export default function SharePage() {
                   {data.file.original_name.endsWith('.md') && fileContent !== null && (
                     <div
                       className="prose prose-invert prose-sm max-w-none text-slate-200 w-full overflow-y-auto max-h-[600px]"
-                      dangerouslySetInnerHTML={{ __html: marked.parse(fileContent) as string }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(fileContent) as string) }}
                     />
                   )}
 

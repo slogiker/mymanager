@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Edit2, Save, XCircle, Download, Code, Eye, FileText, Image, Video, Music, Archive, FileCode, File, Maximize2, Folder, Box, Table, ExternalLink, Share2 } from 'lucide-react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { api } from '../../lib/api';
 import type { FileItem } from './FileCard';
 import { FileIcon } from './fileIcons';
@@ -369,7 +370,7 @@ export default function PreviewPanel({ file, onClose, onSaved, onShare }: Props)
                 <>
                   {isMd && renderView === 'preview' && (
                     <div className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed overflow-y-auto"
-                      dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }} />
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(content) as string) }} />
                   )}
 
                   {isHtmlFile && renderView === 'preview' && (

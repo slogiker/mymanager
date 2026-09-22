@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 export default function GithubReadme() {
   const [html, setHtml] = useState<string>('');
@@ -12,12 +13,13 @@ export default function GithubReadme() {
         if (!res.ok) throw new Error('Failed to fetch');
         return res.json();
       })
-      .then(data => {
+      .then(async data => {
         const decoded = atob(data.content);
-        return marked.parse(decoded);
+        const parsed = await marked.parse(decoded);
+        return DOMPurify.sanitize(parsed as string);
       })
       .then(parsedHtml => {
-        setHtml(parsedHtml as string);
+        setHtml(parsedHtml);
         setLoading(false);
       })
       .catch(err => {
@@ -56,7 +58,7 @@ export default function GithubReadme() {
                        prose-a:text-cyan-400 hover:prose-a:text-cyan-300 hover:prose-a:underline
                        prose-code:text-cyan-200 prose-code:bg-slate-950/50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
                        prose-li:text-slate-300 prose-ul:list-disc prose-ol:list-decimal"
-            dangerouslySetInnerHTML={{ __html: html }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
           />
         )}
       </div>

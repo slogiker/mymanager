@@ -3,6 +3,7 @@ import {
   ChevronLeft, ChevronRight, Copy, Check, Presentation, FileText,
   Table, BookOpen, Search
 } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 export interface SheetData {
   name: string;
@@ -371,7 +372,7 @@ export default function DocumentViewer({ data, loading, fileName, fullscreen = f
 
         <div
           className="flex-1 overflow-y-auto bg-slate-900/60 border border-slate-800 rounded-xl p-6 text-slate-300 text-sm leading-relaxed prose prose-invert max-w-none"
-          dangerouslySetInnerHTML={{ __html: chapter.html }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(chapter.html) }}
         />
       </div>
     );
@@ -397,7 +398,7 @@ export default function DocumentViewer({ data, loading, fileName, fullscreen = f
 
       <div className="flex-1 overflow-y-auto bg-slate-900/60 border border-slate-800 rounded-xl p-5 text-slate-300 text-xs sm:text-sm leading-relaxed prose prose-invert max-w-none">
         {data.html ? (
-          <div dangerouslySetInnerHTML={{ __html: data.html }} />
+          <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.html) }} />
         ) : (
           <pre className="whitespace-pre-wrap font-sans">{data.text || 'No text content found.'}</pre>
         )}

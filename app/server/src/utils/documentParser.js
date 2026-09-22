@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const AdmZip = require('adm-zip');
+const sanitizeHtml = require('sanitize-html');
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -601,10 +602,13 @@ function parseEpub(filePath) {
       const html = entry.getData().toString('utf8');
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
       const inner = bodyMatch ? bodyMatch[1] : html;
-      const cleanHtml = inner
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-        .replace(/<img[^>]*>/gi, '');
+      const cleanHtml = sanitizeHtml(inner, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['h1', 'h2', 'span', 'img']),
+        allowedAttributes: {
+          ...sanitizeHtml.defaults.allowedAttributes,
+          '*': ['class', 'style'],
+        },
+      });
 
       chapters.push({
         chapterIndex: idx + 1,

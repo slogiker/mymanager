@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Download, Edit2, Save, XCircle, Eye, Code, ZoomIn, ZoomOut, Share2 } from 'lucide-react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { api } from '../../lib/api';
 import type { FileItem } from './FileCard';
 import ThreeViewer from './ThreeViewer';
@@ -269,7 +270,7 @@ export default function FullscreenViewer({ file, onClose, onSaved, onShare }: Pr
           <div className="w-full max-w-4xl" onClick={e => e.stopPropagation()}>
             {isMd && renderView === 'preview' && (
               <div className="prose prose-invert prose-base max-w-none text-slate-200 leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }} />
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(content) as string) }} />
             )}
             {isHtml && renderView === 'preview' && (
               <iframe srcDoc={content} sandbox="allow-scripts allow-forms"
