@@ -1,5 +1,6 @@
 require('./config/env');
 require('dotenv').config();
+require('express-async-errors');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
@@ -25,6 +26,7 @@ const logger = require('./utils/logger');
 const { isTrustedProxy } = require('./utils/ipHelper');
 
 const app = express();
+app.disable('x-powered-by');
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -40,8 +42,25 @@ process.on('uncaughtException', (err) => {
 
 app.set('trust proxy', isTrustedProxy);
 
-// Security headers (OWASP)
+// Security headers (Helmet)
 app.use(securityHeaders);
+
+// Block sensitive file patterns: /.env*, /.git/*, *.db, *.sqlite, *.map
+app.use((req, res, next) => {
+  const p = req.path.toLowerCase();
+  if (
+    p.startsWith('/.env') ||
+    p.includes('/.env') ||
+    p.startsWith('/.git') ||
+    p.includes('/.git') ||
+    p.endsWith('.db') ||
+    p.endsWith('.sqlite') ||
+    p.endsWith('.map')
+  ) {
+    return res.status(404).send('Not Found');
+  }
+  next();
+});
 
 app.use(cors({
   origin: IS_PROD ? false : 'http://localhost:5173',
@@ -156,9 +175,15 @@ app.use((err, req, res, _next) => {
     status,
   });
 
-  const message = IS_PROD && status >= 500
-    ? 'Internal server error'
-    : (err.message || 'An unexpected error occurred');
+  const genericMessages = {
+    400: 'Bad request',
+    401: 'Not authenticated',
+    403: 'Forbidden',
+    404: 'Not found',
+    429: 'Too many requests',
+  };
+
+  const message = genericMessages[status] || (status >= 500 ? 'Internal server error' : 'Request failed');
 
   res.status(status).json({
     error: message,

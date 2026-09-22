@@ -1,38 +1,36 @@
+const helmet = require('helmet');
+
 /**
- * Security headers middleware (Zak Drofenik & Marjan Čeh)
+ * Helmet Security Headers Middleware
  * Enforces OWASP-recommended HTTP security headers.
+ * 
+ * Note on style-src 'unsafe-inline':
+ * Dropping 'unsafe-inline' is not currently possible because the client UI
+ * relies on runtime computed inline styles for dynamic gauges, battery/storage bars,
+ * tag colors, and @dnd-kit dragging coordinate transformations.
  */
-function securityHeaders(req, res, next) {
-  // Prevent clickjacking
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-
-  // Prevent MIME-sniffing
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-
-  // XSS protection for older browsers
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-
-  // Privacy-preserving referrer policy
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-
-  // Restrict unwanted browser features
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-
-  // Mask Express server identification
-  res.removeHeader('X-Powered-By');
-
-  // HSTS - enforce HTTPS for 2 years (safe: NPM terminates TLS in front of this app)
-  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
-
-  // Content Security Policy - tight baseline
-  // connect-src allows ws:/wss: for Socket.io terminal feature
-  // object-src 'self' and frame-src allow PDF viewer and embedded document previews
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; object-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'"
-  );
-
-  next();
-}
+const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'", 'ws:', 'wss:'],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+    },
+  },
+  frameguard: { action: 'deny' },
+  hidePoweredBy: true,
+  hsts: {
+    maxAge: 63072000,
+    includeSubDomains: true,
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  xssFilter: true,
+  noSniff: true,
+});
 
 module.exports = { securityHeaders };
