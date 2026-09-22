@@ -14,12 +14,19 @@ function cleanIp(ip) {
 }
 
 function isTrustedProxy(ip) {
-  return cleanIp(ip) === '172.18.0.1';
+  const cleaned = cleanIp(ip);
+  const trustedList = (process.env.TRUSTED_PROXIES || '172.18.0.1')
+    .split(',')
+    .map(s => cleanIp(s.trim()))
+    .filter(Boolean);
+  return trustedList.includes(cleaned);
 }
 
 function getClientIp(req) {
   const socketIp = cleanIp(req.socket?.remoteAddress || req.connection?.remoteAddress);
-  if (socketIp === '172.18.0.1') {
+  if (isTrustedProxy(socketIp)) {
+    const cfIp = req.headers['cf-connecting-ip'];
+    if (cfIp) return cleanIp(cfIp);
     const forwarded = req.headers['x-forwarded-for'];
     if (forwarded) {
       const first = cleanIp(forwarded.split(',')[0]);

@@ -64,6 +64,16 @@ const serviceTestLimiter = rateLimit({
   message: { error: 'Service test probe limit exceeded. Please wait a few moments.', status: 429 },
 });
 
+// Dedicated message submission rate limit
+const messagesLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: realIpKey,
+  message: { error: 'Too many messages sent from this IP. Please try again after an hour.', status: 429 },
+});
+
 module.exports = {
   apiLimiter,
   loginLimiter,
@@ -71,4 +81,5 @@ module.exports = {
   uploadLimiter,
   speedtestLimiter,
   serviceTestLimiter,
+  messagesLimiter,
 };

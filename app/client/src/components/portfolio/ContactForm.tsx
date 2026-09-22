@@ -14,6 +14,7 @@ type SubmitState = 'idle' | 'loading' | 'success' | 'error';
 
 export default function ContactForm() {
   const [form, setForm] = useState<FormState>({ name: '', email: '', subject: '', content: '', _hp: '' });
+  const [loadedAt, setLoadedAt] = useState<number>(() => Date.now());
   const [state, setState] = useState<SubmitState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [inView, setInView] = useState(false);
@@ -42,11 +43,13 @@ export default function ContactForm() {
     setError(null);
 
     try {
-      await api.post('/contact', {
+      await api.post('/messages', {
         name: form.name,
         email: form.email,
         subject: form.subject,
-        content: form.content
+        content: form.content,
+        _hp: form._hp,
+        _t: loadedAt,
       });
       setState('success');
     } catch (err) {
@@ -111,7 +114,7 @@ export default function ContactForm() {
                 </div>
                 <p className="text-slate-300 text-sm font-medium mb-5">{t('contact_success')}</p>
                 <button
-                  onClick={() => { setState('idle'); setForm({ name: '', email: '', subject: '', content: '', _hp: '' }); }}
+                  onClick={() => { setState('idle'); setForm({ name: '', email: '', subject: '', content: '', _hp: '' }); setLoadedAt(Date.now()); }}
                   className="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-4 transition-colors"
                 >
                   {t('contact_reset')}
@@ -171,8 +174,9 @@ export default function ContactForm() {
                   />
                 </div>
 
-                {/* honeypot */}
+                {/* honeypot and timing guard */}
                 <input type="text" name="_hp" value={form._hp} onChange={set('_hp')} style={{ display: 'none' }} tabIndex={-1} autoComplete="off" />
+                <input type="hidden" name="_t" value={loadedAt} />
 
                 {error && (
                   <p className="text-red-400/80 text-sm">{error}</p>
