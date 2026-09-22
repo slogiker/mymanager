@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from '../../context/LanguageContext';
 
 interface AppItem {
   title: string;
@@ -37,24 +38,24 @@ const APPS: AppItem[] = [
 interface WebsiteItem {
   title: string;
   desc: string;
-  url: string;
+  badge: string;
 }
 
 const WEBSITES: WebsiteItem[] = [
   {
     title: 'PGD Majšperk Breg',
-    desc: 'Voluntary fire brigade portal',
-    url: '#',
+    desc: 'Voluntary fire brigade community portal and event operations',
+    badge: 'Portal',
   },
   {
     title: 'Avtopihi',
-    desc: 'Transport & vehicle logistics',
-    url: '#',
+    desc: 'Transport, fleet tracking and vehicle logistics showcase',
+    badge: 'Logistics',
   },
   {
     title: 'Tesarstvo Kamenšek',
-    desc: 'Carpentry & roofing services',
-    url: '#',
+    desc: 'Carpentry, structural roofing and craftsmanship showcase',
+    badge: 'Craftsmanship',
   },
 ];
 
@@ -79,6 +80,7 @@ function useInView(threshold = 0.15) {
 export default function ApplicationsGrid() {
   const appsSection = useInView();
   const websitesSection = useInView();
+  const { t } = useTranslation();
 
   return (
     <div className="max-w-6xl mx-auto w-full px-6 md:px-10 lg:px-16 py-24">
@@ -86,10 +88,10 @@ export default function ApplicationsGrid() {
       <section id="apps" ref={appsSection.ref}>
         <div className="mb-12">
           <span className="text-[11px] font-semibold tracking-[0.2em] uppercase text-slate-600">
-            Open Source
+            {t('apps_opensource')}
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 mt-2 tracking-tight">
-            Applications
+            {t('apps_title')}
           </h2>
         </div>
 
@@ -136,42 +138,42 @@ export default function ApplicationsGrid() {
         </div>
       </section>
 
-      {/* Websites */}
+      {/* Selected Projects / Websites */}
       <section className="mt-32" ref={websitesSection.ref}>
         <div className="mb-12">
           <span className="text-[11px] font-semibold tracking-[0.2em] uppercase text-slate-600">
-            Client Work
+            {t('apps_selected')}
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 mt-2 tracking-tight">
-            Websites I've Made
+            {t('apps_websites_title')}
           </h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {WEBSITES.map((site, i) => (
-            <a
+            <div
               key={site.title}
-              href={site.url}
-              className="group relative p-6 rounded-2xl border border-slate-800/40 hover:border-slate-700/60 bg-white/[0.01] hover:bg-white/[0.025] transition-all duration-500"
+              className="group relative p-6 rounded-2xl border border-slate-800/40 hover:border-slate-700/60 bg-white/[0.01] hover:bg-white/[0.025] transition-all duration-500 flex flex-col justify-between"
               style={{
                 opacity: websitesSection.inView ? 1 : 0,
                 transform: websitesSection.inView ? 'translateY(0)' : 'translateY(16px)',
                 transition: `all 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${i * 0.1}s`,
               }}
             >
-              <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors">
-                {site.title}
-              </h3>
-              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                {site.desc}
-              </p>
-              <div className="mt-4 flex items-center gap-1.5 text-[11px] text-slate-600 group-hover:text-red-500/70 transition-colors">
-                <span>Visit</span>
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors">
+                    {site.title}
+                  </h3>
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 border border-slate-800/80 rounded px-1.5 py-0.5">
+                    {site.badge}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {site.desc}
+                </p>
               </div>
-            </a>
+            </div>
           ))}
         </div>
       </section>

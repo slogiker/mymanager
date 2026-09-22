@@ -35,6 +35,11 @@ const TRANSLATIONS = {
     portfolio_desc: "A collection of projects I've worked on. Most are open-source.",
     portfolio_filter_all: 'All Projects',
     portfolio_tag: 'Portfolio',
+    // Applications & Selected Projects
+    apps_opensource: 'Open Source',
+    apps_title: 'Applications',
+    apps_selected: 'Selected projects',
+    apps_websites_title: 'Selected Websites',
     // Skills
     skills_tag: 'Tech Stack',
     skills_title: 'What I work with',
@@ -99,6 +104,11 @@ const TRANSLATIONS = {
     portfolio_desc: 'Zbirka projektov, na katerih sem delal. Večina jih je odprtokodnih.',
     portfolio_filter_all: 'Vsi projekti',
     portfolio_tag: 'Portfolio',
+    // Applications & Selected Projects
+    apps_opensource: 'Odprta koda',
+    apps_title: 'Aplikacije',
+    apps_selected: 'Izbrani projekti',
+    apps_websites_title: 'Izbrana spletna mesta',
     // Skills
     skills_tag: 'Tehnologije',
     skills_title: 'S čim delam',
