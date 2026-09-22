@@ -20,11 +20,9 @@ class SystemMonitor {
   async getPironmanStats() {
     const urls = [
       process.env.PIRONMAN_API_URL,
-      'http://192.168.1.136:34001/api/v1.0/get-data',
-      'http://host.docker.internal:34001/api/v1.0/get-data',
-      'http://localhost:34001/api/v1.0/get-data',
-      'http://127.0.0.1:34001/api/v1.0/get-data'
     ].filter(Boolean);
+
+    if (urls.length === 0) return null;
 
     for (const url of urls) {
       try {
@@ -247,27 +245,19 @@ class SystemMonitor {
   async fetchCM5Stats() {
     const fs = require('fs');
     const { Client } = require('ssh2');
-    const keyPaths = [
-      '/root/.ssh/id_ed25519',
-      '/root/.ssh/id_rsa',
-      '/home/slogiker/.ssh/id_ed25519',
-      '/home/slogiker/.ssh/id_rsa',
-      process.env.WG_SSH_KEY_PATH,
-    ].filter(Boolean);
+    const host = process.env.WG_SSH_HOST;
+    const port = parseInt(process.env.WG_SSH_PORT || '22', 10);
+    const username = process.env.WG_SSH_USER || process.env.SSH_USERNAME;
+    const keyPath = process.env.WG_SSH_KEY_PATH;
 
     let privateKey = process.env.WG_SSH_KEY || null;
-    if (!privateKey) {
-      for (const kp of keyPaths) {
-        if (fs.existsSync(kp)) {
-          try {
-            privateKey = fs.readFileSync(kp, 'utf8');
-            if (privateKey) break;
-          } catch {}
-        }
-      }
+    if (!privateKey && keyPath && fs.existsSync(keyPath)) {
+      try {
+        privateKey = fs.readFileSync(keyPath, 'utf8');
+      } catch {}
     }
 
-    if (!privateKey) return null;
+    if (!privateKey || !host || !username) return null;
 
     return new Promise((resolve) => {
       const conn = new Client();
@@ -326,9 +316,9 @@ class SystemMonitor {
         clearTimeout(timer);
         resolve(null);
       }).connect({
-        host: '192.168.1.112',
-        port: 22,
-        username: process.env.SSH_USERNAME || 'slogiker',
+        host,
+        port,
+        username,
         privateKey,
         readyTimeout: 2000,
       });

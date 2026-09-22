@@ -42,7 +42,7 @@ function analyticsMiddleware(req, res, next) {
     const token = req.cookies?.token;
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'REMOVED');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.id;
       } catch {}
     }

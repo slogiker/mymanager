@@ -4,15 +4,15 @@ const { verifyToken } = require('../middleware/auth');
 const router = express.Router();
 
 router.get('/stats', verifyToken, async (req, res) => {
-  const baseUrl = process.env.JELLYSEERR_URL || 'http://jellyseerr.slogiker.si';
+  const baseUrl = process.env.JELLYSEERR_URL;
   const apiKey = process.env.JELLYSEERR_API_KEY;
 
-  if (!apiKey) {
+  if (!baseUrl || !apiKey) {
     return res.json({
       online: false,
       pendingCount: 0,
       totalCount: 0,
-      message: 'Jellyseerr API key not configured',
+      message: 'Jellyseerr not configured',
     });
   }
 

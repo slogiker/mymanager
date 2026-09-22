@@ -5,7 +5,7 @@ const db = require('../models/db');
 const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'REMOVED';
+const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_OPTS = {
   httpOnly: true,
   sameSite: 'lax',

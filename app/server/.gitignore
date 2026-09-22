@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+cookies.txt
+data/
+uploads/
+*.db
+*.sqlite
+*.log

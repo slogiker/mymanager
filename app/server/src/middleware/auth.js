@@ -15,7 +15,7 @@ function verifyToken(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
 
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET || 'REMOVED');
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
   } catch {
     res.clearCookie('token');
@@ -27,7 +27,7 @@ function optionalAuth(req, res, next) {
   const token = extractToken(req);
   if (token) {
     try {
-      req.user = jwt.verify(token, process.env.JWT_SECRET || 'REMOVED');
+      req.user = jwt.verify(token, process.env.JWT_SECRET);
     } catch {
       // ignore invalid token for optional auth
     }

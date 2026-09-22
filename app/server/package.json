@@ -23,7 +23,8 @@
     "ssh2": "^1.17.0",
     "systeminformation": "^5.31.1",
     "ua-parser-js": "^1.0.38",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

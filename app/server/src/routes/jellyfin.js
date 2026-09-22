@@ -4,15 +4,15 @@ const { verifyToken } = require('../middleware/auth');
 const router = express.Router();
 
 router.get('/stats', verifyToken, async (req, res) => {
-  const baseUrl = process.env.JELLYFIN_URL || 'http://jellyfin.slogiker.si';
+  const baseUrl = process.env.JELLYFIN_URL;
   const apiKey = process.env.JELLYFIN_API_KEY;
 
-  if (!apiKey) {
+  if (!baseUrl || !apiKey) {
     return res.json({
       online: false,
       activeStreamCount: 0,
       activeSessionCount: 0,
-      message: 'Jellyfin API key not configured',
+      message: 'Jellyfin not configured',
     });
   }
 

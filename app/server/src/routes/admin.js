@@ -17,9 +17,9 @@ router.get('/wireguard/status', verifyToken, requireOwner, async (req, res) => {
     return res.json(wgCache.data);
   }
 
-  const host = process.env.WG_SSH_HOST || '192.168.1.112';
+  const host = process.env.WG_SSH_HOST;
   const port = parseInt(process.env.WG_SSH_PORT || '22', 10);
-  const username = process.env.WG_SSH_USER || 'wg-monitor';
+  const username = process.env.WG_SSH_USER;
   const keyPath = process.env.WG_SSH_KEY_PATH;
 
   let privateKey = process.env.WG_SSH_KEY;
@@ -27,11 +27,11 @@ router.get('/wireguard/status', verifyToken, requireOwner, async (req, res) => {
     try { privateKey = fs.readFileSync(keyPath, 'utf8'); } catch {}
   }
 
-  if (!privateKey) {
+  if (!privateKey || !host || !username) {
     const fallback = {
       online: false,
       cached: false,
-      error: 'SSH private key not configured for WireGuard node',
+      error: 'WireGuard not configured',
       peers: [],
     };
     return res.json(fallback);
@@ -123,8 +123,20 @@ router.get('/wireguard/status', verifyToken, requireOwner, async (req, res) => {
 
 // 2. Pi-hole Stats
 router.get('/pihole/stats', verifyToken, requireOwner, async (req, res) => {
-  const baseUrl = process.env.PIHOLE_URL || 'http://192.168.1.112:8081';
+  const baseUrl = process.env.PIHOLE_URL;
   const token = process.env.PIHOLE_API_TOKEN || '';
+
+  if (!baseUrl) {
+    return res.json({
+      online: false,
+      queriesToday: 0,
+      blockedToday: 0,
+      percentBlocked: 0,
+      domainsBlocked: 0,
+      uniqueClients: 0,
+      message: 'Pi-hole not configured',
+    });
+  }
 
   try {
     // Attempt v5 summaryRaw first

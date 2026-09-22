@@ -1,3 +1,4 @@
+require('./config/env');
 require('dotenv').config();
 const express = require('express');
 const cookieParser = require('cookie-parser');
@@ -26,7 +27,7 @@ const { isTrustedProxy } = require('./utils/ipHelper');
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'REMOVED';
+const JWT_SECRET = process.env.JWT_SECRET;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 // Process-level safety guards

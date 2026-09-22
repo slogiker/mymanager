@@ -44,11 +44,11 @@ async function fetchQbit(baseUrl, path, username, password) {
 }
 
 router.get('/stats', verifyToken, async (req, res) => {
-  const baseUrl = process.env.QBIT_URL || 'http://192.168.1.41:8090';
+  const baseUrl = process.env.QBIT_URL;
   const username = process.env.QBIT_USER;
   const password = process.env.QBIT_PASS;
 
-  if (!username || !password) {
+  if (!baseUrl || !username || !password) {
     return res.json({
       online: false,
       downloadSpeed: 0,
@@ -57,7 +57,7 @@ router.get('/stats', verifyToken, async (req, res) => {
       uploadTotal: 0,
       activeCount: 0,
       torrents: [],
-      message: 'qBittorrent credentials not configured',
+      message: 'qBittorrent not configured',
     });
   }
 
