@@ -67,8 +67,11 @@ if (process.env.FILES_ENABLED === 'true') {
   }));
 }
 
-// Tiered rate limiters & API routes
+const { defaultDeny } = require('./middleware/defaultDeny');
+
+// Tiered rate limiters, default-deny guard & API routes
 app.use('/api', apiLimiter);
+app.use('/api', defaultDeny);
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/services/test', serviceTestLimiter);
