@@ -46,18 +46,17 @@ router.get('/stats', verifyToken, async (req, res) => {
       tvCount: counts.tv || 0,
     };
 
-    // Owner-only breakdown with per-user counts & full list
-    if (req.user?.role === 'owner') {
-      try {
-        const requestsRes = await fetch(`${baseUrl}/api/v1/request?take=50&filter=all`, {
-          headers: {
-            'X-Api-Key': apiKey,
-            Accept: 'application/json',
-          },
-          signal: AbortSignal.timeout(3500),
-        });
+    // Breakdown with per-user counts & full list for authenticated users
+    try {
+      const requestsRes = await fetch(`${baseUrl}/api/v1/request?take=50&filter=all`, {
+        headers: {
+          'X-Api-Key': apiKey,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(3500),
+      });
 
-        if (requestsRes.ok) {
+      if (requestsRes.ok) {
           const reqData = await requestsRes.json();
           const results = Array.isArray(reqData.results) ? reqData.results : [];
 
@@ -90,9 +89,8 @@ router.get('/stats', verifyToken, async (req, res) => {
       } catch (err) {
         responseData.ownerStats = { error: err.message };
       }
-    }
 
-    res.json(responseData);
+      res.json(responseData);
   } catch (err) {
     res.json({
       online: false,

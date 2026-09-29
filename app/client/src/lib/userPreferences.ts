@@ -17,6 +17,7 @@ export interface UserPreferences {
     qbittorrent?: boolean;
     speedtest?: boolean;
   };
+  widgetSizes?: Record<string, { colSpan: number; rowSpan: number }>;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -35,6 +36,12 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     notes: true,
     qbittorrent: true,
     speedtest: true,
+  },
+  widgetSizes: {
+    qbittorrent: { colSpan: 2, rowSpan: 1 },
+    speedtest: { colSpan: 2, rowSpan: 1 },
+    clock: { colSpan: 2, rowSpan: 1 },
+    notes: { colSpan: 2, rowSpan: 1 },
   },
 };
 
@@ -61,6 +68,10 @@ export function getUserPreferences(userId?: number): UserPreferences {
         qbittorrent: parsed.widgetVisible.qbittorrent !== false,
         speedtest: parsed.widgetVisible.speedtest !== false,
       } : DEFAULT_PREFERENCES.widgetVisible,
+      widgetSizes: typeof parsed.widgetSizes === 'object' && parsed.widgetSizes ? {
+        ...DEFAULT_PREFERENCES.widgetSizes,
+        ...parsed.widgetSizes,
+      } : DEFAULT_PREFERENCES.widgetSizes,
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -90,6 +101,10 @@ export async function syncUserPreferencesFromBackend(userId?: number): Promise<U
           qbittorrent: remote.widgetVisible.qbittorrent !== false,
           speedtest: remote.widgetVisible.speedtest !== false,
         } : DEFAULT_PREFERENCES.widgetVisible,
+        widgetSizes: typeof remote.widgetSizes === 'object' && remote.widgetSizes ? {
+          ...DEFAULT_PREFERENCES.widgetSizes,
+          ...remote.widgetSizes,
+        } : DEFAULT_PREFERENCES.widgetSizes,
       };
       localStorage.setItem(`mymanager_user_prefs_${userId}`, JSON.stringify(merged));
       window.dispatchEvent(new CustomEvent('mymanager_prefs_changed', { detail: merged }));

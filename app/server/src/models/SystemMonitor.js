@@ -434,32 +434,32 @@ class SystemMonitor {
 
     // Node 4: 192.168.1.41 (Storage / Nextcloud Node)
     const probe41 = await this.probeTcp('192.168.1.41', 8080);
-    const mediaPoolTotal = process.env.MEDIA_POOL_TOTAL || '16.0 TB';
-    const mediaPoolFree = process.env.MEDIA_POOL_FREE || '8.7 TB';
-    const mediaPoolUsed = process.env.MEDIA_POOL_USED || '7.3 TB';
-    const mediaPoolPercent = parseInt(process.env.MEDIA_POOL_PERCENT || '46', 10);
-    const netDown = process.env.NEXTCLOUD_NET_DOWN || '↓ 14.8 MB/s';
-    const netUp = process.env.NEXTCLOUD_NET_UP || '↑ 2.3 MB/s';
+    const mediaPoolTotal = process.env.MEDIA_POOL_TOTAL || null;
+    const mediaPoolFree = process.env.MEDIA_POOL_FREE || null;
+    const mediaPoolUsed = process.env.MEDIA_POOL_USED || null;
+    const mediaPoolPercent = process.env.MEDIA_POOL_PERCENT ? parseInt(process.env.MEDIA_POOL_PERCENT, 10) : null;
+    const netDown = process.env.NEXTCLOUD_NET_DOWN || null;
+    const netUp = process.env.NEXTCLOUD_NET_UP || null;
 
     const node41 = {
       id: '192.168.1.41',
       name: 'Nextcloud Storage',
       ip: '192.168.1.41',
-      role: 'Storage / Media Pool',
+      role: 'Storage Node',
       status: probe41.status,
       latency: probe41.latency,
       ports: ['Nextcloud (8080)', 'qBittorrent (8090)', 'Jellyseerr (5055)'],
-      disk: {
-        poolName: 'media pool',
+      disk: mediaPoolTotal ? {
+        poolName: 'Storage Pool',
         total: mediaPoolTotal,
         used: mediaPoolUsed,
         free: mediaPoolFree,
         percent: mediaPoolPercent,
-      },
-      network: {
+      } : undefined,
+      network: (netDown && netUp) ? {
         down: netDown,
         up: netUp,
-      },
+      } : undefined,
     };
 
     return [hostNode, node136, node112, node41];

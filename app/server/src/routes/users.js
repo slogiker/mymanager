@@ -4,6 +4,7 @@ const { randomBytes } = require('crypto');
 const db = require('../models/db');
 const { verifyToken } = require('../middleware/auth');
 const { requireOwner } = require('../middleware/owner');
+const { updateEnvVariable } = require('../utils/envHelper');
 
 const router = express.Router();
 
@@ -61,6 +62,10 @@ router.post('/:id/reset-password', verifyToken, requireOwner, async (req, res) =
   const otp = randomBytes(6).toString('hex');
   const hash = await bcrypt.hash(otp, 12);
   db.prepare("UPDATE users SET password_hash=?, must_change_password=1, updated_at=datetime('now') WHERE id=?").run(hash, req.params.id);
+
+  if (user.role === 'owner') {
+    updateEnvVariable('ADMIN_PASSWORD', otp);
+  }
 
   res.json({ oneTimePassword: otp });
 });

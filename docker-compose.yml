@@ -1,11 +1,10 @@
 services:
   dashboard:
     build: .
-    ports:
-      - "127.0.0.1:31847:7293"
     volumes:
       - ./app/server/data:/mymanager/app/server/data
       - ./app/server/uploads:/mymanager/app/server/uploads
+      - ./app/server/.env:/mymanager/app/server/.env
     env_file:
       - app/server/.env
     environment:

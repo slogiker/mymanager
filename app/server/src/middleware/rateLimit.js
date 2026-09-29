@@ -4,10 +4,10 @@ const { getClientIp } = require('../utils/ipHelper');
 // Standard key generator using verified real client IP
 const realIpKey = (req) => getClientIp(req);
 
-// Global API rate limit
+// Global API rate limit - generous limit for dashboard polling and editing
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,
+  max: 15000,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: realIpKey,

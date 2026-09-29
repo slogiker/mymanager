@@ -171,6 +171,10 @@ export interface SpeedtestResult {
   server?: string;
   status: string;
   isRunning?: boolean;
+  phase?: string;
+  progressPct?: number;
+  elapsedSec?: number;
+  durationSec?: number;
 }
 
 export interface Message {
@@ -257,3 +261,5 @@ export interface AnalyticsVisit {
   device_type: string | null;
   created_at: string;
 }
+
+export type { UserPreferences } from './lib/userPreferences';

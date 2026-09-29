@@ -70,7 +70,7 @@ import {
 import { useAuth } from '../../../hooks/useAuth';
 import { getUserPreferences, saveUserPreferences, UserPreferences } from '../../../lib/userPreferences';
 import { api } from '../../../lib/api';
-import { TimeWidget, NotesWidget, MultiServerNodesWidget, QbittorrentWidget, SpeedtestWidget } from '../widgets';
+import { TimeWidget, NotesWidget, MultiServerNodesWidget, QbittorrentWidget, SpeedtestWidget, TopWidgetsGrid } from '../widgets';
 import { Modal, Field, ErrBox, ServiceIcon } from '../common';
 import { SortableCategoryColumn } from './SortableCategoryColumn';
 
@@ -779,34 +779,18 @@ export function HomelabBoard({
         />
       )}
 
-      {/* Top Widgets: Time, Speedtest, and Quick Notes */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {prefs.widgetVisible?.clock !== false && (
-          <div className="col-span-1">
-            <TimeWidget uptime={hostNode?.uptime} />
-          </div>
-        )}
-        {prefs.widgetVisible?.speedtest !== false && (
-          <div className="col-span-1">
-            <SpeedtestWidget
-              speedtest={speedtest}
-              onRunSpeedtest={onRunSpeedtest}
-              isRunningSpeedtest={isRunningSpeedtest}
-            />
-          </div>
-        )}
-        {prefs.widgetVisible?.notes !== false && (
-          <div className={
-            prefs.widgetVisible?.clock !== false && prefs.widgetVisible?.speedtest !== false
-              ? 'col-span-1'
-              : (prefs.widgetVisible?.clock !== false || prefs.widgetVisible?.speedtest !== false)
-              ? 'col-span-1 md:col-span-2'
-              : 'col-span-1 md:col-span-3'
-          }>
-            <NotesWidget />
-          </div>
-        )}
-      </div>
+      {/* Top Widgets Dynamic Super-Grid (Resizable 8-Column Flat Grid) */}
+      <TopWidgetsGrid
+        prefs={prefs}
+        onUpdatePrefs={setPrefs}
+        userId={user?.id}
+        uptime={hostNode?.uptime}
+        speedtest={speedtest}
+        onRunSpeedtest={onRunSpeedtest}
+        isRunningSpeedtest={isRunningSpeedtest}
+        qbitStats={qbitStats}
+        onOpenInspector={onOpenInspector}
+      />
 
       {/* Search & Grid Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
@@ -883,14 +867,6 @@ export function HomelabBoard({
       </div>
 
       <ErrBox msg={error} />
-
-      {/* qBittorrent Dedicated Downloads & Telemetry Widget */}
-      {prefs.widgetVisible?.qbittorrent !== false && qbitStats?.online && (
-        <QbittorrentWidget
-          data={qbitStats}
-          onOpenInspector={() => onOpenInspector?.('qbittorrent')}
-        />
-      )}
 
       {/* Flat 2x1 Grid or Grouped Categories */}
       {prefs.disableCategories ? (

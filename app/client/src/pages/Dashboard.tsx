@@ -235,6 +235,13 @@ export default function DashboardPage() {
 
   const handleRunSpeedtest = async () => {
     setRunningSpeedtest(true);
+    const pollTimer = setInterval(async () => {
+      try {
+        const latest = await api.get<SpeedtestResult>('/speedtest/latest');
+        setSpeedtest(latest);
+      } catch {}
+    }, 800);
+
     try {
       const res = await api.post<SpeedtestResult>('/speedtest/run', {});
       setSpeedtest(res);
@@ -245,6 +252,9 @@ export default function DashboardPage() {
         setSpeedtest(fallback);
       } catch {}
     } finally {
+      clearInterval(pollTimer);
+      // Final fetch to guarantee settled state
+      api.get<SpeedtestResult>('/speedtest/latest').then(setSpeedtest).catch(() => {});
       setRunningSpeedtest(false);
     }
   };

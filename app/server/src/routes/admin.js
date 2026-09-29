@@ -121,6 +121,34 @@ router.get('/wireguard/status', verifyToken, requireOwner, async (req, res) => {
   res.json(result);
 });
 
+let piholeCachedSid = null;
+let piholeSidExpires = 0;
+
+async function getPiholeSid(baseUrl, password) {
+  if (!password) return null;
+  if (piholeCachedSid && Date.now() < piholeSidExpires) {
+    return piholeCachedSid;
+  }
+  try {
+    const res = await fetch(`${baseUrl}/api/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.session?.valid && data?.session?.sid) {
+        piholeCachedSid = data.session.sid;
+        const validitySec = data.session.validity || 1800;
+        piholeSidExpires = Date.now() + Math.max(validitySec - 120, 60) * 1000;
+        return piholeCachedSid;
+      }
+    }
+  } catch {}
+  return null;
+}
+
 // 2. Pi-hole Stats
 router.get('/pihole/stats', verifyToken, requireOwner, async (req, res) => {
   const baseUrl = process.env.PIHOLE_URL;
@@ -160,11 +188,23 @@ router.get('/pihole/stats', verifyToken, requireOwner, async (req, res) => {
     }
 
     // Fallback: Pi-hole v6 API
+    let sid = piholeCachedSid || token;
     const v6Url = `${baseUrl}/api/stats/summary`;
-    const v6Res = await fetch(v6Url, {
-      headers: token ? { 'sid': token, 'Authorization': `Bearer ${token}` } : {},
+    let v6Res = await fetch(v6Url, {
+      headers: sid ? { 'sid': sid, 'Authorization': `Bearer ${sid}` } : {},
       signal: AbortSignal.timeout(3000),
     });
+
+    // If unauthorized and password/token provided, authenticate via /api/auth
+    if (v6Res.status === 401 && token) {
+      const newSid = await getPiholeSid(baseUrl, token);
+      if (newSid) {
+        v6Res = await fetch(v6Url, {
+          headers: { 'sid': newSid, 'Authorization': `Bearer ${newSid}` },
+          signal: AbortSignal.timeout(3000),
+        });
+      }
+    }
 
     if (v6Res.ok) {
       const v6Data = await v6Res.json();

@@ -95,6 +95,7 @@ app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/services/test', serviceTestLimiter);
 app.use('/api/speedtest/run', speedtestLimiter);
+app.get('/api/ping', (req, res) => res.json({ pong: true, time: Date.now() }));
 
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/services', require('./routes/services'));

@@ -9,6 +9,7 @@ const PUBLIC_ALLOW_LIST = [
   { method: 'GET', path: '/api/skills' },
   { method: 'GET', path: '/api/projects' },
   { method: 'GET', path: '/api/projects/tags' },
+  { method: 'GET', path: '/api/ping' },
 ];
 
 function extractToken(req) {

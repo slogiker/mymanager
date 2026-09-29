@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../models/db');
 const { verifyToken } = require('../middleware/auth');
+const { updateEnvVariable } = require('../utils/envHelper');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -93,6 +94,10 @@ router.post('/change-password', verifyToken, async (req, res) => {
 
   const hash = await bcrypt.hash(newPassword, 12);
   db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = datetime(\'now\') WHERE id = ?').run(hash, user.id);
+
+  if (user.role === 'owner') {
+    updateEnvVariable('ADMIN_PASSWORD', newPassword);
+  }
 
   res.json({ message: 'Password changed successfully' });
 });

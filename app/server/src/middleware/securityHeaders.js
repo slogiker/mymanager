@@ -13,10 +13,16 @@ const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://challenges.cloudflare.com",
+        "https://static.cloudflareinsights.com",
+      ],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'blob:'],
-      connectSrc: ["'self'", 'ws:', 'wss:'],
+      connectSrc: ["'self'", "ws:", "wss:", "https://challenges.cloudflare.com"],
+      frameSrc: ["'self'", "https://challenges.cloudflare.com"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
       baseUri: ["'self'"],

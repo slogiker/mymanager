@@ -1,112 +1,76 @@
-# TODO — continue next session
+# MyManager - Development Roadmap & TODO
 
-## 🧪 NEXT SESSION PRIORITY: FULL SYSTEM TESTING & BUG HUNTING
-The next session will focus entirely on thorough end-to-end testing of the application and catching edge-case bugs:
+## Active Tasks & Recent Implementations
 
-1. **File Manager Testing:**
-   - [ ] Drag & Drop raw ZIP file -> Prompt modal appears (Upload as ZIP vs Extract into folder).
-   - [ ] Archive Extraction -> Unpacks files into target folder with correct paths and names.
-   - [ ] ZIP Archive Preview -> Clicking `.zip` displays archive contents list in preview pane without downloading/extracting.
-   - [ ] Folder Download -> Right-click or folder action bundles entire tree recursively into `.zip` and downloads cleanly.
-   - [ ] Public Sharing -> Create share link with various expiry times (`never`, `1h`, `1d`, `7d`, `30d`), open in incognito `/share/:token`, test downloads and preview.
-   - [ ] Upload Drawer -> Upload multiple files, check progress bars, test the Cancel (`XHR.abort()`) button.
-   - [ ] Fullscreen Preview -> Void backdrop click closes, `Esc` key closes, `Ctrl + scroll wheel` zooms image smoothly.
-   - [ ] Text / Markdown Editing -> Auto-resizing textarea as lines are added, save changes.
-   - [ ] Video Formats -> Play `.mov`, `.mkv`, `.webm`, `.avi` files.
-   - [ ] 3D CAD Preview -> Verify `.stl`, `.obj`, and `.f3d` CAD preview with 3D orbit controls.
-   - [ ] Folder Navigation & Hierarchy -> Expanding/collapsing tree in sidebar, pinning subfolders, drag-dropping items into breadcrumbs to move up hierarchy.
-   - [ ] Renaming & Deletions -> In-app renaming of files and folders, multi-selection batch deletion.
-2. **Auth & Sessions Testing:**
-   - [ ] Owner login with `slogiker` / `changeme123`.
-   - [ ] Password visibility toggle (eye icon).
-   - [ ] Guest vs Owner file access and persistence across page reloads.
-3. **Dashboard & Other Modules:**
-   - [ ] Web Terminal (SSH connection).
-   - [ ] Clipboard tool.
-   - [ ] Portfolio public contact form & links.
-
----
-
-### Login returns "internal server error"
-- POST /api/auth/login with {username:"slogiker", password:"REMOVED"}
-- Hasn't been diagnosed — check server/src/routes/auth.js
-- Owner password was manually reset to "REMOVED" via bcrypt in the DB
-
-### Docker: network not found [FIXED]
-- docker compose fails: "npm-host-bridge network could not be found"
-- Fixed by configuring `npm-host-bridge` as a dynamic local bridge network in `docker-compose.yml` and corrected the build workspace name in `Dockerfile`.
-- Fixed SQLite database migration error (unique column alter table constraint issue) in `db.js`.
-
-### Drag and drop folder issue [FIXED]
-- Added interactive ZIP drag-drop prompt (upload as ZIP vs extract into folder) and recursive directory preservation on drop.
-
-### Multi-file deletion does nothing [FIXED]
-- Fixed by accepting ids in both body and query params (?ids=1,2,3) in DELETE /api/files and updating frontend call.
-
-### "All Files" navigation issue [FIXED]
-- Fixed state reset in navigateToRoot and breadcrumbs so root view loads seamlessly.
+### Dashboard Customization & Color Themes
+- [x] Multi-color palette support with random/basic colors:
+  - Red (Crimson)
+  - Green (Emerald)
+  - Yellow (Amber)
+  - Blue (Sky/Ocean)
+  - Pink (Fuchsia/Rose)
+  - Purple (Violet)
+  - Orange (Tangerine)
+  - Cyan (Teal)
+- [x] Color prefixes for category and service names:
+  - Syntax support: `[green]`, `[yellow]`, `[blue]`, `[pink]`, `[red]`, `[purple]`, `[orange]`, `[cyan]` or `green:`, `blue:`, etc.
+  - Automatically parses prefix, strips prefix tag for display, and applies matching accent color to the category column, cards, borders, badges, and hover states.
+- [x] Category-level color picker in Customize Grid modal:
+  - Users can assign specific colors per category without manually typing prefixes.
+- [x] Dashboard-wide primary accent theme:
+  - Selectable in Customize Dashboard modal and profile settings.
+  - Dynamically updates primary buttons, indicators, and highlights.
+- [x] Freeform 2x1 grid card engine with drag-and-drop and resize handles:
+  - Support 1x1 compact cards, 2x1 wide cards, and 2x2 expanded rich cards.
+  - Card movement across categories.
+  - Outline slots visible during dragging and resizing.
 
 ---
 
-## VISUAL REDESIGN (user: site looks ugly, not professional, not full-width)
+## Infrastructure & Cluster Monitoring
 
-### Problems
-- Content capped at max-w-6xl — looks narrow on wide monitors
-- Design too plain for a React portfolio, should impress recruiters
-- User wants something that looks professional / modern
-
-### Plan
-- Keep Tailwind, use shadcn/ui components (already in package.json, unused)
-- Hero: add avatar, typing animation or code snippet visual, more visual weight
-- Portfolio cards: show thumbnails, better hover, tags styled as pills
-- More whitespace on desktop, bolder typography
-- Consider a display font for h1/h2 headings (Clash Display, Cal Sans, etc.)
-
----
-
-## CODE SPLITTING (user: don't load owner modules for regular users)
-
-- Lazy loading already done per route — Admin/Dashboard/Terminal only load on navigation
-- BUT socket.io-client and xterm are static imports in Terminal.tsx
-  → move them to dynamic imports inside the component
-- Add vite.config.ts manualChunks to separate react-vendor, xterm, socket
+### Telemetry & Nodes
+- [x] Multi-server cluster monitoring widget:
+  - Primary host (`localhost`)
+  - Raspberry Pi 5 / Pironman 5 (`192.168.1.136`)
+  - Compute Module 5 (`192.168.1.112`)
+  - Storage / Nextcloud node (`192.168.1.41`)
+- [x] Live client-to-server latency / ping measurement (~10s poll to `/api/ping`).
+- [x] Text summary view vs full cards view toggle for cluster telemetry.
+- [x] Restrict cluster nodes widget to owner role (`slogiker`), keeping non-owner accounts focused on their accessible services.
+- [x] Removed artificial 8TB fallback storage numbers for `.41` node.
+- [ ] Implement lightweight Nextcloud API or agent probe on `.41` to query actual storage pool usage dynamically without SSH credentials.
+- [ ] Add Docker container health status cards to inspector modals.
 
 ---
 
-## INCOMPLETE FEATURES
-
-- File Manager: add preview functionality for office documents (DOCX, Excel/XLSX, ODS, ODT, CSV), 3D files (STL, OBJ, GLTF, CAD F3D/STEP), and Archive contents inspection [COMPLETED]
-- File Manager: Support moving files to a different folder/path when inside folders, including droppable parent breadcrumbs [COMPLETED]
-- File Manager: Public file and folder sharing with expiration presets [COMPLETED]
-- File Manager: Recursive folder download as ZIP [COMPLETED]
-- File Manager: In-app file and folder renaming [COMPLETED]
-- Admin: Profile tab missing (edit bio/title/avatar/links, resume upload)
-- Portfolio: ProjectCard thumbnails not displayed nicely
-- Services public page (portfolio view of self-hosted services)
-- SSH Terminal: not tested end-to-end
-- Seed from GitHub: not tested
-- Error boundary missing in React app
+## Security & Access Control
+- [x] Role-based access control (RBAC):
+  - Owner role with full administrative privileges, layout editing, and server metrics.
+  - User role (`gasper`, etc.) with customized visible service cards and personal preferences.
+- [x] Content-Security-Policy (CSP) hardening with SHA256 hashes for inline Cloudflare scripts.
+- [x] Password rotation and synchronization with Docker environment.
+- [x] Default-deny route guards for unauthorized endpoints.
+- [ ] Session revocation panel in Profile -> Security.
+- [ ] Two-Factor Authentication (TOTP 2FA) support.
 
 ---
 
-## TYPESCRIPT
-
-- Conversion done, but run: cd client && npx tsc --noEmit
-- Server is still plain JS (lower priority)
-
----
-
-## DEPLOY CHECKLIST
-
-1. docker network create npm-host-bridge
-2. Set JWT_SECRET and OWNER_PASSWORD in env
-3. docker compose up -d --build
+## Service Integrations & Telemetry Modals
+- [x] Jellyfin inspector modal (active streams, playback position, transcoding stats).
+- [x] Jellyseerr inspector modal (pending media requests, fulfilled stats).
+- [x] qBittorrent inspector modal (active download/upload speeds, torrent list).
+- [x] WireGuard VPN status inspector (peer handshakes, data transfer).
+- [x] Pi-hole DNS inspector (queries blocked, percentage, domains on blocklist).
+- [ ] Real-time WebSocket event streaming for instant playback and download updates.
+- [ ] Notification webhook integrations (Discord / Telegram alerts on server down).
 
 ---
 
-## LOCAL DEV
-
-- Start: ./dev.sh
-- Stop: kill $(lsof -ti:3000,5173)
-- Owner login: slogiker / REMOVED (will prompt password change)
-- Frontend: http://localhost:5173
+## UI/UX & Polish
+- [x] Fast category renaming modal with auto-focus.
+- [x] VPN-locked badge with interactive WireGuard guidance toast.
+- [x] Quick action buttons on card hover (Copy URL, Edit, Delete).
+- [ ] Import and Export dashboard layout JSON configurations.
+- [ ] Custom background image / wallpaper selector for dashboard.
+- [ ] Mobile navigation drawer improvements for smaller screens.

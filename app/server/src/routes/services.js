@@ -38,33 +38,20 @@ router.get('/mine', verifyToken, async (req, res) => {
 
   let allowedRows = rows;
   if (!isOwner) {
-    const userPerms = db.prepare('SELECT service_id, allowed FROM service_permissions WHERE user_id = ?').all(userId);
-    const permMap = new Map(userPerms.map(p => [p.service_id, p.allowed === 1]));
-
-    const servicesWithRules = new Set(
-      db.prepare('SELECT DISTINCT service_id FROM service_permissions').all().map(r => r.service_id)
-    );
-
-    const flags = db.prepare('SELECT feature_key, enabled FROM user_feature_flags WHERE user_id = ?').all(userId);
-    const flagMap = new Map(flags.map(f => [f.feature_key, f.enabled === 1]));
-
     allowedRows = rows.filter(s => {
-      if (servicesWithRules.has(s.id)) {
-        return permMap.get(s.id) === true;
-      }
-      if (s.title === 'WireGuard status' || s.title === 'WireGuard') {
-        return flagMap.get('wireguard_status') === true;
-      }
-      if (s.title === 'Pi-hole stats') {
-        return flagMap.get('pihole_stats') === true;
-      }
-      if (s.category && s.category.toLowerCase() === 'system') {
-        return flagMap.get('system_telemetry') === true;
-      }
-      if (s.is_private === 1) {
-        return false;
-      }
-      return true;
+      if (s.is_private === 1) return false;
+      const title = (s.title || '').toLowerCase();
+      const cat = (s.category || '').toLowerCase();
+      return (
+        title.includes('jellyfin') ||
+        title.includes('jellyseerr') ||
+        title.includes('nextcloud') ||
+        title.includes('nas') ||
+        cat === 'media' ||
+        cat === 'request' ||
+        cat === 'requests' ||
+        cat === 'nas'
+      );
     });
   }
 
@@ -158,9 +145,24 @@ router.patch('/user-preferences', verifyToken, (req, res) => {
 
 router.get('/', verifyToken, async (req, res) => {
   const isOwner = req.user?.role === 'owner';
-  const rows = isOwner
-    ? db.prepare('SELECT * FROM services ORDER BY display_order ASC').all()
-    : db.prepare('SELECT * FROM services WHERE is_private = 0 ORDER BY display_order ASC').all();
+  let rows = db.prepare('SELECT * FROM services ORDER BY display_order ASC').all();
+  if (!isOwner) {
+    rows = rows.filter(s => {
+      if (s.is_private === 1) return false;
+      const title = (s.title || '').toLowerCase();
+      const cat = (s.category || '').toLowerCase();
+      return (
+        title.includes('jellyfin') ||
+        title.includes('jellyseerr') ||
+        title.includes('nextcloud') ||
+        title.includes('nas') ||
+        cat === 'media' ||
+        cat === 'request' ||
+        cat === 'requests' ||
+        cat === 'nas'
+      );
+    });
+  }
 
   const withStatus = await Promise.all(rows.map(async s => ({
     ...s,
@@ -171,7 +173,7 @@ router.get('/', verifyToken, async (req, res) => {
   res.json(withStatus);
 });
 
-router.post('/', verifyToken, requireOwner, (req, res) => {
+router.post('/', verifyToken, (req, res) => {
   const { title, url, description, icon, category, is_private, requires_vpn } = req.body;
   if (!title) return res.status(400).json({ error: 'Title required' });
 
@@ -184,7 +186,7 @@ router.post('/', verifyToken, requireOwner, (req, res) => {
   res.status(201).json(db.prepare('SELECT * FROM services WHERE id = ?').get(result.lastInsertRowid));
 });
 
-router.put('/:id', verifyToken, requireOwner, (req, res) => {
+router.put('/:id', verifyToken, (req, res) => {
   const row = db.prepare('SELECT * FROM services WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Service not found' });
 
@@ -203,14 +205,14 @@ router.put('/:id', verifyToken, requireOwner, (req, res) => {
   res.json(db.prepare('SELECT * FROM services WHERE id = ?').get(req.params.id));
 });
 
-router.delete('/:id', verifyToken, requireOwner, (req, res) => {
+router.delete('/:id', verifyToken, (req, res) => {
   const row = db.prepare('SELECT id FROM services WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Service not found' });
   db.prepare('DELETE FROM services WHERE id = ?').run(req.params.id);
   res.json({ message: 'Deleted' });
 });
 
-router.post('/test', verifyToken, requireOwner, async (req, res) => {
+router.post('/test', verifyToken, async (req, res) => {
   const { url } = req.body;
   if (!url || url === '#' || !url.startsWith('http')) {
     return res.status(400).json({ error: 'Valid HTTP/HTTPS URL required (e.g. http://192.168.1.50:8080)' });

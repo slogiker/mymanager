@@ -47,35 +47,35 @@ router.get('/stats', verifyToken, async (req, res) => {
       activeSessionCount,
     };
 
-    // Owner-only sub-response with per-user breakdown
-    if (req.user?.role === 'owner') {
-      let userStats = [];
-      try {
-        // Attempt Playback Reporting plugin endpoint first
-        const reportRes = await fetch(`${baseUrl}/user_usage_stats/user_activity?days=30`, {
-          headers: { 'X-Emby-Token': apiKey, Accept: 'application/json' },
-          signal: AbortSignal.timeout(2000),
-        });
-        if (reportRes.ok) {
-          const reportData = await reportRes.json();
-          userStats = reportData;
-        }
-      } catch {}
+    // Include stream and user breakdown for authenticated users
+    let userStats = [];
+    try {
+      const reportRes = await fetch(`${baseUrl}/user_usage_stats/user_activity?days=30`, {
+        headers: { 'X-Emby-Token': apiKey, Accept: 'application/json' },
+        signal: AbortSignal.timeout(2000),
+      });
+      if (reportRes.ok) {
+        const reportData = await reportRes.json();
+        userStats = Array.isArray(reportData) ? reportData : [];
+      }
+    } catch {}
 
-      // Fallback or complement with active stream user details
-      const activeUsers = activeStreams.map(s => ({
-        userName: s.UserName,
-        client: s.Client,
-        deviceName: s.DeviceName,
-        item: s.NowPlayingItem?.Name || 'Unknown Media',
-        playMethod: s.PlayState?.PlayMethod || 'DirectPlay',
-      }));
+    const activeUsers = activeStreams.map(s => ({
+      userName: s.UserName || 'User',
+      client: s.Client,
+      deviceName: s.DeviceName,
+      item: s.NowPlayingItem?.Name || 'Unknown Media',
+      itemType: s.NowPlayingItem?.Type || 'Video',
+      playMethod: s.PlayState?.PlayMethod || 'DirectPlay',
+      playbackPosition: s.PlayState?.PositionTicks ? Math.floor(s.PlayState.PositionTicks / 10000000) : 0,
+      playbackDuration: s.NowPlayingItem?.RunTimeTicks ? Math.floor(s.NowPlayingItem.RunTimeTicks / 10000000) : 0,
+      isPaused: s.PlayState?.IsPaused || false,
+    }));
 
-      responseData.ownerStats = {
-        activeUsers,
-        playbackReporting: userStats,
-      };
-    }
+    responseData.ownerStats = {
+      activeUsers,
+      playbackReporting: userStats,
+    };
 
     res.json(responseData);
   } catch (err) {

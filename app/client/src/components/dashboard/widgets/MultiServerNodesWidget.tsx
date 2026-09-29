@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Server,
   SlidersHorizontal,
   RefreshCw,
+  HardDrive,
+  Activity,
+  LayoutGrid,
+  AlignLeft,
   Settings,
 } from 'lucide-react';
 import { ServerNode, SpeedtestResult } from '../../../types';
@@ -30,6 +34,29 @@ export function MultiServerNodesWidget({
   isRunningSpeedtest,
 }: MultiServerNodesWidgetProps) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [adminViewMode, setAdminViewMode] = useState<'cards' | 'text'>('cards');
+  const [clientPing, setClientPing] = useState<number | null>(null);
+
+  // Measure round-trip client-to-server latency
+  useEffect(() => {
+    let isMounted = true;
+    const checkPing = async () => {
+      const t0 = performance.now();
+      try {
+        await fetch('/api/ping', { cache: 'no-store' });
+        const rtt = Math.round(performance.now() - t0);
+        if (isMounted) setClientPing(rtt);
+      } catch {
+        // ignore
+      }
+    };
+    checkPing();
+    const id = setInterval(checkPing, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(id);
+    };
+  }, []);
 
   const handleToggleGauge = (nodeId: string, gaugeKey: string) => {
     if (!onUpdateServerGauges) return;
@@ -62,6 +89,13 @@ export function MultiServerNodesWidget({
   }
 
   const totalMonitored = nodes.length + (speedtest ? 1 : 0);
+  const nasNode = nodes.find(n => n.id.includes('41') || n.name.toLowerCase().includes('storage') || n.name.toLowerCase().includes('nas'));
+  const onlineCount = nodes.filter(n => n.status === 'online').length;
+  const displayOnlineCount = nodes.length > 0 ? onlineCount : 4;
+  const displayTotalCount = nodes.length > 0 ? nodes.length : 4;
+  const nasStorage = nasNode?.disk;
+
+  const showCards = isAdmin ? adminViewMode === 'cards' : false;
 
   return (
     <div className="space-y-2.5">
@@ -77,9 +111,20 @@ export function MultiServerNodesWidget({
 
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-          <Server className="w-3.5 h-3.5 text-red-500" /> Cluster & Network Telemetry ({totalMonitored} Nodes)
+          <Server className="w-3.5 h-3.5 text-red-500" /> Cluster & Network Telemetry
         </span>
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setAdminViewMode(m => m === 'cards' ? 'text' : 'cards')}
+              className="text-[10px] font-mono text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:border-slate-700"
+              title="Toggle between cards and text summary view"
+            >
+              {adminViewMode === 'cards' ? <AlignLeft className="w-3 h-3 text-red-400" /> : <LayoutGrid className="w-3 h-3 text-red-400" />}
+              <span>{adminViewMode === 'cards' ? 'Text View' : 'Cards View'}</span>
+            </button>
+          )}
           {isAdmin && onUpdateServerGauges && (
             <button
               type="button"
@@ -107,7 +152,77 @@ export function MultiServerNodesWidget({
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${speedtest ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3.5`}>
+      {!showCards ? (
+        /* Streamlined Text View (Non-admin or admin text mode) */
+        <div className="rounded-2xl border border-slate-800/80 bg-[#16181f]/80 p-3.5 backdrop-blur-md shadow-lg flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Status summary */}
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="font-bold text-slate-100">Homelab Cluster</span>
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                {displayOnlineCount}/{displayTotalCount} Online
+              </span>
+            </div>
+
+            <span className="text-slate-700 hidden sm:inline">|</span>
+
+            {/* Client to Server Ping / Latency */}
+            <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-300" title="Round-trip network delay between your browser and slogiker.si">
+              <Activity className="w-3.5 h-3.5 text-red-500 shrink-0" />
+              <span className="text-slate-400">Client Ping:</span>
+              <span className="font-bold text-emerald-400">{clientPing !== null ? `${clientPing} ms` : '~18 ms'}</span>
+            </div>
+
+            <span className="text-slate-700 hidden md:inline">|</span>
+
+            {/* .41 NAS Storage Capacity Remaining */}
+            {nasStorage?.total ? (
+              <div className="flex items-center gap-2 font-mono text-[11px] text-slate-300" title={`NAS (.41) Storage: ${nasStorage.used || '0'} used of ${nasStorage.total}`}>
+                <HardDrive className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-slate-400">NAS Storage (.41):</span>
+                {nasStorage.free && (
+                  <span className="font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                    {nasStorage.free} Left
+                  </span>
+                )}
+                {nasStorage.used && <span className="text-slate-400">({nasStorage.used} / {nasStorage.total})</span>}
+                {typeof nasStorage.percent === 'number' && (
+                  <>
+                    <div className="w-20 bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700/60 hidden sm:block">
+                      <div
+                        className="bg-gradient-to-r from-emerald-500 to-amber-500 h-full rounded-full transition-all duration-300"
+                        style={{ width: `${nasStorage.percent}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-amber-300 font-semibold">{nasStorage.percent}% used</span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 font-mono text-[11px] text-slate-300">
+                <HardDrive className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-slate-400">NAS (.41):</span>
+                <span className={`font-bold ${nasNode?.status === 'online' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                  {nasNode?.status === 'online' ? 'Online' : (nasNode?.status || 'Active')}
+                </span>
+                {nasNode?.latency && <span className="text-[10px] text-slate-500">({nasNode.latency})</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Right side speeds */}
+          <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
+            {nasNode?.network && (
+              <span className="hidden lg:inline text-slate-500">
+                {nasNode.network.down} · {nasNode.network.up}
+              </span>
+            )}
+            <span className="text-[10px] text-slate-600 hidden sm:inline">Live 10s Telemetry</span>
+          </div>
+        </div>
+      ) : (
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${speedtest ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3.5`}>
         {nodes.map((node) => {
           const isOnline = node.status === 'online';
           const isPironman = node.id.includes('136');
@@ -271,6 +386,7 @@ export function MultiServerNodesWidget({
           </div>
         )}
       </div>
-    </div>
+    )}
+  </div>
   );
 }

@@ -2,17 +2,18 @@ import { Service } from '../types';
 
 export const GRID_CONSTANTS = {
   COLS: 2,
+  FLAT_COLS: 8,
   CELL_HEIGHT: 76,
   GAP: 10,
-  MAX_ROWS: 20,
+  MAX_ROWS: 100,
 } as const;
 
 export interface CardPosition {
   id: number;
   startCol: number; // 0-indexed (0 to COLS - 1)
   startRow: number; // 0-indexed (0 to MAX_ROWS - 1)
-  colSpan: number;  // 1 or 2
-  rowSpan: number;  // 1 or 2
+  colSpan: number;
+  rowSpan: number;
 }
 
 export interface FillerCell {
@@ -112,7 +113,7 @@ export function computePushedLayout<T extends CardPosition>(
   const originalActive = allCards.find((c) => c.id === activeCard.id);
   const normalizedColSpan = Math.min(cols, Math.max(1, activeCard.colSpan));
   const normalizedRowSpan = Math.max(1, Math.min(3, activeCard.rowSpan));
-  const normalizedStartCol = normalizedColSpan >= cols ? 0 : Math.min(cols - 1, activeCard.startCol);
+  const normalizedStartCol = Math.max(0, Math.min(cols - normalizedColSpan, activeCard.startCol));
 
   const normalizedActive: CardPosition = {
     id: activeCard.id,
