@@ -3,7 +3,7 @@ const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-let cachedSid = null;
+let cachedCookie = null;
 
 async function loginQbit(baseUrl, username, password) {
   if (!username || !password) return null;
@@ -15,10 +15,10 @@ async function loginQbit(baseUrl, username, password) {
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) return null;
-    const cookie = res.headers.get('set-cookie');
-    if (!cookie) return null;
-    const match = cookie.match(/SID=([^;]+)/);
-    return match ? match[1] : null;
+    const cookieHeader = res.headers.get('set-cookie');
+    if (!cookieHeader) return null;
+    const cookiePart = cookieHeader.split(';')[0].trim();
+    return cookiePart || null;
   } catch {
     return null;
   }
@@ -26,14 +26,14 @@ async function loginQbit(baseUrl, username, password) {
 
 async function fetchQbit(baseUrl, path, username, password) {
   let url = `${baseUrl}${path}`;
-  let headers = cachedSid ? { Cookie: `SID=${cachedSid}` } : {};
+  let headers = cachedCookie ? { Cookie: cachedCookie } : {};
 
   try {
     let res = await fetch(url, { headers, signal: AbortSignal.timeout(3000) });
-    if (res.status === 403 || !cachedSid) {
-      cachedSid = await loginQbit(baseUrl, username, password);
-      if (!cachedSid) return null;
-      headers = { Cookie: `SID=${cachedSid}` };
+    if (res.status === 403 || !cachedCookie) {
+      cachedCookie = await loginQbit(baseUrl, username, password);
+      if (!cachedCookie) return null;
+      headers = { Cookie: cachedCookie };
       res = await fetch(url, { headers, signal: AbortSignal.timeout(3000) });
     }
     if (!res.ok) return null;

@@ -1666,7 +1666,7 @@ export function HomelabBoard({
                         </div>
                       </div>
                       <div className="text-right font-mono text-[11px] text-emerald-400">
-                        {piholeStats.percentBlocked ?? 0}% blocked
+                        {Number(piholeStats.percentBlocked ?? 0).toFixed(1)}% blocked
                       </div>
                     </div>
                   )}

@@ -184,7 +184,8 @@ export default function DashboardPage() {
               telemetryType = 'pihole';
               if (pihole) {
                 const queries = pihole.queriesToday?.toLocaleString?.() ?? pihole.queriesToday ?? 0;
-                statText = `${queries} queries · ${pihole.percentBlocked ?? 0}% blocked`;
+                const pct = Number(pihole.percentBlocked ?? 0).toFixed(1);
+                statText = `${queries} queries · ${pct}% blocked`;
               } else if (piRes?.online === false) {
                 statText = 'Offline';
               }
@@ -218,14 +219,18 @@ export default function DashboardPage() {
       .then(res => setSpeedtest(res))
       .catch(() => {});
 
-    // Load stats & unread
-    Promise.all([
-      api.get<SystemStats>('/system/stats').catch(() => null),
-      api.get<{ count: number }>('/messages/unread-count').catch(() => ({ count: 0 })),
-    ]).then(([s, u]) => {
-      if (s) setStats(s);
-      if (u) setUnread(u.count);
-    }).finally(() => setLoading(false));
+    // Load stats & unread (owner only)
+    if (user?.role === 'owner') {
+      Promise.all([
+        api.get<SystemStats>('/system/stats').catch(() => null),
+        api.get<{ count: number }>('/messages/unread-count').catch(() => ({ count: 0 })),
+      ]).then(([s, u]) => {
+        if (s) setStats(s);
+        if (u) setUnread(u.count);
+      }).finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
   };
 
   const handleRunSpeedtest = async () => {
@@ -250,9 +255,11 @@ export default function DashboardPage() {
       api.get<ServerNode[]>('/system/nodes')
         .then(res => setNodes(res))
         .catch(() => {});
-      api.get<SystemStats>('/system/stats')
-        .then(res => { if (res) setStats(res); })
-        .catch(() => {});
+      if (user?.role === 'owner') {
+        api.get<SystemStats>('/system/stats')
+          .then(res => { if (res) setStats(res); })
+          .catch(() => {});
+      }
     }, 2500);
 
     // General dashboard refresh
@@ -303,6 +310,32 @@ export default function DashboardPage() {
       });
     } catch (e) {
       console.error('Failed to persist card layout', e);
+    }
+  };
+
+  const handleMoveCardCategory = async (
+    serviceId: number,
+    fromCategory: string,
+    toCategory: string
+  ) => {
+    if (!toCategory || fromCategory === toCategory) return;
+
+    // Optimistically update local services state
+    setServices((prev) =>
+      prev.map((s) => (s.id === serviceId ? { ...s, category: toCategory } : s))
+    );
+
+    const currentService = services.find((s) => s.id === serviceId);
+    if (currentService) {
+      try {
+        await api.put(`/services/${serviceId}`, {
+          ...currentService,
+          category: toCategory,
+        });
+      } catch (e) {
+        console.error('Failed to move service category', e);
+        loadAll();
+      }
     }
   };
 
@@ -449,9 +482,15 @@ export default function DashboardPage() {
               loadingNodes={loadingNodes}
               speedtest={speedtest}
               vpnConnected={vpnStatus?.connected}
+              jellyfinStats={jellyfinStats}
+              jellyseerrStats={jellyseerrStats}
+              qbitStats={qbitStats}
+              wgStats={wgStats}
+              piholeStats={piholeStats}
               onRunSpeedtest={handleRunSpeedtest}
               isRunningSpeedtest={runningSpeedtest}
               onUpdateCardLayout={handleUpdateCardLayout}
+              onMoveCardCategory={handleMoveCardCategory}
               onOpenInspector={(type) => setActiveInspector(type)}
               onRefresh={loadAll}
             />
