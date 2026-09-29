@@ -5,6 +5,7 @@ export interface UserPreferences {
   hiddenServices: number[];
   hiddenGauges: string[];
   compactMode: boolean;
+  disableCategories?: boolean;
   categoryOrder?: string[];
   categoryWidths?: Record<string, 1 | 2>;
   customCategories?: string[];
@@ -13,6 +14,7 @@ export interface UserPreferences {
     clock: boolean;
     nodes: boolean;
     notes: boolean;
+    qbittorrent?: boolean;
   };
 }
 
@@ -21,6 +23,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   hiddenServices: [],
   hiddenGauges: [],
   compactMode: false,
+  disableCategories: false,
   categoryOrder: [],
   categoryWidths: {},
   customCategories: [],
@@ -29,6 +32,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     clock: true,
     nodes: true,
     notes: true,
+    qbittorrent: true,
   },
 };
 
@@ -43,6 +47,7 @@ export function getUserPreferences(userId?: number): UserPreferences {
       hiddenServices: Array.isArray(parsed.hiddenServices) ? parsed.hiddenServices : [],
       hiddenGauges: Array.isArray(parsed.hiddenGauges) ? parsed.hiddenGauges : [],
       compactMode: typeof parsed.compactMode === 'boolean' ? parsed.compactMode : false,
+      disableCategories: typeof parsed.disableCategories === 'boolean' ? parsed.disableCategories : false,
       categoryOrder: Array.isArray(parsed.categoryOrder) ? parsed.categoryOrder : [],
       categoryWidths: typeof parsed.categoryWidths === 'object' && parsed.categoryWidths ? parsed.categoryWidths : {},
       customCategories: Array.isArray(parsed.customCategories) ? parsed.customCategories : [],
@@ -51,6 +56,7 @@ export function getUserPreferences(userId?: number): UserPreferences {
         clock: parsed.widgetVisible.clock !== false,
         nodes: parsed.widgetVisible.nodes !== false,
         notes: parsed.widgetVisible.notes !== false,
+        qbittorrent: parsed.widgetVisible.qbittorrent !== false,
       } : DEFAULT_PREFERENCES.widgetVisible,
     };
   } catch {
@@ -66,6 +72,7 @@ export async function syncUserPreferencesFromBackend(userId?: number): Promise<U
       const merged: UserPreferences = {
         ...DEFAULT_PREFERENCES,
         ...remote,
+        disableCategories: typeof remote.disableCategories === 'boolean' ? remote.disableCategories : false,
         serverGauges: typeof remote.serverGauges === 'object' && remote.serverGauges ? remote.serverGauges : {},
         categoryWidths: typeof remote.categoryWidths === 'object' && remote.categoryWidths ? remote.categoryWidths : {},
         categoryOrder: Array.isArray(remote.categoryOrder) ? remote.categoryOrder : [],
@@ -77,6 +84,7 @@ export async function syncUserPreferencesFromBackend(userId?: number): Promise<U
           clock: remote.widgetVisible.clock !== false,
           nodes: remote.widgetVisible.nodes !== false,
           notes: remote.widgetVisible.notes !== false,
+          qbittorrent: remote.widgetVisible.qbittorrent !== false,
         } : DEFAULT_PREFERENCES.widgetVisible,
       };
       localStorage.setItem(`mymanager_user_prefs_${userId}`, JSON.stringify(merged));

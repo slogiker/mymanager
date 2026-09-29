@@ -70,7 +70,7 @@ import {
 import { useAuth } from '../../../hooks/useAuth';
 import { getUserPreferences, saveUserPreferences, UserPreferences } from '../../../lib/userPreferences';
 import { api } from '../../../lib/api';
-import { TimeWidget, NotesWidget, MultiServerNodesWidget } from '../widgets';
+import { TimeWidget, NotesWidget, MultiServerNodesWidget, QbittorrentWidget } from '../widgets';
 import { Modal, Field, ErrBox, ServiceIcon } from '../common';
 import { SortableCategoryColumn } from './SortableCategoryColumn';
 
@@ -869,92 +869,12 @@ export function HomelabBoard({
 
       <ErrBox msg={error} />
 
-      {/* qBittorrent Dedicated Downloads & Telemetry Panel (Outside Categories) */}
-      {qbitStats?.online && (
-        <div className="rounded-2xl border border-slate-800/80 bg-[#141620]/90 p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/60">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                <DownloadCloud className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-white">qBittorrent Active Downloads</span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Connected
-                  </span>
-                </div>
-                <div className="text-[11px] font-mono text-slate-400 mt-0.5">
-                  {qbitStats.activeCount || qbitStats.torrents?.length || 0} active download{(qbitStats.activeCount || qbitStats.torrents?.length) === 1 ? '' : 's'} · Total down: {(qbitStats.downloadTotal ? (qbitStats.downloadTotal / (1024 * 1024 * 1024)).toFixed(1) : 0)} GB
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono">
-                <span className="text-sky-400 font-bold flex items-center gap-1">
-                  <ArrowDown className="w-3.5 h-3.5" />
-                  {(qbitStats.downloadSpeed ? (qbitStats.downloadSpeed / (1024 * 1024)).toFixed(1) : '0.0')} MB/s
-                </span>
-                <span className="text-slate-600">·</span>
-                <span className="text-cyan-300 font-bold flex items-center gap-1">
-                  <ArrowUp className="w-3.5 h-3.5" />
-                  {(qbitStats.uploadSpeed ? (qbitStats.uploadSpeed / 1024).toFixed(0) : '0')} KB/s
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onOpenInspector?.('qbittorrent')}
-                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                title="Open full qBittorrent inspector"
-              >
-                <span>Inspector</span>
-                <ExternalLink className="w-3 h-3 text-slate-400" />
-              </button>
-            </div>
-          </div>
-
-          {/* Active downloading torrents list */}
-          {qbitStats.torrents && qbitStats.torrents.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-              {qbitStats.torrents.map((t: any, idx: number) => {
-                const pct = Math.round((t.progress || 0) * 100);
-                const dlSpeedStr = t.downloadSpeed >= 1048576 
-                  ? `${(t.downloadSpeed / 1048576).toFixed(1)} MB/s`
-                  : `${(t.downloadSpeed / 1024).toFixed(0)} KB/s`;
-                const sizeStr = t.size ? `${(t.size / (1024 * 1024 * 1024)).toFixed(1)} GB` : '0 B';
-                const etaStr = t.eta && t.eta > 0 && t.eta < 8640000 
-                  ? `ETA: ${Math.round(t.eta / 60)}m` 
-                  : (t.state || 'downloading');
-
-                return (
-                  <div key={idx} className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/60 space-y-1.5">
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold text-slate-200 truncate flex-1" title={t.name}>{t.name}</span>
-                      <span className="text-[11px] font-mono font-bold text-sky-400 shrink-0">{pct}%</span>
-                    </div>
-                    <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-sky-500 to-cyan-400 h-full rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-                      <span>{sizeStr} · ↓ {dlSpeedStr}</span>
-                      <span>{etaStr}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-2.5 px-3 rounded-xl bg-slate-900/40 border border-slate-800/40 text-center text-xs font-mono text-slate-500">
-              No active downloads in progress · Transfer queue idle
-            </div>
-          )}
-        </div>
+      {/* qBittorrent Dedicated Downloads & Telemetry Widget */}
+      {prefs.widgetVisible?.qbittorrent !== false && qbitStats?.online && (
+        <QbittorrentWidget
+          data={qbitStats}
+          onOpenInspector={() => onOpenInspector?.('qbittorrent')}
+        />
       )}
 
       {/* Flat 2x1 Grid or Grouped Categories */}
@@ -2114,12 +2034,12 @@ export function HomelabBoard({
           {/* Widget Toggles */}
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Widgets</span>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => {
                   const val = prefs.widgetVisible?.clock !== false;
-                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true }), clock: !val } };
+                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true }), clock: !val } };
                   setPrefs(updated);
                   saveUserPreferences(user?.id, updated);
                 }}
@@ -2135,7 +2055,7 @@ export function HomelabBoard({
                 type="button"
                 onClick={() => {
                   const val = prefs.widgetVisible?.notes !== false;
-                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true }), notes: !val } };
+                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true }), notes: !val } };
                   setPrefs(updated);
                   saveUserPreferences(user?.id, updated);
                 }}
@@ -2151,7 +2071,7 @@ export function HomelabBoard({
                 type="button"
                 onClick={() => {
                   const val = prefs.widgetVisible?.nodes !== false;
-                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true }), nodes: !val } };
+                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true }), nodes: !val } };
                   setPrefs(updated);
                   saveUserPreferences(user?.id, updated);
                 }}
@@ -2162,6 +2082,22 @@ export function HomelabBoard({
                 }`}
               >
                 Cluster Nodes
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const val = prefs.widgetVisible?.qbittorrent !== false;
+                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true }), qbittorrent: !val } };
+                  setPrefs(updated);
+                  saveUserPreferences(user?.id, updated);
+                }}
+                className={`p-2.5 rounded-xl border text-center transition-all ${
+                  prefs.widgetVisible?.qbittorrent !== false
+                    ? 'bg-red-600/10 border-red-500/40 text-white font-bold'
+                    : 'bg-slate-900 border-slate-800 text-slate-500'
+                }`}
+              >
+                qBittorrent
               </button>
             </div>
           </div>
