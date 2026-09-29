@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -38,6 +38,7 @@ export interface SortableCategoryColumnProps {
   onDeleteService: (id: number) => void;
   onUpdateCardLayout?: (updates: Array<{ id: number; start_col: number; start_row: number; col_span: number; row_span: number }>) => void;
   onOpenInspector?: (type: 'wireguard' | 'pihole' | 'qbittorrent' | 'jellyfin' | 'jellyseerr') => void;
+  onMoveCardCategory?: (serviceId: number, fromCategory: string, toCategory: string) => void;
 }
 
 export function SortableCategoryColumn({
@@ -54,8 +55,26 @@ export function SortableCategoryColumn({
   onDeleteService,
   onUpdateCardLayout,
   onOpenInspector,
+  onMoveCardCategory,
 }: SortableCategoryColumnProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+
+  const [isDropTargetHovered, setIsDropTargetHovered] = useState<boolean>(false);
+  const [dragFloating, setDragFloating] = useState<{
+    card: Service & CardPosition;
+    x: number;
+    y: number;
+    targetCategory: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleDragOverCat = (e: Event) => {
+      const catName = (e as CustomEvent).detail;
+      setIsDropTargetHovered(catName === category);
+    };
+    window.addEventListener('card_drag_over_category', handleDragOverCat);
+    return () => window.removeEventListener('card_drag_over_category', handleDragOverCat);
+  }, [category]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -86,11 +105,6 @@ export function SortableCategoryColumn({
 
   const activeCards = livePushedCards || placedCards;
 
-  // Compute filler placeholder cells for unoccupied slots
-  const fillerCells = useMemo(() => {
-    return getFillerCells(activeCards, GRID_CONSTANTS.COLS, 2);
-  }, [activeCards]);
-
   // Resizing state
   const [resizing, setResizing] = useState<{
     id: number;
@@ -114,6 +128,12 @@ export function SortableCategoryColumn({
     colSpan: number;
     rowSpan: number;
   } | null>(null);
+
+  // Compute filler placeholder cells for unoccupied slots
+  const fillerCells = useMemo(() => {
+    const isInteracting = resizing !== null || cardDragging !== null;
+    return getFillerCells(activeCards, GRID_CONSTANTS.COLS, isInteracting ? 3 : 2);
+  }, [activeCards, resizing, cardDragging]);
 
   const handleStartCardDrag = (e: React.MouseEvent, card: Service & CardPosition) => {
     if (e.button !== 0) return;
@@ -147,69 +167,102 @@ export function SortableCategoryColumn({
         preventClickRef.current = true;
       }
 
-      if (!gridRef.current) return;
-      const currentGridRect = gridRef.current.getBoundingClientRect();
-      const currentX = moveEvent.clientX - currentGridRect.left;
-      const currentY = moveEvent.clientY - currentGridRect.top;
+      // Check which category column we are hovering over
+      const elem = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+      const targetColElem = elem?.closest('[data-category-column]');
+      const overCat = targetColElem?.getAttribute('data-category-column') || null;
+      const targetCat = overCat && overCat !== category ? overCat : null;
 
-      const rawCol = Math.floor(currentX / colWidth) - grabOffsetCol;
-      const rawRow = Math.floor(currentY / rowHeight) - grabOffsetRow;
+      setDragFloating({
+        card,
+        x: moveEvent.clientX,
+        y: moveEvent.clientY,
+        targetCategory: targetCat,
+      });
 
-      const targetCol = Math.max(0, Math.min(GRID_CONSTANTS.COLS - card.colSpan, rawCol));
-      const targetRow = Math.max(0, Math.min(GRID_CONSTANTS.MAX_ROWS - 1, rawRow));
+      window.dispatchEvent(new CustomEvent('card_drag_over_category', { detail: targetCat }));
 
-      const candidate: CardPosition = {
-        id: card.id,
-        startCol: targetCol,
-        startRow: targetRow,
-        colSpan: card.colSpan,
-        rowSpan: card.rowSpan,
-      };
+      if (!targetCat) {
+        if (!gridRef.current) return;
+        const currentGridRect = gridRef.current.getBoundingClientRect();
+        const currentX = moveEvent.clientX - currentGridRect.left;
+        const currentY = moveEvent.clientY - currentGridRect.top;
 
-      const pushedLayout = computePushedLayout(candidate, placedCards, GRID_CONSTANTS.COLS);
-      livePushedCardsRef.current = pushedLayout;
-      setCardDragging(candidate);
-      setLivePushedCards(pushedLayout);
+        const rawCol = Math.floor(currentX / colWidth) - grabOffsetCol;
+        const rawRow = Math.floor(currentY / rowHeight) - grabOffsetRow;
+
+        const targetCol = Math.max(0, Math.min(GRID_CONSTANTS.COLS - card.colSpan, rawCol));
+        const targetRow = Math.max(0, Math.min(GRID_CONSTANTS.MAX_ROWS - 1, rawRow));
+
+        const candidate: CardPosition = {
+          id: card.id,
+          startCol: targetCol,
+          startRow: targetRow,
+          colSpan: card.colSpan,
+          rowSpan: card.rowSpan,
+        };
+
+        const pushedLayout = computePushedLayout(candidate, placedCards, GRID_CONSTANTS.COLS);
+        livePushedCardsRef.current = pushedLayout;
+        setCardDragging(candidate);
+        setLivePushedCards(pushedLayout);
+      } else {
+        livePushedCardsRef.current = null;
+        setCardDragging(null);
+        setLivePushedCards(null);
+      }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (upEvent: MouseEvent) => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      window.dispatchEvent(new CustomEvent('card_drag_over_category', { detail: null }));
+
+      setDragFloating(null);
 
       if (isDragActive) {
-        const finalLayout = livePushedCardsRef.current;
-        if (finalLayout && onUpdateCardLayout) {
-          const changedCards: Array<{
-            id: number;
-            start_col: number;
-            start_row: number;
-            col_span: number;
-            row_span: number;
-          }> = [];
+        const dropElem = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
+        const targetColElem = dropElem?.closest('[data-category-column]');
+        const targetCategory = targetColElem?.getAttribute('data-category-column') || null;
 
-          for (const item of finalLayout) {
-            const original = placedCards.find((c) => c.id === item.id);
-            if (
-              !original ||
-              original.startCol !== item.startCol ||
-              original.startRow !== item.startRow ||
-              original.colSpan !== item.colSpan ||
-              original.rowSpan !== item.rowSpan
-            ) {
-              changedCards.push({
-                id: item.id,
-                start_col: item.startCol,
-                start_row: item.startRow,
-                col_span: item.colSpan,
-                row_span: item.rowSpan,
-              });
+        if (targetCategory && targetCategory !== category) {
+          onMoveCardCategory?.(card.id, category, targetCategory);
+        } else {
+          const finalLayout = livePushedCardsRef.current;
+          if (finalLayout && onUpdateCardLayout) {
+            const changedCards: Array<{
+              id: number;
+              start_col: number;
+              start_row: number;
+              col_span: number;
+              row_span: number;
+            }> = [];
+
+            for (const item of finalLayout) {
+              const original = placedCards.find((c) => c.id === item.id);
+              if (
+                !original ||
+                original.startCol !== item.startCol ||
+                original.startRow !== item.startRow ||
+                original.colSpan !== item.colSpan ||
+                original.rowSpan !== item.rowSpan
+              ) {
+                changedCards.push({
+                  id: item.id,
+                  start_col: item.startCol,
+                  start_row: item.startRow,
+                  col_span: item.colSpan,
+                  row_span: item.rowSpan,
+                });
+              }
+            }
+
+            if (changedCards.length > 0) {
+              onUpdateCardLayout(changedCards);
             }
           }
-
-          if (changedCards.length > 0) {
-            onUpdateCardLayout(changedCards);
-          }
         }
+
         preventClickRef.current = true;
         setTimeout(() => {
           preventClickRef.current = false;
@@ -227,7 +280,11 @@ export function SortableCategoryColumn({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleStartResize = (e: React.MouseEvent, card: Service & CardPosition) => {
+  const handleStartResize = (
+    e: React.MouseEvent,
+    card: Service & CardPosition,
+    direction: 'se' | 'top' = 'se'
+  ) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -235,14 +292,16 @@ export function SortableCategoryColumn({
     const startY = e.clientY;
     const initialColSpan = card.colSpan;
     const initialRowSpan = card.rowSpan;
+    const initialStartCol = card.startCol;
+    const initialStartRow = card.startRow;
     const gridWidth = gridRef.current ? gridRef.current.clientWidth : 320;
     const colWidth = (gridWidth - GRID_CONSTANTS.GAP) / GRID_CONSTANTS.COLS;
     const rowHeight = GRID_CONSTANTS.CELL_HEIGHT;
 
-    const initialCandidate = {
+    const initialCandidate: CardPosition = {
       id: card.id,
-      startCol: card.startCol,
-      startRow: card.startRow,
+      startCol: initialStartCol,
+      startRow: initialStartRow,
       colSpan: initialColSpan,
       rowSpan: initialRowSpan,
     };
@@ -254,17 +313,47 @@ export function SortableCategoryColumn({
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
 
-      const colStep = Math.round(deltaX / (colWidth * 0.45));
-      const rowStep = Math.round(deltaY / (rowHeight * 0.45));
+      let candidateStartCol = initialStartCol;
+      let candidateStartRow = initialStartRow;
+      let candidateColSpan = initialColSpan;
+      let candidateRowSpan = initialRowSpan;
 
-      const candidateColSpan = Math.max(1, Math.min(GRID_CONSTANTS.COLS, initialColSpan + colStep));
-      const candidateRowSpan = Math.max(1, Math.min(3, initialRowSpan + rowStep));
-      const candidateStartCol = candidateColSpan >= GRID_CONSTANTS.COLS ? 0 : card.startCol;
+      if (direction === 'top') {
+        const rowStep = Math.round(-deltaY / (rowHeight * 0.45));
+        if (rowStep > 0) {
+          const maxUp = Math.min(initialStartRow, 3 - initialRowSpan);
+          const actualUp = Math.max(0, Math.min(maxUp, rowStep));
+          candidateStartRow = initialStartRow - actualUp;
+          candidateRowSpan = initialRowSpan + actualUp;
+        } else if (rowStep < 0) {
+          const maxDown = initialRowSpan - 1;
+          const actualDown = Math.max(0, Math.min(maxDown, -rowStep));
+          candidateStartRow = initialStartRow + actualDown;
+          candidateRowSpan = initialRowSpan - actualDown;
+        }
+      } else {
+        const colStep = Math.round(deltaX / (colWidth * 0.45));
+        const rowStep = Math.round(deltaY / (rowHeight * 0.45));
+
+        candidateColSpan = Math.max(1, Math.min(GRID_CONSTANTS.COLS, initialColSpan + colStep));
+        candidateStartCol = candidateColSpan >= GRID_CONSTANTS.COLS ? 0 : initialStartCol;
+
+        if (initialRowSpan + rowStep >= 1) {
+          candidateRowSpan = Math.max(1, Math.min(3, initialRowSpan + rowStep));
+          candidateStartRow = initialStartRow;
+        } else {
+          const excessUp = 1 - (initialRowSpan + rowStep);
+          const maxUp = Math.min(initialStartRow, 2);
+          const actualUp = Math.min(maxUp, excessUp);
+          candidateStartRow = initialStartRow - actualUp;
+          candidateRowSpan = Math.min(3, 1 + actualUp);
+        }
+      }
 
       const candidate: CardPosition = {
         id: card.id,
         startCol: candidateStartCol,
-        startRow: card.startRow,
+        startRow: candidateStartRow,
         colSpan: candidateColSpan,
         rowSpan: candidateRowSpan,
       };
@@ -330,11 +419,24 @@ export function SortableCategoryColumn({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/col relative p-1 transition-all duration-200 flex flex-col space-y-3 ${
+      data-category-column={category}
+      className={`group/col relative p-1.5 transition-all duration-200 flex flex-col space-y-3 rounded-2xl ${
         colSpan === 2 ? 'col-span-1 md:col-span-2' : 'col-span-1'
+      } ${
+        isDropTargetHovered
+          ? 'ring-2 ring-red-500 bg-red-500/10 shadow-[0_0_30px_rgba(239,68,68,0.25)] border border-red-500/40'
+          : 'border border-transparent'
       }`}
     >
-      {/* Category Header - Clean, open, invisible box */}
+      {/* Category Drop Indicator Banner */}
+      {isDropTargetHovered && (
+        <div className="mx-1 px-3 py-2 rounded-xl border border-dashed border-red-500 bg-red-500/20 text-red-300 font-bold text-xs flex items-center justify-center gap-2 animate-pulse shadow-lg">
+          <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
+          <span>Drop card here to move into {category}</span>
+        </div>
+      )}
+
+      {/* Category Header */}
       <div className="flex items-center justify-between pb-1 px-1">
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -383,26 +485,17 @@ export function SortableCategoryColumn({
           gridAutoRows: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
         }}
       >
-        {/* Filler Placeholder Cells for Unoccupied Slots */}
-        {fillerCells.map((filler) => (
+        {/* Grid Slots Outline (Shown when user is actively resizing or dragging) */}
+        {(resizing !== null || cardDragging !== null || isDropTargetHovered) && fillerCells.map((filler) => (
           <div
             key={`filler-${filler.col}-${filler.row}`}
-            onClick={() => isOwner && onAddService(category)}
             style={{
               gridColumn: `${filler.col + 1} / span 1`,
               gridRow: `${filler.row + 1} / span 1`,
               minHeight: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
             }}
-            className={`rounded-xl border-2 border-dotted border-slate-800/80 bg-slate-950/20 flex items-center justify-center gap-1.5 transition-all select-none ${
-              isOwner
-                ? 'hover:border-red-500/50 hover:bg-red-500/[0.04] text-slate-500 hover:text-red-400 cursor-pointer group/slot'
-                : 'text-slate-700/40 pointer-events-none'
-            }`}
-            title={isOwner ? `Add new service to ${category}` : undefined}
-          >
-            <Plus className="w-3.5 h-3.5 transition-transform group-hover/slot:scale-110" />
-            <span className="text-xs font-medium tracking-tight">Add new</span>
-          </div>
+            className="rounded-xl border border-dashed border-red-500/30 bg-red-500/[0.03] pointer-events-none transition-all"
+          />
         ))}
 
         {/* Placed Service Cards */}
@@ -466,8 +559,8 @@ export function SortableCategoryColumn({
                 gridRow: `${startRow + 1} / span ${currentRowSpan}`,
               }}
               className={`group relative rounded-xl border transition-colors duration-150 select-none overflow-hidden ${
-                isCurrentDragging
-                  ? 'border-red-500 shadow-2xl scale-[1.03] bg-[#1e2230] z-40 cursor-grabbing ring-2 ring-red-500/40 opacity-95'
+                isCurrentDragging || dragFloating?.card.id === s.id
+                  ? 'border-red-500/80 shadow-2xl scale-[0.98] bg-[#1a1d28]/60 z-20 cursor-grabbing ring-2 ring-red-500/30 opacity-40 border-dashed'
                   : isCurrentResizing
                   ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] bg-[#1c1f2b] z-30 cursor-se-resize'
                   : isVpnLocked
@@ -489,6 +582,50 @@ export function SortableCategoryColumn({
                         {s.url.replace(/^https?:\/\//, '')}
                       </span>
                     </div>
+                  </div>
+
+                  {/* Hover Quick Action Buttons on Compact 1x1 Card */}
+                  <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 bg-[#16181f]/95 p-0.5 rounded-lg border border-slate-700/80 shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopy(e, s)}
+                      className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                      title="Copy URL"
+                    >
+                      {copiedUrlId === s.id ? (
+                        <Check className="w-2.5 h-2.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-2.5 h-2.5" />
+                      )}
+                    </button>
+                    {isOwner && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onEditService(s);
+                          }}
+                          className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                          title="Edit service"
+                        >
+                          <Edit2 className="w-2.5 h-2.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDeleteService(s.id);
+                          }}
+                          className="p-1 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors"
+                          title="Remove service"
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between pt-1 border-t border-slate-800/40 text-[9px] font-mono">
@@ -551,11 +688,6 @@ export function SortableCategoryColumn({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {s.liveStat && (
-                      <span className="hidden sm:inline-block text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 truncate max-w-[130px]">
-                        {s.liveStat}
-                      </span>
-                    )}
                     {isVpnLocked ? (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30" title="Connect to WireGuard VPN to access this hostname">
                         <Lock className="w-2.5 h-2.5 text-amber-400" />
@@ -612,34 +744,30 @@ export function SortableCategoryColumn({
                           <Copy className="w-3 h-3" />
                         )}
                       </button>
-                      {isOwner && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onEditService(s);
-                            }}
-                            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onDeleteService(s.id);
-                            }}
-                            className="p-1 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onEditService(s);
+                        }}
+                        className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                        title="Edit service"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onDeleteService(s.id);
+                        }}
+                        className="p-1 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors"
+                        title="Remove service"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
                 </>
@@ -652,24 +780,32 @@ export function SortableCategoryColumn({
                 </span>
               )}
 
+              {/* Top Edge Resize Handle (Drag upward) */}
+              <div
+                onMouseDown={(e) => handleStartResize(e, s, 'top')}
+                data-no-drag="true"
+                className="resize-handle absolute top-0 inset-x-0 h-2.5 cursor-ns-resize z-20 group/tophandle flex items-center justify-center"
+                title="Drag upward to resize card"
+              >
+                <div className="w-10 h-0.5 rounded-full bg-slate-600/40 group-hover/tophandle:bg-red-400 group-hover/tophandle:h-1 opacity-0 group-hover:opacity-100 transition-all" />
+              </div>
+
               {/* Drag Handle to Resize Card */}
-              {isOwner && (
-                <div
-                  onMouseDown={(e) => handleStartResize(e, s)}
-                  data-no-drag="true"
-                  className="resize-handle absolute bottom-0.5 right-0.5 w-5 h-5 cursor-se-resize flex items-center justify-center text-slate-600 hover:text-red-400 opacity-20 group-hover:opacity-100 transition-opacity z-20"
-                  title="Drag to resize card (1x1, 2x1, 1x2, 2x2)"
-                >
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="text-current">
-                    <circle cx="7" cy="7" r="1" fill="currentColor" />
-                    <circle cx="7" cy="4" r="1" fill="currentColor" />
-                    <circle cx="7" cy="1" r="1" fill="currentColor" />
-                    <circle cx="4" cy="7" r="1" fill="currentColor" />
-                    <circle cx="4" cy="4" r="1" fill="currentColor" />
-                    <circle cx="1" cy="7" r="1" fill="currentColor" />
-                  </svg>
-                </div>
-              )}
+              <div
+                onMouseDown={(e) => handleStartResize(e, s, 'se')}
+                data-no-drag="true"
+                className="resize-handle absolute bottom-0.5 right-0.5 w-5 h-5 cursor-se-resize flex items-center justify-center text-slate-600 hover:text-red-400 opacity-20 group-hover:opacity-100 transition-opacity z-20"
+                title="Drag to resize card"
+              >
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="text-current">
+                  <circle cx="7" cy="7" r="1" fill="currentColor" />
+                  <circle cx="7" cy="4" r="1" fill="currentColor" />
+                  <circle cx="7" cy="1" r="1" fill="currentColor" />
+                  <circle cx="4" cy="7" r="1" fill="currentColor" />
+                  <circle cx="4" cy="4" r="1" fill="currentColor" />
+                  <circle cx="1" cy="7" r="1" fill="currentColor" />
+                </svg>
+              </div>
             </div>
           );
         })}
@@ -688,7 +824,7 @@ export function SortableCategoryColumn({
       </div>
 
       {/* Stacked Live Stats for Category */}
-      {items.some((s) => s.liveStat || s.telemetryType) && (
+      {items.some((s) => (s.liveStat || s.telemetryType) && s.telemetryType !== 'qbittorrent' && !s.title.toLowerCase().includes('qbit')) && (
         <div className="pt-2 border-t border-slate-800/80 space-y-1.5 mt-1">
           <div className="flex items-center justify-between px-1 text-[10px] font-mono uppercase tracking-wider text-slate-500">
             <span className="flex items-center gap-1.5">
@@ -698,7 +834,7 @@ export function SortableCategoryColumn({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           </div>
           {items
-            .filter((s) => s.liveStat || s.telemetryType)
+            .filter((s) => (s.liveStat || s.telemetryType) && s.telemetryType !== 'qbittorrent' && !s.title.toLowerCase().includes('qbit'))
             .map((s) => (
               <div
                 key={`cat-stat-${s.id}`}
@@ -726,6 +862,37 @@ export function SortableCategoryColumn({
                 </div>
               </div>
             ))}
+        </div>
+      )}
+
+      {/* Floating Drag Overlay */}
+      {dragFloating && (
+        <div
+          style={{
+            position: 'fixed',
+            left: dragFloating.x + 14,
+            top: dragFloating.y + 14,
+            pointerEvents: 'none',
+            zIndex: 99999,
+          }}
+          className="rounded-xl border border-red-500 bg-[#1e2230]/95 shadow-2xl p-2.5 flex items-center gap-2.5 ring-2 ring-red-500/50 backdrop-blur-md min-w-[180px]"
+        >
+          <ServiceIcon icon={dragFloating.card.icon} title={dragFloating.card.title} />
+          <div>
+            <div className="font-bold text-xs text-white truncate max-w-[160px]">
+              {dragFloating.card.title}
+            </div>
+            <div className="text-[10px] text-red-400 font-semibold flex items-center gap-1 mt-0.5">
+              {dragFloating.targetCategory ? (
+                <>
+                  <span>Move to:</span>
+                  <span className="underline decoration-red-400 font-bold">{dragFloating.targetCategory}</span>
+                </>
+              ) : (
+                <span className="text-slate-400">Drag to category</span>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
