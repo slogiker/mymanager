@@ -5,6 +5,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { UploadProvider } from './context/UploadContext';
 import CookieConsent from './components/common/CookieConsent';
 import FloatingAccessibilityButton from './components/common/FloatingAccessibilityButton';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const PortfolioPage = lazy(() => import('./pages/Portfolio'));
 const LoginPage = lazy(() => import('./pages/Login'));
@@ -115,11 +116,13 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <UploadProvider>
-        <AppRoutes />
-      </UploadProvider>
-    </LanguageProvider>
+    <ErrorBoundary fallbackTitle="Application Error">
+      <LanguageProvider>
+        <UploadProvider>
+          <AppRoutes />
+        </UploadProvider>
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -312,23 +312,67 @@ function seed() {
     `).run('Daniel', 'Full Stack Developer', 'I build useful things for fun', 'https://github.com/slogiker', 'plibersek.daniel@gmail.com');
   }
 
-  const ownerExists = db.prepare("SELECT id FROM users WHERE role = 'owner'").get();
+  const ownerExists = db.prepare("SELECT id, password_hash FROM users WHERE role = 'owner'").get();
+  const configuredPassword = process.env.ADMIN_PASSWORD || process.env.OWNER_PASSWORD;
+
   if (!ownerExists) {
-    const otp = randomBytes(8).toString('hex');
-    bcrypt.hash(otp, 12).then((hash) => {
+    const password = configuredPassword || randomBytes(8).toString('hex');
+    const mustChange = configuredPassword ? 0 : 1;
+    bcrypt.hash(password, 12).then((hash) => {
       db.prepare(`
         INSERT INTO users (name, username, email, password_hash, role, must_change_password)
-        VALUES (?, ?, ?, ?, 'owner', 1)
-      `).run('Daniel', 'slogiker', 'plibersek.daniel@gmail.com', hash);
+        VALUES (?, ?, ?, ?, 'owner', ?)
+      `).run('Daniel', 'slogiker', 'plibersek.daniel@gmail.com', hash, mustChange);
 
-      console.log('\n╔══════════════════════════════════════╗');
-      console.log('║         OWNER ACCOUNT CREATED        ║');
-      console.log('╠══════════════════════════════════════╣');
-      console.log(`║  Username : slogiker                 ║`);
-      console.log(`║  Password : ${otp}  ║`);
-      console.log('║  (Change password on first login)    ║');
-      console.log('╚══════════════════════════════════════╝\n');
+      if (!configuredPassword) {
+        console.log('\n╔══════════════════════════════════════╗');
+        console.log('║         OWNER ACCOUNT CREATED        ║');
+        console.log('╠══════════════════════════════════════╣');
+        console.log(`║  Username : slogiker                 ║`);
+        console.log(`║  Password : ${password}  ║`);
+        console.log('║  (Change password on first login)    ║');
+        console.log('╚══════════════════════════════════════╝\n');
+      } else {
+        console.log('[Auth] Owner account created with configured password from environment.');
+      }
     }).catch(err => console.error('Failed to hash owner seed password:', err));
+  } else if (configuredPassword && configuredPassword.trim() !== '') {
+    try {
+      const isSame = bcrypt.compareSync(configuredPassword, ownerExists.password_hash);
+      if (!isSame) {
+        const hash = bcrypt.hashSync(configuredPassword, 12);
+        db.prepare("UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = datetime('now') WHERE id = ?").run(hash, ownerExists.id);
+        console.log('[Auth] Owner password updated to match configured password in environment.');
+      }
+    } catch (e) {
+      console.error('[Auth] Failed to sync owner password:', e);
+    }
+  }
+
+  // Ensure gasper user exists with password 123456
+  try {
+    const gasperUser = db.prepare("SELECT id FROM users WHERE username = 'gasper'").get();
+    const gasperHash = bcrypt.hashSync('123456', 12);
+    if (!gasperUser) {
+      const gasperRes = db.prepare(`
+        INSERT INTO users (name, username, email, password_hash, role, must_change_password)
+        VALUES (?, ?, ?, ?, 'user', 0)
+      `).run('Gasper', 'gasper', 'gasper@local.lan', gasperHash);
+
+      const gasperId = gasperRes.lastInsertRowid;
+      const allServices = db.prepare("SELECT id, title FROM services").all();
+      const allowedTitles = ['jellyfin', 'jellyseerr', 'nas', 'nextcloud'];
+      const insertPerm = db.prepare("INSERT OR IGNORE INTO service_permissions (service_id, user_id, allowed) VALUES (?, ?, ?)");
+      for (const svc of allServices) {
+        const isAllowed = allowedTitles.some(t => svc.title.toLowerCase().includes(t));
+        insertPerm.run(svc.id, gasperId, isAllowed ? 1 : 0);
+      }
+      console.log('[Auth] Gasper user profile created with default permissions.');
+    } else {
+      db.prepare("UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = datetime('now') WHERE id = ?").run(gasperHash, gasperUser.id);
+    }
+  } catch (e) {
+    console.error('[Auth] Failed to seed/update gasper user:', e);
   }
 
   const servicesCount = db.prepare('SELECT COUNT(*) as c FROM services').get();

@@ -1,7 +1,44 @@
 const express = require('express');
+const http = require('http');
+const https = require('https');
 const { getClientIp } = require('../utils/ipHelper');
 
 const router = express.Router();
+
+// Cached server WAN IP with auto-refresh every 10 minutes
+let cachedWanIp = null;
+let wanIpFetchedAt = 0;
+const WAN_IP_TTL = 10 * 60 * 1000; // 10 minutes
+
+function fetchWanIp() {
+  return new Promise((resolve) => {
+    const request = https.get('https://ifconfig.me/ip', { timeout: 5000, headers: { 'User-Agent': 'curl/8.0' } }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        const ip = data.trim();
+        if (ip && /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+          cachedWanIp = ip;
+          wanIpFetchedAt = Date.now();
+          console.log(`[VPN] Server WAN IP resolved: ${ip}`);
+        }
+        resolve(cachedWanIp);
+      });
+    });
+    request.on('error', () => resolve(cachedWanIp));
+    request.on('timeout', () => { request.destroy(); resolve(cachedWanIp); });
+  });
+}
+
+// Fetch on startup
+fetchWanIp();
+
+async function getWanIp() {
+  if (cachedWanIp && (Date.now() - wanIpFetchedAt < WAN_IP_TTL)) {
+    return cachedWanIp;
+  }
+  return fetchWanIp();
+}
 
 function isVpnIp(ip) {
   if (!ip) return false;
@@ -27,15 +64,20 @@ function isLanIp(ip) {
   return false;
 }
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const ip = getClientIp(req);
+  const wanIp = await getWanIp();
   const isVpn = isVpnIp(ip);
   const isLan = isLanIp(ip);
-  const connected = isVpn || isLan;
+  // Client shares the same public IP as the server - they are on the home
+  // network or routed through the WireGuard full-tunnel VPN
+  const isHomeNetwork = !!(wanIp && ip === wanIp);
+  const connected = isVpn || isLan || isHomeNetwork;
   res.json({
     connected,
     isVpn,
     isLan,
+    isHomeNetwork,
     ip,
     subnet: '10.7.235.0/24',
     detectedAt: new Date().toISOString(),

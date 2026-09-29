@@ -2,9 +2,9 @@ const { z } = require('zod');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment from app/server/.env or current working directory
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-dotenv.config();
+// Load environment from app/server/.env or current working directory with override enabled
+dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
+dotenv.config({ override: true });
 
 const envSchema = z.object({
   // ONLY JWT_SECRET (>=32 chars) is required
@@ -23,11 +23,12 @@ const envSchema = z.object({
   FILES_ENABLED: z.string().optional().default('false'),
   TERMINAL_ENABLED: z.string().optional().default('false'),
 
-  // Host SSH
+  // Host SSH and Authentication
   SSH_HOST: z.string().optional(),
   SSH_PORT: z.string().optional(),
   SSH_USERNAME: z.string().optional(),
   OWNER_PASSWORD: z.string().optional(),
+  ADMIN_PASSWORD: z.string().optional(),
 
   // Optional integration credentials and configuration
   QBIT_URL: z.string().optional(),

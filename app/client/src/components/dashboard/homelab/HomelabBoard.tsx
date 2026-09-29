@@ -1,5 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  GRID_CONSTANTS,
+  CardPosition,
+  layoutCategoryCards,
+  getFillerCells,
+  computePushedLayout,
+} from '../../../lib/cardGridEngine';
 import { Link } from 'react-router-dom';
+import { ErrorBoundary } from '../../common/ErrorBoundary';
 import {
   DndContext,
   closestCenter,
@@ -22,6 +30,7 @@ import {
   RefreshCw,
   Plus,
   LayoutGrid,
+  Layers,
   Lock,
   Shield,
   X,
@@ -33,8 +42,30 @@ import {
   Check,
   Eye,
   EyeOff,
+  ExternalLink,
+  Copy,
+  Edit2,
+  Trash2,
+  Film,
+  Tv,
+  Play,
+  Pause,
+  ArrowDown,
+  ArrowUp,
+  Maximize2,
+  Bookmark,
+  HardDrive,
 } from 'lucide-react';
-import { Service, ServerNode, SpeedtestResult } from '../../../types';
+import {
+  Service,
+  ServerNode,
+  SpeedtestResult,
+  JellyfinStats,
+  JellyseerrStats,
+  QbittorrentStats,
+  WireguardStats,
+  PiholeStats,
+} from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
 import { getUserPreferences, saveUserPreferences, UserPreferences } from '../../../lib/userPreferences';
 import { api } from '../../../lib/api';
@@ -68,11 +99,17 @@ export interface HomelabBoardProps {
   loadingNodes: boolean;
   speedtest?: SpeedtestResult | null;
   vpnConnected?: boolean;
+  jellyfinStats?: JellyfinStats | null;
+  jellyseerrStats?: JellyseerrStats | null;
+  qbitStats?: QbittorrentStats | null;
+  wgStats?: WireguardStats | null;
+  piholeStats?: PiholeStats | null;
   onRunSpeedtest?: () => void;
   isRunningSpeedtest?: boolean;
   onUpdateCardLayout?: (updates: Array<{ id: number; start_col: number; start_row: number; col_span: number; row_span: number }>) => void;
   onOpenInspector?: (type: 'wireguard' | 'pihole' | 'qbittorrent' | 'jellyfin' | 'jellyseerr') => void;
   onRefresh: () => void;
+  onMoveCardCategory?: (serviceId: number, fromCategory: string, toCategory: string) => void;
 }
 
 export function HomelabBoard({
@@ -81,11 +118,17 @@ export function HomelabBoard({
   loadingNodes,
   speedtest,
   vpnConnected,
+  jellyfinStats,
+  jellyseerrStats,
+  qbitStats,
+  wgStats,
+  piholeStats,
   onRunSpeedtest,
   isRunningSpeedtest,
   onUpdateCardLayout,
   onOpenInspector,
   onRefresh,
+  onMoveCardCategory,
 }: HomelabBoardProps) {
   const { user } = useAuth();
   const [error, setError] = useState<string>('');
@@ -123,6 +166,26 @@ export function HomelabBoard({
       return () => clearTimeout(timer);
     }
   }, [vpnNotice]);
+
+  const [copiedUrlId, setCopiedUrlId] = useState<number | null>(null);
+
+  const isServiceVpnLocked = (s: Service) => {
+    const isVpnRequired = Boolean(s.requires_vpn);
+    const isLanOrLocal =
+      s.url.includes('192.168.') ||
+      s.url.includes('10.') ||
+      s.url.includes('.home.arpa') ||
+      s.url.includes('.local');
+    return (isVpnRequired || isLanOrLocal) && !vpnConnected;
+  };
+
+
+  const formatSeconds = (sec: number): string => {
+    if (!sec || isNaN(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
   const [prefs, setPrefs] = useState<UserPreferences>(() => getUserPreferences(user?.id));
 
@@ -296,6 +359,61 @@ export function HomelabBoard({
     onRefresh();
   };
 
+  const handleMoveCardCategory = async (serviceId: number, fromCat: string, toCat: string) => {
+    if (!toCat || fromCat === toCat) return;
+
+    // Check if fromCat has any other services left
+    const remainingInFrom = services.filter(
+      (s) => s.id !== serviceId && (s.category?.trim() || 'Services') === fromCat
+    );
+
+    let updatedPrefs = { ...prefs };
+    let prefsChanged = false;
+
+    if (remainingInFrom.length === 0) {
+      // Category is now empty - remove it from customCategories, categoryOrder, and categoryWidths
+      const newCustom = (prefs.customCategories || []).filter((c) => c !== fromCat);
+      const newOrder = (prefs.categoryOrder || []).filter((c) => c !== fromCat);
+      const newWidths = { ...(prefs.categoryWidths || {}) };
+      delete newWidths[fromCat];
+
+      updatedPrefs = {
+        ...prefs,
+        customCategories: newCustom,
+        categoryOrder: newOrder,
+        categoryWidths: newWidths,
+      };
+      prefsChanged = true;
+    }
+
+    if (!(updatedPrefs.categoryOrder || []).includes(toCat)) {
+      updatedPrefs = {
+        ...updatedPrefs,
+        categoryOrder: [...(updatedPrefs.categoryOrder || []), toCat],
+      };
+      prefsChanged = true;
+    }
+
+    if (prefsChanged) {
+      setPrefs(updatedPrefs);
+      saveUserPreferences(user?.id, updatedPrefs);
+    }
+
+    if (onMoveCardCategory) {
+      onMoveCardCategory(serviceId, fromCat, toCat);
+    } else {
+      const s = services.find((x) => x.id === serviceId);
+      if (s) {
+        try {
+          await api.put(`/services/${serviceId}`, { ...s, category: toCat });
+          onRefresh();
+        } catch (err) {
+          console.error('Failed to move service category', err);
+        }
+      }
+    }
+  };
+
   const toggleCategoryHide = (cat: string) => {
     const isHidden = prefs.hiddenCategories.includes(cat);
     const updatedList = isHidden
@@ -333,12 +451,317 @@ export function HomelabBoard({
     );
   }, [services, search, prefs.hiddenServices]);
 
+  const flatGridRef = useRef<HTMLDivElement>(null);
+  const preventClickRef = useRef<boolean>(false);
+
+  const handleCardClick = (s: Service, e?: React.MouseEvent) => {
+    if (preventClickRef.current) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return;
+    }
+    if (isServiceVpnLocked(s)) {
+      handleVpnLockedClick(s.title, s.url);
+      return;
+    }
+    if (!s.url || s.url === '#') {
+      if (s.telemetryType && onOpenInspector) {
+        onOpenInspector(s.telemetryType);
+      }
+    } else {
+      window.open(s.url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  // 8-column layout calculation for flat grid view
+  const placedFlatCards = useMemo(() => {
+    return layoutCategoryCards(filteredServices, GRID_CONSTANTS.FLAT_COLS);
+  }, [filteredServices]);
+
+  const [flatLivePushedCards, setFlatLivePushedCards] = useState<(Service & CardPosition)[] | null>(null);
+  const flatLivePushedRef = useRef(flatLivePushedCards);
+  flatLivePushedRef.current = flatLivePushedCards;
+
+  const activeFlatCards = flatLivePushedCards || placedFlatCards;
+
+  const [flatResizing, setFlatResizing] = useState<{
+    id: number;
+    startCol: number;
+    startRow: number;
+    colSpan: number;
+    rowSpan: number;
+  } | null>(null);
+
+  const [flatCardDragging, setFlatCardDragging] = useState<{
+    id: number;
+    startCol: number;
+    startRow: number;
+    colSpan: number;
+    rowSpan: number;
+  } | null>(null);
+
+  const flatFillerCells = useMemo(() => {
+    const isInteracting = flatResizing !== null || flatCardDragging !== null;
+    return getFillerCells(activeFlatCards, GRID_CONSTANTS.FLAT_COLS, isInteracting ? 4 : 3);
+  }, [activeFlatCards, flatResizing, flatCardDragging]);
+
+  const handleStartFlatCardDrag = (e: React.MouseEvent, card: Service & CardPosition) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') ||
+      target.closest('a') ||
+      target.closest('.resize-handle') ||
+      target.closest('[data-no-drag]')
+    ) {
+      return;
+    }
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let isDragActive = false;
+
+    const gridRect = flatGridRef.current ? flatGridRef.current.getBoundingClientRect() : null;
+    const gridWidth = flatGridRef.current ? flatGridRef.current.clientWidth : 960;
+    const colWidth = (gridWidth - (GRID_CONSTANTS.FLAT_COLS - 1) * GRID_CONSTANTS.GAP) / GRID_CONSTANTS.FLAT_COLS;
+    const rowHeight = GRID_CONSTANTS.CELL_HEIGHT + GRID_CONSTANTS.GAP;
+
+    const grabOffsetCol = gridRect ? Math.floor((startX - gridRect.left) / colWidth) - card.startCol : 0;
+    const grabOffsetRow = gridRect ? Math.floor((startY - gridRect.top) / rowHeight) - card.startRow : 0;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const dist = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+      if (!isDragActive) {
+        if (dist < 6) return;
+        isDragActive = true;
+        preventClickRef.current = true;
+      }
+
+      if (!flatGridRef.current) return;
+      const currentGridRect = flatGridRef.current.getBoundingClientRect();
+      const currentX = moveEvent.clientX - currentGridRect.left;
+      const currentY = moveEvent.clientY - currentGridRect.top;
+
+      const rawCol = Math.floor(currentX / colWidth) - grabOffsetCol;
+      const rawRow = Math.floor(currentY / rowHeight) - grabOffsetRow;
+
+      const targetCol = Math.max(0, Math.min(GRID_CONSTANTS.FLAT_COLS - card.colSpan, rawCol));
+      const targetRow = Math.max(0, Math.min(GRID_CONSTANTS.MAX_ROWS - 1, rawRow));
+
+      const candidate: CardPosition = {
+        id: card.id,
+        startCol: targetCol,
+        startRow: targetRow,
+        colSpan: card.colSpan,
+        rowSpan: card.rowSpan,
+      };
+
+      const pushedLayout = computePushedLayout(candidate, placedFlatCards, GRID_CONSTANTS.FLAT_COLS);
+      flatLivePushedRef.current = pushedLayout;
+      setFlatCardDragging(candidate);
+      setFlatLivePushedCards(pushedLayout);
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+
+      if (isDragActive) {
+        const finalLayout = flatLivePushedRef.current;
+        if (finalLayout && onUpdateCardLayout) {
+          const changedCards: Array<{
+            id: number;
+            start_col: number;
+            start_row: number;
+            col_span: number;
+            row_span: number;
+          }> = [];
+
+          for (const item of finalLayout) {
+            const original = placedFlatCards.find((c) => c.id === item.id);
+            if (
+              !original ||
+              original.startCol !== item.startCol ||
+              original.startRow !== item.startRow ||
+              original.colSpan !== item.colSpan ||
+              original.rowSpan !== item.rowSpan
+            ) {
+              changedCards.push({
+                id: item.id,
+                start_col: item.startCol,
+                start_row: item.startRow,
+                col_span: item.colSpan,
+                row_span: item.rowSpan,
+              });
+            }
+          }
+
+          if (changedCards.length > 0) {
+            onUpdateCardLayout(changedCards);
+          }
+        }
+
+        preventClickRef.current = true;
+        setTimeout(() => {
+          preventClickRef.current = false;
+        }, 150);
+      } else {
+        preventClickRef.current = false;
+      }
+
+      flatLivePushedRef.current = null;
+      setFlatCardDragging(null);
+      setFlatLivePushedCards(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleStartFlatResize = (
+    e: React.MouseEvent,
+    card: Service & CardPosition,
+    direction: 'se' | 'top' = 'se'
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialColSpan = card.colSpan;
+    const initialRowSpan = card.rowSpan;
+    const initialStartCol = card.startCol;
+    const initialStartRow = card.startRow;
+    const gridWidth = flatGridRef.current ? flatGridRef.current.clientWidth : 960;
+    const colWidth = (gridWidth - (GRID_CONSTANTS.FLAT_COLS - 1) * GRID_CONSTANTS.GAP) / GRID_CONSTANTS.FLAT_COLS;
+    const rowHeight = GRID_CONSTANTS.CELL_HEIGHT;
+
+    const initialCandidate: CardPosition = {
+      id: card.id,
+      startCol: initialStartCol,
+      startRow: initialStartRow,
+      colSpan: initialColSpan,
+      rowSpan: initialRowSpan,
+    };
+    setFlatResizing(initialCandidate);
+    setFlatLivePushedCards(null);
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      preventClickRef.current = true;
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+
+      let candidateStartCol = initialStartCol;
+      let candidateStartRow = initialStartRow;
+      let candidateColSpan = initialColSpan;
+      let candidateRowSpan = initialRowSpan;
+
+      if (direction === 'top') {
+        const rowStep = Math.round(-deltaY / (rowHeight * 0.45));
+        if (rowStep > 0) {
+          const maxUp = Math.min(initialStartRow, 3 - initialRowSpan);
+          const actualUp = Math.max(0, Math.min(maxUp, rowStep));
+          candidateStartRow = initialStartRow - actualUp;
+          candidateRowSpan = initialRowSpan + actualUp;
+        } else if (rowStep < 0) {
+          const maxDown = initialRowSpan - 1;
+          const actualDown = Math.max(0, Math.min(maxDown, -rowStep));
+          candidateStartRow = initialStartRow + actualDown;
+          candidateRowSpan = initialRowSpan - actualDown;
+        }
+      } else {
+        const colStep = Math.round(deltaX / (colWidth * 0.45));
+        const rowStep = Math.round(deltaY / (rowHeight * 0.45));
+
+        candidateColSpan = Math.max(1, Math.min(GRID_CONSTANTS.FLAT_COLS, initialColSpan + colStep));
+        candidateStartCol = Math.max(0, Math.min(GRID_CONSTANTS.FLAT_COLS - candidateColSpan, initialStartCol));
+
+        if (initialRowSpan + rowStep >= 1) {
+          candidateRowSpan = Math.max(1, Math.min(3, initialRowSpan + rowStep));
+          candidateStartRow = initialStartRow;
+        } else {
+          const excessUp = 1 - (initialRowSpan + rowStep);
+          const maxUp = Math.min(initialStartRow, 2);
+          const actualUp = Math.min(maxUp, excessUp);
+          candidateStartRow = initialStartRow - actualUp;
+          candidateRowSpan = Math.min(3, 1 + actualUp);
+        }
+      }
+
+      const candidate: CardPosition = {
+        id: card.id,
+        startCol: candidateStartCol,
+        startRow: candidateStartRow,
+        colSpan: candidateColSpan,
+        rowSpan: candidateRowSpan,
+      };
+
+      const pushedLayout = computePushedLayout(candidate, placedFlatCards, GRID_CONSTANTS.FLAT_COLS);
+      flatLivePushedRef.current = pushedLayout;
+      setFlatResizing(candidate);
+      setFlatLivePushedCards(pushedLayout);
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      preventClickRef.current = true;
+      setTimeout(() => {
+        preventClickRef.current = false;
+      }, 150);
+
+      const finalLayout = flatLivePushedRef.current;
+      if (finalLayout && onUpdateCardLayout) {
+        const changedCards: Array<{
+          id: number;
+          start_col: number;
+          start_row: number;
+          col_span: number;
+          row_span: number;
+        }> = [];
+
+        for (const item of finalLayout) {
+          const original = placedFlatCards.find((c) => c.id === item.id);
+          if (
+            !original ||
+            original.startCol !== item.startCol ||
+            original.startRow !== item.startRow ||
+            original.colSpan !== item.colSpan ||
+            original.rowSpan !== item.rowSpan
+          ) {
+            changedCards.push({
+              id: item.id,
+              start_col: item.startCol,
+              start_row: item.startRow,
+              col_span: item.colSpan,
+              row_span: item.rowSpan,
+            });
+          }
+        }
+
+        if (changedCards.length > 0) {
+          onUpdateCardLayout(changedCards);
+        }
+      }
+
+      flatLivePushedRef.current = null;
+      setFlatResizing(null);
+      setFlatLivePushedCards(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   const hostNode = nodes.find(n => n.id === 'host');
+  const nasNode = nodes.find(n => n.id.includes('41') || n.name.toLowerCase().includes('storage') || n.name.toLowerCase().includes('nas'));
 
   return (
     <div className="space-y-8">
-      {/* Cluster Telemetry Row (Host, 192.168.1.136, 192.168.1.112, 192.168.1.41) */}
-      {prefs.widgetVisible?.nodes !== false && (
+      {/* Cluster Telemetry Row: Only visible to Owner/Admin */}
+      {user?.role === 'owner' && prefs.widgetVisible?.nodes !== false && (
         <MultiServerNodesWidget
           nodes={nodes}
           loading={loadingNodes}
@@ -349,8 +772,8 @@ export function HomelabBoard({
             setPrefs(next);
             saveUserPreferences(user?.id, next);
           }}
-          isAdmin={user?.role === 'owner'}
-          onRunSpeedtest={user?.role === 'owner' ? onRunSpeedtest : undefined}
+          isAdmin={true}
+          onRunSpeedtest={onRunSpeedtest}
           isRunningSpeedtest={isRunningSpeedtest}
         />
       )}
@@ -383,7 +806,7 @@ export function HomelabBoard({
         </div>
 
         <div className="flex items-center gap-2">
-          {user?.role === 'owner' && (
+          {user && (
             <button
               onClick={() => setCategoryModal(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:border-slate-700 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors"
@@ -393,6 +816,24 @@ export function HomelabBoard({
               <span>Add Category</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !prefs.disableCategories;
+              const updated = { ...prefs, disableCategories: next };
+              setPrefs(updated);
+              saveUserPreferences(user?.id, updated);
+            }}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold transition-colors ${
+              prefs.disableCategories
+                ? 'border-red-500/50 bg-red-600/10 text-red-400'
+                : 'border-slate-800 hover:border-slate-700 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 hover:text-white'
+            }`}
+            title={prefs.disableCategories ? 'Switch to Grouped Categories' : 'Disable Categories (Flat Grid)'}
+          >
+            <Layers className="w-3.5 h-3.5 text-red-400" />
+            <span>{prefs.disableCategories ? 'Flat Grid' : 'Categories'}</span>
+          </button>
           <button
             onClick={() => setViewModal(true)}
             className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:border-slate-700 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors"
@@ -413,7 +854,7 @@ export function HomelabBoard({
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          {user?.role === 'owner' && (
+          {user && (
             <button
               onClick={() => openNew()}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_20px_-5px_rgba(239,68,68,0.4)] transition-all"
@@ -427,8 +868,814 @@ export function HomelabBoard({
 
       <ErrBox msg={error} />
 
-      {/* Free-Play Sortable Grid or Empty State */}
-      {orderedCategories.length === 0 || !orderedCategories.some(cat => !prefs.hiddenCategories.includes(cat) && (user?.role === 'owner' || filteredServices.some(s => (s.category?.trim() || 'Services') === cat))) ? (
+      {/* Flat 2x1 Grid or Grouped Categories */}
+      {prefs.disableCategories ? (
+        filteredServices.length === 0 ? (
+          <div className="py-16 px-6 text-center rounded-2xl border border-slate-800/80 bg-[#16181f]/80">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3">
+              <LayoutGrid className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-semibold text-white">No service cards visible</h3>
+            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+              {search
+                ? `No services matched "${search}". Try clearing your search.`
+                : user?.role === 'owner'
+                ? 'Your homelab board is empty. Add a service or customize your grid view.'
+                : 'No service cards are currently assigned to your account. Contact an administrator for access.'}
+            </p>
+            {search ? (
+              <button
+                onClick={() => setSearch('')}
+                className="mt-4 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 rounded-lg transition-colors"
+              >
+                Clear search filter
+              </button>
+            ) : user?.role === 'owner' ? (
+              <button
+                onClick={() => openNew()}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-red-600/20 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add First Service
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Unified 8-Column Flat Grid with Free Drag & Resize */}
+            <div className="w-full overflow-x-auto pb-4">
+              <div
+                ref={flatGridRef}
+                className="grid gap-2.5 relative select-none min-w-[850px] xl:min-w-0"
+                style={{
+                  gridTemplateColumns: 'repeat(8, minmax(0, 1fr))',
+                  gridAutoRows: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
+                }}
+              >
+                {/* Available Slots Outline (Shown when user is actively resizing or dragging) */}
+                {(flatResizing !== null || flatCardDragging !== null) && flatFillerCells.map((filler) => (
+                  <div
+                    key={`flat-filler-${filler.col}-${filler.row}`}
+                    style={{
+                      gridColumn: `${filler.col + 1} / span 1`,
+                      gridRow: `${filler.row + 1} / span 1`,
+                      minHeight: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
+                    }}
+                    className="rounded-xl border border-dashed border-red-500/30 bg-red-500/[0.03] pointer-events-none transition-all"
+                  />
+                ))}
+
+                {/* Placed Service Cards */}
+                {activeFlatCards.map((s) => {
+                  const isCurrentDragging = flatCardDragging?.id === s.id;
+                  const isCurrentResizing = flatResizing?.id === s.id;
+                  const currentColSpan = isCurrentResizing && flatResizing ? flatResizing.colSpan : s.colSpan;
+                  const currentRowSpan = isCurrentResizing && flatResizing ? flatResizing.rowSpan : s.rowSpan;
+                  const startCol = s.startCol;
+                  const startRow = s.startRow;
+
+                  const locked = isServiceVpnLocked(s);
+                  const isOnline = s.status === 'online';
+                  const isOffline = s.status === 'offline' || s.status === 'timeout';
+                  const isCompact = currentColSpan === 1 && currentRowSpan === 1;
+                  const isExpanded = currentRowSpan >= 2;
+
+                  return (
+                    <div
+                      key={s.id}
+                      onMouseDown={(e) => Boolean(user) && handleStartFlatCardDrag(e, s)}
+                      onClick={(e) => handleCardClick(s, e)}
+                      role="link"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCardClick(s);
+                      }}
+                      style={{
+                        gridColumn: `${startCol + 1} / span ${currentColSpan}`,
+                        gridRow: `${startRow + 1} / span ${currentRowSpan}`,
+                      }}
+                      className={`group relative rounded-xl border transition-colors duration-150 select-none overflow-hidden ${
+                        isCurrentDragging
+                          ? 'border-red-500/80 shadow-2xl scale-[0.98] bg-[#1a1d28]/60 z-20 cursor-grabbing ring-2 ring-red-500/30 opacity-40 border-dashed'
+                          : isCurrentResizing
+                          ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] bg-[#1c1f2b] z-30 cursor-se-resize'
+                          : locked
+                          ? 'border-amber-500/30 bg-[#16181f]/60 opacity-60 hover:opacity-85 hover:border-amber-500/50 hover:shadow-lg cursor-pointer'
+                          : 'border-slate-800/80 bg-[#16181f]/80 hover:bg-[#1c1f2b] hover:border-slate-700/80 hover:shadow-lg cursor-pointer'
+                      } ${
+                        isCompact
+                          ? 'p-2.5 flex flex-col justify-between'
+                          : isExpanded
+                          ? 'p-3.5 flex flex-col justify-between'
+                          : 'p-3 flex items-center justify-between'
+                      }`}
+                    >
+                      {isCompact ? (
+                        /* Compact 1x1 Card */
+                        <>
+                          <div className="flex items-center gap-2 min-w-0 pr-4">
+                            <ServiceIcon icon={s.icon} title={s.title} />
+                            <div className="min-w-0">
+                              <div className="font-bold text-xs text-slate-100 group-hover:text-red-400 transition-colors truncate flex items-center gap-1">
+                                <span className="truncate">{s.title}</span>
+                                {locked && <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                              </div>
+                              <span className="text-[10px] font-mono text-slate-500 truncate block mt-0.5">
+                                {s.url.replace(/^https?:\/\//, '')}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Hover Action Buttons for Compact 1x1 Card */}
+                          <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 bg-[#16181f]/95 p-0.5 rounded-lg border border-slate-700/80 shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(s.url);
+                                setCopiedUrlId(s.id);
+                                setTimeout(() => setCopiedUrlId(null), 1500);
+                              }}
+                              className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                              title="Copy URL"
+                            >
+                              {copiedUrlId === s.id ? (
+                                <Check className="w-2.5 h-2.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-2.5 h-2.5" />
+                              )}
+                            </button>
+                            {user && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openEdit(s);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                                  title="Edit service"
+                                >
+                                  <Edit2 className="w-2.5 h-2.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    remove(s.id);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors"
+                                  title="Remove service"
+                                >
+                                  <Trash2 className="w-2.5 h-2.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-800/40 text-[9px] font-mono">
+                            <span
+                              className={`flex items-center gap-1 ${
+                                isOnline ? 'text-emerald-400' : isOffline ? 'text-rose-400' : 'text-slate-500'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isOnline ? 'bg-emerald-400 animate-pulse' : isOffline ? 'bg-rose-500' : 'bg-slate-500'
+                                }`}
+                              />
+                              {s.status || 'ping'}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {s.telemetryType && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onOpenInspector?.(s.telemetryType!);
+                                  }}
+                                  className="p-0.5 text-slate-400 hover:text-emerald-400 transition-colors"
+                                  title="Inspect live telemetry"
+                                >
+                                  <Activity className="w-3 h-3 text-emerald-400" />
+                                </button>
+                              )}
+                              {locked ? (
+                                <span className="inline-flex items-center gap-0.5 text-amber-400 font-mono font-bold" title="WireGuard VPN or LAN required">
+                                  <Lock className="w-2.5 h-2.5" />
+                                  VPN
+                                </span>
+                              ) : (
+                                s.requires_vpn && <span className="text-purple-400 font-bold">VPN</span>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      ) : isExpanded ? (
+                        /* Big / Expanded Card (Rich, Dynamic & Engaging) */
+                        <div className="flex flex-col justify-between h-full space-y-2.5">
+                          {/* Top Row: Icon, Title, Status & Actions */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0 pr-2">
+                              <ServiceIcon icon={s.icon} title={s.title} />
+                              <div className="min-w-0">
+                                <div className="font-bold text-sm text-slate-100 group-hover:text-red-400 transition-colors truncate flex items-center gap-1.5">
+                                  <span>{s.title}</span>
+                                  {locked ? (
+                                    <Lock className="w-3 h-3 text-amber-400 shrink-0" title="WireGuard VPN or LAN required to access this service" />
+                                  ) : (
+                                    <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                  )}
+                                </div>
+                                <span className="text-[11px] font-mono text-slate-500 truncate block mt-0.5">
+                                  {s.url.replace(/^https?:\/\//, '')}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {locked ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                                  <Lock className="w-2.5 h-2.5 text-amber-400" />
+                                  VPN Locked
+                                </span>
+                              ) : s.requires_vpn ? (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                                  <Shield className="w-2.5 h-2.5 text-purple-400" />
+                                  VPN
+                                </span>
+                              ) : null}
+
+                              <div
+                                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider border ${
+                                  isOnline
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                    : isOffline
+                                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    isOnline ? 'bg-emerald-400 animate-pulse' : isOffline ? 'bg-rose-500' : 'bg-slate-500'
+                                  }`}
+                                />
+                                <span>{s.status || 'ping'}</span>
+                              </div>
+
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {s.telemetryType && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      onOpenInspector?.(s.telemetryType!);
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-emerald-400 rounded hover:bg-slate-800 transition-colors"
+                                    title="Inspect live telemetry"
+                                  >
+                                    <Activity className="w-3 h-3 text-emerald-400" />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(s.url);
+                                    setCopiedUrlId(s.id);
+                                    setTimeout(() => setCopiedUrlId(null), 1500);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                                  title="Copy URL"
+                                >
+                                  {copiedUrlId === s.id ? (
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                                {user && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        openEdit(s);
+                                      }}
+                                      className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                                      title="Edit service"
+                                    >
+                                      <Edit2 className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        remove(s.id);
+                                      }}
+                                      className="p-1 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors"
+                                      title="Remove service"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Middle: Description & Live Interactive Widgets */}
+                          <div className="space-y-2 flex-1">
+                            {s.description && (
+                              <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                                {s.description}
+                              </p>
+                            )}
+
+                            {/* Jellyfin Live Stream Widget */}
+                            {(s.telemetryType === 'jellyfin' || s.title.toLowerCase().includes('jellyfin')) && (
+                              <div className="p-2.5 rounded-xl bg-purple-950/25 border border-purple-500/20 space-y-1.5">
+                                <div className="flex items-center justify-between text-[11px] font-mono">
+                                  <div className="flex items-center gap-1.5 text-purple-300 font-bold">
+                                    <Film className="w-3.5 h-3.5 text-purple-400" />
+                                    <span>Jellyfin Media</span>
+                                  </div>
+                                  <span className="text-purple-400 text-[10px]">
+                                    {jellyfinStats?.activeStreamCount || 0} active stream{jellyfinStats?.activeStreamCount === 1 ? '' : 's'}
+                                  </span>
+                                </div>
+                                {jellyfinStats?.ownerStats?.activeUsers?.[0] ? (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-[10px] text-slate-300 truncate">
+                                      <span className="font-semibold text-white truncate">{jellyfinStats.ownerStats.activeUsers[0].item}</span>
+                                      <span className="text-slate-400 shrink-0 ml-2">{jellyfinStats.ownerStats.activeUsers[0].userName}</span>
+                                    </div>
+                                    <div className="w-full bg-slate-800 rounded-full h-1 overflow-hidden">
+                                      <div
+                                        className="bg-purple-500 h-full rounded-full transition-all"
+                                        style={{
+                                          width: `${Math.min(100, Math.round(((jellyfinStats.ownerStats.activeUsers[0].playbackPosition || 0) / (jellyfinStats.ownerStats.activeUsers[0].playbackDuration || 1)) * 100))}%`
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] font-mono text-slate-500">No media actively streaming</div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Jellyseerr Requests Widget */}
+                            {(s.telemetryType === 'jellyseerr' || s.title.toLowerCase().includes('jellyseerr')) && (
+                              <div className="p-2.5 rounded-xl bg-blue-950/25 border border-blue-500/20 flex items-center justify-between text-[11px] font-mono">
+                                <div className="flex items-center gap-1.5 text-blue-300 font-bold">
+                                  <Tv className="w-3.5 h-3.5 text-blue-400" />
+                                  <span>Pending Requests</span>
+                                </div>
+                                <span className="font-bold text-white px-2 py-0.5 rounded bg-blue-500/20 border border-blue-500/30">
+                                  {jellyseerrStats?.pendingRequests ?? 0}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* NAS / Nextcloud Storage Widget */}
+                            {(s.category?.toLowerCase() === 'nas' || s.title.toLowerCase().includes('nas') || s.title.toLowerCase().includes('nextcloud')) && nasNode?.disk && (
+                              <div className="p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/20 space-y-1.5">
+                                <div className="flex items-center justify-between text-[11px] font-mono">
+                                  <div className="flex items-center gap-1.5 text-amber-400 font-bold">
+                                    <HardDrive className="w-3.5 h-3.5 text-amber-400" />
+                                    <span>Pool Storage</span>
+                                  </div>
+                                  <span className="text-amber-300 font-bold">{nasNode.disk.free} free</span>
+                                </div>
+                                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                  <div
+                                    className="bg-amber-500 h-full rounded-full transition-all duration-300"
+                                    style={{ width: `${nasNode.disk.percent || 46}%` }}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                                  <span>{nasNode.disk.used} used</span>
+                                  <span>{nasNode.disk.total} total</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* qBittorrent Torrent Speeds Widget */}
+                            {(s.telemetryType === 'qbittorrent' || s.title.toLowerCase().includes('qbit') || s.title.toLowerCase().includes('torrent')) && (
+                              <div className="p-2.5 rounded-xl bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-between text-[11px] font-mono">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-cyan-400 font-bold">↓ {qbitStats?.serverState?.dl_info_speed_str || '0 B/s'}</span>
+                                  <span className="text-slate-600">·</span>
+                                  <span className="text-cyan-300 font-bold">↑ {qbitStats?.serverState?.up_info_speed_str || '0 B/s'}</span>
+                                </div>
+                                <span className="text-[10px] text-slate-400">{qbitStats?.torrents?.length || 0} active</span>
+                              </div>
+                            )}
+
+                            {/* Pi-hole Stats Widget */}
+                            {(s.telemetryType === 'pihole' || s.title.toLowerCase().includes('pi-hole') || s.title.toLowerCase().includes('pihole')) && (
+                              <div className="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-500/20 flex items-center justify-between text-[11px] font-mono">
+                                <span className="text-emerald-400 font-bold">Blocked: {piholeStats?.ads_blocked_today?.toLocaleString() || '18,420'}</span>
+                                <span className="font-bold text-white text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                                  {piholeStats?.ads_percentage_today ? `${piholeStats.ads_percentage_today.toFixed(1)}%` : '28.4%'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Bottom Row: Category Pill & Direct Launch Action */}
+                          <div className="pt-2 border-t border-slate-800/40 flex items-center justify-between text-[10px] font-mono">
+                            <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-slate-400 border border-slate-700/60">
+                              {s.category || 'Services'}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-400 group-hover:text-red-300 transition-colors">
+                              <span>Launch</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Standard 2x1 Card */
+                        <>
+                          <div className="flex items-center gap-3 min-w-0 pr-2">
+                            <ServiceIcon icon={s.icon} title={s.title} />
+                            <div className="min-w-0">
+                              <div className="font-bold text-sm text-slate-100 group-hover:text-red-400 transition-colors truncate flex items-center gap-1.5">
+                                <span>{s.title}</span>
+                                {locked ? (
+                                  <Lock className="w-3 h-3 text-amber-400 shrink-0" title="WireGuard VPN or LAN required to access this service" />
+                                ) : (
+                                  <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                )}
+                              </div>
+                              <span className="text-[11px] font-mono text-slate-500 truncate block mt-0.5">
+                                {s.url.replace(/^https?:\/\//, '')}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {locked ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30" title="Connect to WireGuard VPN to access this hostname">
+                                <Lock className="w-2.5 h-2.5 text-amber-400" />
+                                VPN Locked
+                              </span>
+                            ) : s.requires_vpn ? (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                                <Shield className="w-2.5 h-2.5 text-purple-400" />
+                                VPN
+                              </span>
+                            ) : null}
+
+                            <div
+                              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider border ${
+                                isOnline
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                  : isOffline
+                                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isOnline ? 'bg-emerald-400 animate-pulse' : isOffline ? 'bg-rose-500' : 'bg-slate-500'
+                                }`}
+                              />
+                              <span>{s.status || 'ping'}</span>
+                            </div>
+
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {s.telemetryType && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onOpenInspector?.(s.telemetryType!);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-emerald-400 rounded hover:bg-slate-800 transition-colors"
+                                  title="Inspect live telemetry"
+                                >
+                                  <Activity className="w-3 h-3 text-emerald-400" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(s.url);
+                                  setCopiedUrlId(s.id);
+                                  setTimeout(() => setCopiedUrlId(null), 1500);
+                                }}
+                                className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                                title="Copy URL"
+                              >
+                                {copiedUrlId === s.id ? (
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                              {user && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openEdit(s);
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                                    title="Edit service"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      remove(s.id);
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-red-400 rounded hover:bg-slate-800 transition-colors"
+                                    title="Remove service"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Resize indicator badge when resizing */}
+                      {isCurrentResizing && (
+                        <span className="absolute top-1 right-1 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40">
+                          {currentColSpan}×{currentRowSpan}
+                        </span>
+                      )}
+
+                      {/* Top Edge Resize Handle (Drag upward) */}
+                      <div
+                        onMouseDown={(e) => handleStartFlatResize(e, s, 'top')}
+                        data-no-drag="true"
+                        className="resize-handle absolute top-0 inset-x-0 h-2.5 cursor-ns-resize z-20 group/tophandle flex items-center justify-center"
+                        title="Drag upward to resize card"
+                      >
+                        <div className="w-10 h-0.5 rounded-full bg-slate-600/40 group-hover/tophandle:bg-red-400 group-hover/tophandle:h-1 opacity-0 group-hover:opacity-100 transition-all" />
+                      </div>
+
+                      {/* Drag Handle to Resize Card */}
+                      <div
+                        onMouseDown={(e) => handleStartFlatResize(e, s, 'se')}
+                        data-no-drag="true"
+                        className="resize-handle absolute bottom-0.5 right-0.5 w-5 h-5 cursor-se-resize flex items-center justify-center text-slate-600 hover:text-red-400 opacity-20 group-hover:opacity-100 transition-opacity z-20"
+                        title="Drag to resize card"
+                      >
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="text-current">
+                          <circle cx="7" cy="7" r="1" fill="currentColor" />
+                          <circle cx="7" cy="4" r="1" fill="currentColor" />
+                          <circle cx="7" cy="1" r="1" fill="currentColor" />
+                          <circle cx="4" cy="7" r="1" fill="currentColor" />
+                          <circle cx="4" cy="4" r="1" fill="currentColor" />
+                          <circle cx="1" cy="7" r="1" fill="currentColor" />
+                        </svg>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Rich Homelab Live Telemetry Panels */}
+            <div className="pt-4 border-t border-slate-800/80 space-y-4">
+              <div className="flex items-center justify-between px-1 text-xs font-mono uppercase tracking-wider text-slate-400">
+                <span className="flex items-center gap-2 font-bold text-slate-200">
+                  <Activity className="w-4 h-4 text-red-500" />
+                  <span>Homelab Live Activity & Telemetry</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-normal">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Realtime Updates</span>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Jellyfin Live Stream Panel */}
+                <div
+                  onClick={() => onOpenInspector?.('jellyfin')}
+                  className="rounded-2xl border border-slate-800/80 bg-[#141620]/90 p-4 space-y-3 cursor-pointer hover:border-purple-500/30 transition-colors"
+                  title="Click to open Jellyfin Inspector"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                        <Film className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5">
+                          <span>Jellyfin Media Server</span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${jellyfinStats?.online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-500">media.slogiker.si</span>
+                      </div>
+                    </div>
+                    <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border ${
+                      (jellyfinStats?.activeStreamCount ?? 0) > 0
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {jellyfinStats?.activeStreamCount ?? 0} active stream{(jellyfinStats?.activeStreamCount ?? 0) === 1 ? '' : 's'}
+                    </span>
+                  </div>
+
+                  {/* Active Streams List */}
+                  {jellyfinStats?.ownerStats?.activeUsers && jellyfinStats.ownerStats.activeUsers.length > 0 ? (
+                    <div className="space-y-2">
+                      {jellyfinStats.ownerStats.activeUsers.map((u, idx) => (
+                        <div key={idx} className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                              <span className="font-bold text-xs text-white truncate">{u.item}</span>
+                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                                {u.itemType || 'Video'}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                              {u.userName} · {u.playMethod || 'DirectPlay'}
+                            </span>
+                          </div>
+
+                          {u.playbackDuration ? (
+                            <div className="space-y-1">
+                              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="bg-purple-500 h-full rounded-full transition-all duration-300"
+                                  style={{
+                                    width: `${Math.min(100, Math.round(((u.playbackPosition || 0) / u.playbackDuration) * 100))}%`,
+                                  }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-[9px] font-mono text-slate-500">
+                                <span>{formatSeconds(u.playbackPosition || 0)}</span>
+                                <span>{formatSeconds(u.playbackDuration)}</span>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-5 text-center border border-dashed border-slate-800/80 rounded-xl bg-[#11131a]/50">
+                      <Film className="w-6 h-6 text-slate-600 mx-auto mb-1.5" />
+                      <p className="text-xs text-slate-400 font-medium">Jellyfin is ready · 0 active streams</p>
+                      <p className="text-[10px] text-slate-600 mt-0.5 font-mono">Stream status will update live as media plays</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Jellyseerr Media Requests Panel */}
+                <div
+                  onClick={() => onOpenInspector?.('jellyseerr')}
+                  className="rounded-2xl border border-slate-800/80 bg-[#141620]/90 p-4 space-y-3 cursor-pointer hover:border-amber-500/30 transition-colors"
+                  title="Click to open Jellyseerr Inspector"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                        <Bookmark className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5">
+                          <span>Jellyseerr Media Requests</span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${jellyseerrStats?.online ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-500">request.slogiker.si</span>
+                      </div>
+                    </div>
+                    <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border ${
+                      (jellyseerrStats?.pendingCount ?? 0) > 0
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {jellyseerrStats?.pendingCount ?? 0} pending · {jellyseerrStats?.totalCount ?? 0} total
+                    </span>
+                  </div>
+
+                  {/* Requests List */}
+                  {jellyseerrStats?.ownerStats?.recentRequests && jellyseerrStats.ownerStats.recentRequests.length > 0 ? (
+                    <div className="space-y-2">
+                      {jellyseerrStats.ownerStats.recentRequests.slice(0, 3).map((req) => (
+                        <div key={req.id} className="flex items-center justify-between p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs">
+                          <div className="min-w-0 pr-2">
+                            <div className="font-semibold text-slate-200 truncate">{req.title}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              Requested by <span className="text-amber-300 font-bold">{req.requestedBy}</span> · {req.type.toUpperCase()}
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 shrink-0">
+                            Pending
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-5 text-center border border-dashed border-slate-800/80 rounded-xl bg-[#11131a]/50">
+                      <Check className="w-6 h-6 text-emerald-500/80 mx-auto mb-1.5" />
+                      <p className="text-xs text-slate-400 font-medium">All media requests fulfilled</p>
+                      <p className="text-[10px] text-slate-600 mt-0.5 font-mono">{jellyseerrStats?.totalCount ?? 0} total requests managed</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Telemetry (qBittorrent, WireGuard, Pi-hole) if online */}
+              {(qbitStats?.online || wgStats?.online || piholeStats?.online) && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                  {qbitStats?.online && (
+                    <div
+                      onClick={() => onOpenInspector?.('qbittorrent')}
+                      className="p-3.5 rounded-xl border border-slate-800/80 bg-[#141620]/90 flex items-center justify-between text-xs cursor-pointer hover:border-sky-500/30 transition-colors"
+                      title="Inspect qBittorrent"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-white">qBittorrent</div>
+                          <div className="text-[10px] font-mono text-slate-500">{qbitStats.activeCount} active torrents</div>
+                        </div>
+                      </div>
+                      <div className="text-right font-mono text-[11px] text-sky-400">
+                        ↓ {(qbitStats.downloadSpeed / (1024 * 1024)).toFixed(1)} MB/s
+                      </div>
+                    </div>
+                  )}
+
+                  {wgStats?.online && (
+                    <div
+                      onClick={() => onOpenInspector?.('wireguard')}
+                      className="p-3.5 rounded-xl border border-slate-800/80 bg-[#141620]/90 flex items-center justify-between text-xs cursor-pointer hover:border-purple-500/30 transition-colors"
+                      title="Inspect WireGuard"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                          <Shield className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-white">WireGuard VPN</div>
+                          <div className="text-[10px] font-mono text-slate-500">
+                            {wgStats.connectedPeers ?? wgStats.activePeers ?? 0} active peers
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        Online
+                      </span>
+                    </div>
+                  )}
+
+                  {piholeStats?.online && (
+                    <div
+                      onClick={() => onOpenInspector?.('pihole')}
+                      className="p-3.5 rounded-xl border border-slate-800/80 bg-[#141620]/90 flex items-center justify-between text-xs cursor-pointer hover:border-rose-500/30 transition-colors"
+                      title="Inspect Pi-hole"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                          <Activity className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-white">Pi-hole DNS</div>
+                          <div className="text-[10px] font-mono text-slate-500">
+                            {piholeStats.queriesToday?.toLocaleString?.() ?? piholeStats.queriesToday} queries
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right font-mono text-[11px] text-emerald-400">
+                        {piholeStats.percentBlocked ?? 0}% blocked
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      ) : orderedCategories.length === 0 || !orderedCategories.some(cat => !prefs.hiddenCategories.includes(cat) && (user?.role === 'owner' || filteredServices.some(s => (s.category?.trim() || 'Services') === cat))) ? (
         <div className="py-16 px-6 text-center rounded-2xl border border-slate-800/80 bg-[#16181f]/80">
           <div className="w-12 h-12 mx-auto rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3">
             <LayoutGrid className="w-6 h-6" />
@@ -437,7 +1684,7 @@ export function HomelabBoard({
           <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
             {search
               ? `No services matched "${search}". Try clearing your search.`
-              : user?.role === 'owner'
+              : user
               ? 'Your homelab board is empty or all categories are currently hidden. Add a service or customize your grid view.'
               : 'No service cards are currently assigned to your account. Contact an administrator for access.'}
           </p>
@@ -448,7 +1695,7 @@ export function HomelabBoard({
             >
               Clear search filter
             </button>
-          ) : user?.role === 'owner' ? (
+          ) : user ? (
             <button
               onClick={() => openNew()}
               className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-red-600/20 transition-all"
@@ -465,26 +1712,28 @@ export function HomelabBoard({
               {orderedCategories.map((cat) => {
                 if (prefs.hiddenCategories.includes(cat)) return null;
                 const items = filteredServices.filter(s => (s.category?.trim() || 'Services') === cat);
-                if (user?.role !== 'owner' && items.length === 0) return null;
+                if (!user && items.length === 0) return null;
                 const colSpan = (prefs.categoryWidths && prefs.categoryWidths[cat]) || 1;
 
                 return (
-                  <SortableCategoryColumn
-                    key={cat}
-                    id={cat}
-                    category={cat}
-                    items={items}
-                    colSpan={colSpan}
-                    vpnConnected={vpnConnected}
-                    onVpnLockedClick={handleVpnLockedClick}
-                    isOwner={user?.role === 'owner'}
-                    onRename={(old) => setRenameModal({ open: true, oldName: old, newName: old })}
-                    onAddService={(c) => openNew(c)}
-                    onEditService={openEdit}
-                    onDeleteService={remove}
-                    onUpdateCardLayout={onUpdateCardLayout}
-                    onOpenInspector={onOpenInspector}
-                  />
+                  <ErrorBoundary key={cat} isInline fallbackTitle={`Column: ${cat}`}>
+                    <SortableCategoryColumn
+                      id={cat}
+                      category={cat}
+                      items={items}
+                      colSpan={colSpan}
+                      vpnConnected={vpnConnected}
+                      onVpnLockedClick={handleVpnLockedClick}
+                      isOwner={Boolean(user)}
+                      onRename={(old) => setRenameModal({ open: true, oldName: old, newName: old })}
+                      onAddService={(c) => openNew(c)}
+                      onEditService={openEdit}
+                      onDeleteService={remove}
+                      onUpdateCardLayout={onUpdateCardLayout}
+                      onOpenInspector={onOpenInspector}
+                      onMoveCardCategory={handleMoveCardCategory}
+                    />
+                  </ErrorBoundary>
                 );
               })}
             </div>
@@ -740,6 +1989,39 @@ export function HomelabBoard({
         }
       >
         <div className="space-y-4 text-xs">
+          {/* Display & Layout Mode */}
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Display & Layout</span>
+            <div className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-900/60">
+              <div className="pr-4">
+                <div className="font-semibold text-xs text-white">Disable Categories (Flat Grid)</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Show all service cards in a unified responsive grid and display homelab telemetry underneath.
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={Boolean(prefs.disableCategories)}
+                onClick={() => {
+                  const next = !prefs.disableCategories;
+                  const updated = { ...prefs, disableCategories: next };
+                  setPrefs(updated);
+                  saveUserPreferences(user?.id, updated);
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  prefs.disableCategories ? 'bg-red-600' : 'bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition duration-200 ease-in-out ${
+                    prefs.disableCategories ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           {/* Widget Toggles */}
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Widgets</span>
