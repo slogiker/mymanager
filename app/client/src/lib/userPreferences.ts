@@ -15,6 +15,7 @@ export interface UserPreferences {
     nodes: boolean;
     notes: boolean;
     qbittorrent?: boolean;
+    speedtest?: boolean;
   };
 }
 
@@ -33,6 +34,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     nodes: true,
     notes: true,
     qbittorrent: true,
+    speedtest: true,
   },
 };
 
@@ -57,6 +59,7 @@ export function getUserPreferences(userId?: number): UserPreferences {
         nodes: parsed.widgetVisible.nodes !== false,
         notes: parsed.widgetVisible.notes !== false,
         qbittorrent: parsed.widgetVisible.qbittorrent !== false,
+        speedtest: parsed.widgetVisible.speedtest !== false,
       } : DEFAULT_PREFERENCES.widgetVisible,
     };
   } catch {
@@ -85,6 +88,7 @@ export async function syncUserPreferencesFromBackend(userId?: number): Promise<U
           nodes: remote.widgetVisible.nodes !== false,
           notes: remote.widgetVisible.notes !== false,
           qbittorrent: remote.widgetVisible.qbittorrent !== false,
+          speedtest: remote.widgetVisible.speedtest !== false,
         } : DEFAULT_PREFERENCES.widgetVisible,
       };
       localStorage.setItem(`mymanager_user_prefs_${userId}`, JSON.stringify(merged));

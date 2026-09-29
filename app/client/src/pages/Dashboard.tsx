@@ -236,9 +236,14 @@ export default function DashboardPage() {
   const handleRunSpeedtest = async () => {
     setRunningSpeedtest(true);
     try {
-      const res = await api.post<SpeedtestResult>('/admin/speedtest/run', {});
+      const res = await api.post<SpeedtestResult>('/speedtest/run', {});
       setSpeedtest(res);
     } catch {
+      // Fallback for older admin endpoint if needed
+      try {
+        const fallback = await api.post<SpeedtestResult>('/admin/speedtest/run', {});
+        setSpeedtest(fallback);
+      } catch {}
     } finally {
       setRunningSpeedtest(false);
     }

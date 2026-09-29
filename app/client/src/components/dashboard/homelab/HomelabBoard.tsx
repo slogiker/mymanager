@@ -70,7 +70,7 @@ import {
 import { useAuth } from '../../../hooks/useAuth';
 import { getUserPreferences, saveUserPreferences, UserPreferences } from '../../../lib/userPreferences';
 import { api } from '../../../lib/api';
-import { TimeWidget, NotesWidget, MultiServerNodesWidget, QbittorrentWidget } from '../widgets';
+import { TimeWidget, NotesWidget, MultiServerNodesWidget, QbittorrentWidget, SpeedtestWidget } from '../widgets';
 import { Modal, Field, ErrBox, ServiceIcon } from '../common';
 import { SortableCategoryColumn } from './SortableCategoryColumn';
 
@@ -779,15 +779,30 @@ export function HomelabBoard({
         />
       )}
 
-      {/* Top Widgets: Time and Quick Notes */}
+      {/* Top Widgets: Time, Speedtest, and Quick Notes */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {prefs.widgetVisible?.clock !== false && (
           <div className="col-span-1">
             <TimeWidget uptime={hostNode?.uptime} />
           </div>
         )}
+        {prefs.widgetVisible?.speedtest !== false && (
+          <div className="col-span-1">
+            <SpeedtestWidget
+              speedtest={speedtest}
+              onRunSpeedtest={onRunSpeedtest}
+              isRunningSpeedtest={isRunningSpeedtest}
+            />
+          </div>
+        )}
         {prefs.widgetVisible?.notes !== false && (
-          <div className={prefs.widgetVisible?.clock !== false ? 'col-span-1 md:col-span-2' : 'col-span-1 md:col-span-3'}>
+          <div className={
+            prefs.widgetVisible?.clock !== false && prefs.widgetVisible?.speedtest !== false
+              ? 'col-span-1'
+              : (prefs.widgetVisible?.clock !== false || prefs.widgetVisible?.speedtest !== false)
+              ? 'col-span-1 md:col-span-2'
+              : 'col-span-1 md:col-span-3'
+          }>
             <NotesWidget />
           </div>
         )}
@@ -2034,12 +2049,12 @@ export function HomelabBoard({
           {/* Widget Toggles */}
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Widgets</span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               <button
                 type="button"
                 onClick={() => {
                   const val = prefs.widgetVisible?.clock !== false;
-                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true }), clock: !val } };
+                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true, speedtest: true }), clock: !val } };
                   setPrefs(updated);
                   saveUserPreferences(user?.id, updated);
                 }}
@@ -2054,8 +2069,24 @@ export function HomelabBoard({
               <button
                 type="button"
                 onClick={() => {
+                  const val = prefs.widgetVisible?.speedtest !== false;
+                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true, speedtest: true }), speedtest: !val } };
+                  setPrefs(updated);
+                  saveUserPreferences(user?.id, updated);
+                }}
+                className={`p-2.5 rounded-xl border text-center transition-all ${
+                  prefs.widgetVisible?.speedtest !== false
+                    ? 'bg-red-600/10 border-red-500/40 text-white font-bold'
+                    : 'bg-slate-900 border-slate-800 text-slate-500'
+                }`}
+              >
+                Speedtest
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   const val = prefs.widgetVisible?.notes !== false;
-                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true }), notes: !val } };
+                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true, speedtest: true }), notes: !val } };
                   setPrefs(updated);
                   saveUserPreferences(user?.id, updated);
                 }}
@@ -2071,7 +2102,7 @@ export function HomelabBoard({
                 type="button"
                 onClick={() => {
                   const val = prefs.widgetVisible?.nodes !== false;
-                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true }), nodes: !val } };
+                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true, speedtest: true }), nodes: !val } };
                   setPrefs(updated);
                   saveUserPreferences(user?.id, updated);
                 }}
@@ -2087,7 +2118,7 @@ export function HomelabBoard({
                 type="button"
                 onClick={() => {
                   const val = prefs.widgetVisible?.qbittorrent !== false;
-                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true }), qbittorrent: !val } };
+                  const updated = { ...prefs, widgetVisible: { ...(prefs.widgetVisible || { clock: true, nodes: true, notes: true, qbittorrent: true, speedtest: true }), qbittorrent: !val } };
                   setPrefs(updated);
                   saveUserPreferences(user?.id, updated);
                 }}
