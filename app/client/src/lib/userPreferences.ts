@@ -18,6 +18,7 @@ export interface UserPreferences {
     speedtest?: boolean;
   };
   widgetSizes?: Record<string, { colSpan: number; rowSpan: number }>;
+  widgetLayouts?: Record<string, { startCol: number; startRow: number; colSpan: number; rowSpan: number }>;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -38,10 +39,18 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     speedtest: true,
   },
   widgetSizes: {
+    nodes: { colSpan: 8, rowSpan: 2 },
     qbittorrent: { colSpan: 2, rowSpan: 1 },
     speedtest: { colSpan: 2, rowSpan: 1 },
     clock: { colSpan: 2, rowSpan: 1 },
     notes: { colSpan: 2, rowSpan: 1 },
+  },
+  widgetLayouts: {
+    nodes: { startCol: 0, startRow: 0, colSpan: 8, rowSpan: 2 },
+    qbittorrent: { startCol: 0, startRow: 2, colSpan: 2, rowSpan: 1 },
+    speedtest: { startCol: 2, startRow: 2, colSpan: 2, rowSpan: 1 },
+    clock: { startCol: 4, startRow: 2, colSpan: 2, rowSpan: 1 },
+    notes: { startCol: 6, startRow: 2, colSpan: 2, rowSpan: 1 },
   },
 };
 
@@ -72,6 +81,10 @@ export function getUserPreferences(userId?: number): UserPreferences {
         ...DEFAULT_PREFERENCES.widgetSizes,
         ...parsed.widgetSizes,
       } : DEFAULT_PREFERENCES.widgetSizes,
+      widgetLayouts: typeof parsed.widgetLayouts === 'object' && parsed.widgetLayouts ? {
+        ...DEFAULT_PREFERENCES.widgetLayouts,
+        ...parsed.widgetLayouts,
+      } : DEFAULT_PREFERENCES.widgetLayouts,
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -105,6 +118,10 @@ export async function syncUserPreferencesFromBackend(userId?: number): Promise<U
           ...DEFAULT_PREFERENCES.widgetSizes,
           ...remote.widgetSizes,
         } : DEFAULT_PREFERENCES.widgetSizes,
+        widgetLayouts: typeof remote.widgetLayouts === 'object' && remote.widgetLayouts ? {
+          ...DEFAULT_PREFERENCES.widgetLayouts,
+          ...remote.widgetLayouts,
+        } : DEFAULT_PREFERENCES.widgetLayouts,
       };
       localStorage.setItem(`mymanager_user_prefs_${userId}`, JSON.stringify(merged));
       window.dispatchEvent(new CustomEvent('mymanager_prefs_changed', { detail: merged }));

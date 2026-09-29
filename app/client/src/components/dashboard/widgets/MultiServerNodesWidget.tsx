@@ -21,6 +21,8 @@ export interface MultiServerNodesWidgetProps {
   isAdmin?: boolean;
   onRunSpeedtest?: () => void;
   isRunningSpeedtest?: boolean;
+  colSpan?: number;
+  rowSpan?: number;
 }
 
 export function MultiServerNodesWidget({
@@ -32,6 +34,8 @@ export function MultiServerNodesWidget({
   isAdmin,
   onRunSpeedtest,
   isRunningSpeedtest,
+  colSpan = 8,
+  rowSpan = 2,
 }: MultiServerNodesWidgetProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [adminViewMode, setAdminViewMode] = useState<'cards' | 'text'>('cards');
@@ -222,7 +226,7 @@ export function MultiServerNodesWidget({
           </div>
         </div>
       ) : (
-        <div className={`grid grid-cols-1 sm:grid-cols-2 ${speedtest ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3.5`}>
+        <div className={`grid grid-cols-1 ${colSpan <= 4 ? 'sm:grid-cols-2' : speedtest ? 'sm:grid-cols-2 lg:grid-cols-5' : 'sm:grid-cols-2 lg:grid-cols-4'} gap-3.5`}>
         {nodes.map((node) => {
           const isOnline = node.status === 'online';
           const isPironman = node.id.includes('136');

@@ -9,7 +9,7 @@ export const GRID_CONSTANTS = {
 } as const;
 
 export interface CardPosition {
-  id: number;
+  id: number | string;
   startCol: number; // 0-indexed (0 to COLS - 1)
   startRow: number; // 0-indexed (0 to MAX_ROWS - 1)
   colSpan: number;

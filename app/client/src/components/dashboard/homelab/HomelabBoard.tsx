@@ -761,25 +761,7 @@ export function HomelabBoard({
 
   return (
     <div className="space-y-8">
-      {/* Cluster Telemetry Row: Only visible to Owner/Admin */}
-      {user?.role === 'owner' && prefs.widgetVisible?.nodes !== false && (
-        <MultiServerNodesWidget
-          nodes={nodes}
-          loading={loadingNodes}
-          speedtest={speedtest}
-          serverGauges={prefs.serverGauges}
-          onUpdateServerGauges={(updated) => {
-            const next = { ...prefs, serverGauges: updated };
-            setPrefs(next);
-            saveUserPreferences(user?.id, next);
-          }}
-          isAdmin={true}
-          onRunSpeedtest={onRunSpeedtest}
-          isRunningSpeedtest={isRunningSpeedtest}
-        />
-      )}
-
-      {/* Top Widgets Dynamic Super-Grid (Resizable 8-Column Flat Grid) */}
+      {/* Top Widgets Dynamic Super-Grid with Cluster Nodes & Free Drag-and-Drop */}
       <TopWidgetsGrid
         prefs={prefs}
         onUpdatePrefs={setPrefs}
@@ -790,6 +772,15 @@ export function HomelabBoard({
         isRunningSpeedtest={isRunningSpeedtest}
         qbitStats={qbitStats}
         onOpenInspector={onOpenInspector}
+        nodes={nodes}
+        loadingNodes={loadingNodes}
+        isAdmin={user?.role === 'owner'}
+        serverGauges={prefs.serverGauges}
+        onUpdateServerGauges={(updated) => {
+          const next = { ...prefs, serverGauges: updated };
+          setPrefs(next);
+          saveUserPreferences(user?.id, next);
+        }}
       />
 
       {/* Search & Grid Controls */}
