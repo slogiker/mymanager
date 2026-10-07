@@ -1,29 +1,19 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Download,
-  File,
-  Folder,
   AlertTriangle,
   ArrowLeft,
   Clock,
-  RotateCw,
-  Hourglass,
-  Edit2,
-  Save,
-  XCircle,
-  Upload,
-  Check,
-  Music,
   ShieldCheck,
   Eye,
-  Copy,
-  ExternalLink
 } from 'lucide-react';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
-import DocumentViewer, { type DocumentData } from '../components/files/DocumentViewer';
-import { FileIcon } from '../components/files/fileIcons';
+import { type DocumentData } from '../components/files/DocumentViewer';
+import {
+  ShareExpiredView,
+  ShareClipView,
+  ShareFileView,
+  ShareFolderView,
+} from '../components/share';
 
 interface SharedFile {
   id: number;
@@ -104,7 +94,7 @@ export default function SharePage() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Ask for share again feedback
+  // Ask for share feedback
   const [askCopied, setAskCopied] = useState(false);
 
   const fetchShareData = () => {
@@ -177,7 +167,6 @@ export default function SharePage() {
     fetchShareData();
   }, [token]);
 
-  // Handle saving edited text file
   const handleSaveContent = async () => {
     if (!token || !data?.file) return;
     setSavingContent(true);
@@ -197,7 +186,6 @@ export default function SharePage() {
     }
   };
 
-  // Handle uploading into shared folder
   const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !token) return;
@@ -227,7 +215,6 @@ export default function SharePage() {
     }
   };
 
-  // "Ask for share again" button handler
   const handleAskForShare = () => {
     const itemName = expiredData?.item_name || 'the shared item';
     const expDate = expiredData?.expires_at ? new Date(expiredData.expires_at).toLocaleString() : 'recently';
@@ -244,74 +231,22 @@ export default function SharePage() {
       <div className="min-h-screen bg-[#111216] text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 border-red-500 border-t-transparent animate-spin" />
-          <p className="text-xs text-slate-400">Loading shared content…</p>
+          <p className="text-xs text-slate-400">Loading shared content...</p>
         </div>
       </div>
     );
   }
 
-  // CUSTOM EXPIRED LINK SITE
   if (expiredData?.expired) {
     return (
-      <div className="min-h-screen bg-[#111216] text-white flex flex-col items-center justify-center p-6 text-center select-none">
-        <div className="w-full max-w-md bg-[#17181e] border border-white/10 rounded-2xl shadow-2xl p-8 text-center relative overflow-hidden">
-          <div className="absolute -top-16 -right-16 w-32 h-32 bg-red-600/10 rounded-full blur-2xl pointer-events-none" />
-
-          {/* Hourglass Icon */}
-          <div className="w-20 h-20 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 mx-auto mb-5 shadow-xl shadow-red-500/10">
-            <Hourglass size={36} className="animate-pulse" />
-          </div>
-
-          <h2 className="text-2xl font-bold text-white mb-2">Share Link Has Expired</h2>
-          <p className="text-xs text-slate-400 mb-6 max-w-sm mx-auto leading-relaxed">
-            The owner set this link to expire on{' '}
-            <span className="text-slate-200 font-semibold">
-              {expiredData.expires_at ? new Date(expiredData.expires_at).toLocaleString() : 'a previous date'}
-            </span>
-            . For security reasons, the requested content is no longer accessible with this link.
-          </p>
-
-          {/* Item details card */}
-          <div className="p-3.5 bg-white/[0.03] border border-white/10 rounded-xl mb-6 flex items-center gap-3 text-left">
-            <div className="w-10 h-10 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 flex items-center justify-center text-base shrink-0">
-              {expiredData.type === 'folder' ? <Folder size={20} /> : <FileIcon fileName={expiredData.item_name} size={20} />}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-slate-200 truncate">{expiredData.item_name}</p>
-              <p className="text-[11px] text-slate-500">Access window closed</p>
-            </div>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 font-semibold shrink-0">
-              Expired
-            </span>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex flex-col gap-2.5">
-            <button
-              onClick={handleAskForShare}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs shadow-lg shadow-red-600/30 transition-all"
-            >
-              {askCopied ? <Check size={14} className="text-emerald-300" /> : <RotateCw size={14} />}
-              <span>{askCopied ? 'Request copied to clipboard!' : 'Ask for share again'}</span>
-            </button>
-            {askCopied && (
-              <p className="text-[11px] text-emerald-400 animate-fadeIn">
-                Ready to paste! Send this message to the owner to request a renewed link.
-              </p>
-            )}
-            <Link
-              to="/"
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all"
-            >
-              <ArrowLeft size={14} /> Back to Dashboard
-            </Link>
-          </div>
-        </div>
-      </div>
+      <ShareExpiredView
+        expiredData={expiredData}
+        askCopied={askCopied}
+        onAskForShare={handleAskForShare}
+      />
     );
   }
 
-  // Generic Error Page
   if (error || !data) {
     return (
       <div className="min-h-screen bg-[#111216] text-white flex flex-col items-center justify-center p-6 text-center">
@@ -344,7 +279,6 @@ export default function SharePage() {
         </Link>
 
         <div className="flex items-center gap-3">
-          {/* Permission Badge */}
           <div className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border bg-white/5 border-white/10">
             {isEditor ? (
               <>
@@ -359,7 +293,6 @@ export default function SharePage() {
             )}
           </div>
 
-          {/* Expiration badge */}
           {data.expires_at && (
             <div className="flex items-center gap-1.5 text-xs text-amber-400/90 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
               <Clock size={12} /> Expires: {new Date(data.expires_at).toLocaleDateString()}
@@ -370,320 +303,41 @@ export default function SharePage() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-6 md:p-10 flex flex-col">
-        {/* Shared Clipboard Snippet View */}
         {data.type === 'clip' && data.clip && (
-          <div className="flex flex-col flex-1 gap-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-              <div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-red-600/20 text-red-400 border border-red-500/30">
-                    Shared Snippet
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    {new Date(data.clip.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </span>
-                </div>
-                <h2 className="text-2xl font-bold text-white">
-                  {data.clip.title || 'Shared Clipboard Item'}
-                </h2>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {data.clip.content && (
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(data.clip!.content!);
-                      setAskCopied(true);
-                      setTimeout(() => setAskCopied(false), 2000);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
-                  >
-                    {askCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                    <span>{askCopied ? 'Copied' : 'Copy Content'}</span>
-                  </button>
-                )}
-                {data.clip.file_path && (
-                  <a
-                    href={data.clip.file_path}
-                    download={data.clip.filename || true}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-lg shadow-red-600/30 transition-all"
-                  >
-                    <Download size={14} /> Download Attachment
-                  </a>
-                )}
-              </div>
-            </div>
-
-            {/* Content area */}
-            <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6 space-y-5">
-              {data.clip.type === 'link' && data.clip.content && (
-                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <span className="text-blue-400 break-all text-sm">{data.clip.content}</span>
-                  <a
-                    href={data.clip.content}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shrink-0"
-                  >
-                    Open Link <ExternalLink size={13} />
-                  </a>
-                </div>
-              )}
-
-              {data.clip.type === 'code' && data.clip.content && (
-                <div className="rounded-xl overflow-hidden border border-slate-800 bg-[#08090d]">
-                  <pre className="p-4 font-mono text-xs text-emerald-300 leading-relaxed overflow-x-auto selection:bg-emerald-500/20">
-                    <code>{data.clip.content}</code>
-                  </pre>
-                </div>
-              )}
-
-              {data.clip.type !== 'code' && data.clip.type !== 'link' && data.clip.content && (
-                <div className="text-slate-200 text-sm whitespace-pre-wrap leading-relaxed select-text">
-                  {data.clip.content}
-                </div>
-              )}
-
-              {data.clip.file_path && data.clip.mime_type?.startsWith('image/') && (
-                <div className="pt-2">
-                  <p className="text-xs font-semibold text-slate-400 mb-2">Attached Image:</p>
-                  <img
-                    src={data.clip.file_path}
-                    alt={data.clip.filename || 'Shared snippet image'}
-                    className="max-h-[550px] max-w-full rounded-xl object-contain border border-slate-800 bg-black/40"
-                  />
-                </div>
-              )}
-
-              {data.clip.file_path && !data.clip.mime_type?.startsWith('image/') && (
-                <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-                  <div className="flex items-center gap-3">
-                    <File size={22} className="text-amber-400" />
-                    <span className="text-sm font-medium text-slate-200">{data.clip.filename || 'Attached file'}</span>
-                  </div>
-                  <a
-                    href={data.clip.file_path}
-                    download={data.clip.filename || true}
-                    className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5"
-                  >
-                    <Download size={13} /> Download
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
+          <ShareClipView clip={data.clip} />
         )}
 
-        {/* Single File View */}
         {isFile && data.file && (
-          <div className="flex flex-col flex-1 gap-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 shrink-0 flex items-center justify-center">
-                  <FileIcon fileName={data.file.original_name} mimeType={data.file.mime_type} size={24} />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-xl md:text-2xl font-bold text-slate-100 truncate">{data.file.original_name}</h1>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {formatSize(data.file.size)} &middot; Shared via mymanager
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {isEditor && fileContent !== null && !isEditing && (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm transition-all"
-                  >
-                    <Edit2 size={15} /> Edit File
-                  </button>
-                )}
-
-                {isEditing && (
-                  <>
-                    <button
-                      onClick={handleSaveContent}
-                      disabled={savingContent}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-all"
-                    >
-                      <Save size={15} /> {savingContent ? 'Saving…' : 'Save'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingContent(fileContent ?? '');
-                        setIsEditing(false);
-                      }}
-                      className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-sm transition-all"
-                    >
-                      <XCircle size={15} /> Cancel
-                    </button>
-                  </>
-                )}
-
-                <a
-                  href={downloadUrl}
-                  download={data.file.original_name}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-sm shadow-lg shadow-red-600/30 transition-all shrink-0"
-                >
-                  <Download size={16} /> Download
-                </a>
-              </div>
-            </div>
-
-            {/* Inline Previews & Editor */}
-            <div className="flex-1 rounded-2xl bg-slate-900/60 border border-slate-800 p-6 flex items-center justify-center min-h-[400px]">
-              {/* Text editor mode */}
-              {isEditing ? (
-                <textarea
-                  value={editingContent}
-                  onChange={e => setEditingContent(e.target.value)}
-                  className="w-full flex-1 min-h-[500px] bg-slate-900/90 border border-slate-700 rounded-xl p-4 text-xs font-mono text-slate-200 outline-none focus:border-red-500/50 resize-none leading-relaxed"
-                />
-              ) : (
-                <>
-                  {data.file.mime_type?.startsWith('image/') && (
-                    <img
-                      src={data.file.file_path}
-                      alt={data.file.original_name}
-                      className="max-h-[600px] max-w-full object-contain rounded-lg shadow-2xl"
-                    />
-                  )}
-
-                  {data.file.mime_type?.startsWith('video/') && (
-                    <video controls className="max-h-[600px] max-w-full rounded-lg shadow-2xl">
-                      <source src={data.file.file_path} type={data.file.mime_type} />
-                    </video>
-                  )}
-
-                  {data.file.mime_type?.startsWith('audio/') && (
-                    <div className="flex flex-col items-center gap-4 py-8">
-                      <Music size={48} className="text-pink-400 opacity-60" />
-                      <audio controls className="w-80">
-                        <source src={data.file.file_path} type={data.file.mime_type} />
-                      </audio>
-                    </div>
-                  )}
-
-                  {data.file.mime_type === 'application/pdf' && (
-                    <iframe
-                      src={data.file.file_path}
-                      className="w-full h-[650px] rounded-lg bg-white border border-slate-700"
-                      title={data.file.original_name}
-                    />
-                  )}
-
-                  {(isOfficeDoc(data.file.original_name) || isPresentation(data.file.original_name)) && (
-                    <div className="w-full">
-                      <DocumentViewer
-                        data={docData}
-                        loading={loadingDoc}
-                        fileName={data.file.original_name}
-                        fullscreen
-                      />
-                    </div>
-                  )}
-
-                  {data.file.original_name.endsWith('.md') && fileContent !== null && (
-                    <div
-                      className="prose prose-invert prose-sm max-w-none text-slate-200 w-full overflow-y-auto max-h-[600px]"
-                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(fileContent) as string) }}
-                    />
-                  )}
-
-                  {!data.file.original_name.endsWith('.md') && fileContent !== null && (
-                    <pre className="font-mono text-xs text-slate-300 whitespace-pre-wrap break-words w-full max-h-[600px] overflow-y-auto">
-                      {fileContent}
-                    </pre>
-                  )}
-
-                  {!data.file.mime_type?.startsWith('image/') &&
-                    !data.file.mime_type?.startsWith('video/') &&
-                    !data.file.mime_type?.startsWith('audio/') &&
-                    data.file.mime_type !== 'application/pdf' &&
-                    fileContent === null && (
-                      <div className="flex flex-col items-center gap-3 text-center py-12 text-slate-500">
-                        <FileIcon fileName={data.file.original_name} mimeType={data.file.mime_type} size={48} className="opacity-60" />
-                        <p className="text-sm">Preview not available for this file type.</p>
-                        <a href={downloadUrl} className="text-xs text-red-400 hover:underline">
-                          Download to view on your device
-                        </a>
-                      </div>
-                    )}
-                </>
-              )}
-            </div>
-          </div>
+          <ShareFileView
+            file={data.file}
+            isEditor={isEditor}
+            downloadUrl={downloadUrl}
+            fileContent={fileContent}
+            editingContent={editingContent}
+            setEditingContent={setEditingContent}
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            savingContent={savingContent}
+            onSaveContent={handleSaveContent}
+            docData={docData}
+            loadingDoc={loadingDoc}
+            formatSize={formatSize}
+            isOfficeDoc={isOfficeDoc}
+            isPresentation={isPresentation}
+          />
         )}
 
-        {/* Shared Folder View */}
         {isFolder && data.folder && (
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 rounded-xl bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center text-yellow-400 shrink-0">
-                  <Folder size={24} />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-xl md:text-2xl font-bold text-slate-100 truncate">{data.folder.name}</h1>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {data.files?.length || 0} file{data.files?.length !== 1 ? 's' : ''} &middot; Shared Folder
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {isEditor && (
-                  <>
-                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFolderUpload} />
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingFile}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm transition-all disabled:opacity-50"
-                    >
-                      <Upload size={16} /> {uploadingFile ? 'Uploading…' : 'Upload to Folder'}
-                    </button>
-                  </>
-                )}
-                <a
-                  href={downloadUrl}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-sm shadow-lg shadow-red-600/30 transition-all shrink-0"
-                >
-                  <Download size={16} /> Download All as ZIP
-                </a>
-              </div>
-            </div>
-
-            {/* Folder file list */}
-            <div className="divide-y divide-slate-800/80 bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
-              {data.files?.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-500">
-                  This shared folder is currently empty.{isEditor && ' Use the upload button above to add files.'}
-                </div>
-              ) : (
-                data.files?.map(file => (
-                  <div key={file.id} className="flex items-center justify-between gap-3 p-4 hover:bg-white/[0.02] transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FileIcon fileName={file.original_name} mimeType={file.mime_type} size={16} className="shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-200 truncate">{file.original_name}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">{formatSize(file.size)}</p>
-                      </div>
-                    </div>
-
-                    <a
-                      href={file.file_path}
-                      download={file.original_name}
-                      className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/10"
-                      title="Download individual file"
-                    >
-                      <Download size={15} />
-                    </a>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <ShareFolderView
+            folder={data.folder}
+            files={data.files}
+            isEditor={isEditor}
+            downloadUrl={downloadUrl}
+            uploadingFile={uploadingFile}
+            fileInputRef={fileInputRef}
+            onFolderUpload={handleFolderUpload}
+            formatSize={formatSize}
+          />
         )}
       </main>
     </div>

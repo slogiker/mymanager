@@ -5,6 +5,7 @@ import { FileItem } from './FileCard';
 import { FolderItem } from './FolderSidebar';
 import { useUpload } from '../../context/UploadContext';
 import { api } from '../../lib/api';
+import { useFileSelectionAndDnD } from './useFileSelectionAndDnD';
 import {
   BreadcrumbEntry,
   applySearch,
@@ -20,14 +21,9 @@ export function useFilesManager() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [allFiles, setAllFiles] = useState<FileItem[]>([]);
   const [pinnedFiles, setPinnedFiles] = useState<FileItem[]>([]);
-  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
-  const [lastSelectedId, setLastSelectedId] = useState<number | null>(null);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [showPreview, setShowPreview] = useState(true);
   const [previewWidth, setPreviewWidth] = useState(320);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [fullscreenId, setFullscreenId] = useState<number | null>(null);
-  const [activeFileId, setActiveFileId] = useState<number | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [creatingFile, setCreatingFile] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -337,116 +333,30 @@ export function useFilesManager() {
     document.body.removeChild(a);
   }
 
-  function handleSelectFile(id: number, e?: React.MouseEvent) {
-    if (e?.shiftKey && lastSelectedId !== null) {
-      const ids = displayFiles.map((f) => f.id);
-      const startIdx = ids.indexOf(lastSelectedId);
-      const endIdx = ids.indexOf(id);
-      if (startIdx !== -1 && endIdx !== -1) {
-        const min = Math.min(startIdx, endIdx);
-        const max = Math.max(startIdx, endIdx);
-        const range = ids.slice(min, max + 1);
-        setCheckedIds(new Set(range));
-      }
-      return;
-    }
-
-    if (e?.ctrlKey || e?.metaKey) {
-      setCheckedIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
-      setLastSelectedId(id);
-      return;
-    }
-
-    setSelectedId((prev) => (prev === id ? null : id));
-    setLastSelectedId(id);
-    if (!showPreview) setShowPreview(true);
-  }
-
-  function handleCheck(id: number, checked: boolean) {
-    setCheckedIds((prev) => {
-      const s = new Set(prev);
-      if (checked) s.add(id);
-      else s.delete(id);
-      return s;
-    });
-    setLastSelectedId(id);
-  }
-
-  async function handleBulkDelete() {
-    const ids = Array.from(checkedIds);
-    if (!ids.length) return;
-    if (!confirm(`Delete ${ids.length} file${ids.length > 1 ? 's' : ''}?`)) return;
-    try {
-      await api.delete(`/files?ids=${ids.join(',')}`);
-      setFiles((prev) => prev.filter((f) => !checkedIds.has(f.id)));
-      setAllFiles((prev) => prev.filter((f) => !checkedIds.has(f.id)));
-      setPinnedFiles((prev) => prev.filter((f) => !checkedIds.has(f.id)));
-      if (selectedId && checkedIds.has(selectedId)) setSelectedId(null);
-      setCheckedIds(new Set());
-    } catch {}
-  }
-
-  function handleBulkDownload() {
-    const toDownload = displayFiles.filter((f) => checkedIds.has(f.id));
-    toDownload.forEach((file, i) => {
-      setTimeout(() => {
-        const a = document.createElement('a');
-        a.href = file.file_path;
-        a.download = file.original_name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }, i * 150);
-    });
-  }
-
-  function handlePreviewSaved(id: number, size: number) {
-    const update = (prev: FileItem[]) =>
-      prev.map((f) => (f.id === id ? { ...f, size } : f));
-    setFiles(update);
-    setAllFiles(update);
-  }
-
-  function handleDragStart(event: DragStartEvent) {
-    const id = (event.active.data.current as { fileId: number })?.fileId;
-    setActiveFileId(id ?? null);
-  }
-
-  async function handleDragEnd(event: DragEndEvent) {
-    setActiveFileId(null);
-    const { active, over } = event;
-    if (!over) return;
-    const fileId = (active.data.current as { fileId: number })?.fileId;
-    if (!fileId) return;
-
-    const overId = String(over.id);
-    const targetFolderId =
-      overId === '__root__'
-        ? null
-        : overId.startsWith('card-')
-        ? overId.slice(5)
-        : overId.startsWith('breadcrumb-')
-        ? overId.slice(11)
-        : overId;
-
-    const idsToMove = checkedIds.has(fileId) ? Array.from(checkedIds) : [fileId];
-
-    try {
-      await Promise.all(
-        idsToMove.map((id) => api.patch(`/files/${id}/move`, { folder_id: targetFolderId }))
-      );
-      const movedSet = new Set(idsToMove);
-      setFiles((prev) => prev.filter((f) => !movedSet.has(f.id)));
-      setAllFiles((prev) => prev.filter((f) => !movedSet.has(f.id)));
-      if (selectedId && movedSet.has(selectedId)) setSelectedId(null);
-      if (checkedIds.has(fileId)) setCheckedIds(new Set());
-    } catch {}
-  }
+  const {
+    checkedIds,
+    setCheckedIds,
+    selectedId,
+    setSelectedId,
+    fullscreenId,
+    setFullscreenId,
+    activeFileId,
+    handleSelectFile,
+    handleCheck,
+    handleBulkDelete,
+    handleBulkDownload,
+    handleDragStart,
+    handleDragEnd,
+  } = useFileSelectionAndDnD({
+    displayFiles,
+    files,
+    setFiles,
+    allFiles,
+    setAllFiles,
+    setPinnedFiles,
+    showPreview,
+    setShowPreview,
+  });
 
   const selectedFile = useMemo(() => {
     if (selectedId === null) return null;

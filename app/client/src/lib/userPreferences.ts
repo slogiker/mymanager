@@ -16,9 +16,15 @@ export interface UserPreferences {
     notes: boolean;
     qbittorrent?: boolean;
     speedtest?: boolean;
+    pihole?: boolean;
+    wireguard?: boolean;
+    jellyfin?: boolean;
+    jellyseerr?: boolean;
   };
   widgetSizes?: Record<string, { colSpan: number; rowSpan: number }>;
   widgetLayouts?: Record<string, { startCol: number; startRow: number; colSpan: number; rowSpan: number }>;
+  syncThemeWithPironman?: boolean;
+  pironmanAccentColor?: string;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -27,6 +33,8 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   hiddenGauges: [],
   compactMode: false,
   disableCategories: false,
+  syncThemeWithPironman: false,
+  pironmanAccentColor: '#ef4444',
   categoryOrder: [],
   categoryWidths: {},
   customCategories: [],
@@ -37,6 +45,10 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     notes: true,
     qbittorrent: true,
     speedtest: true,
+    pihole: true,
+    wireguard: true,
+    jellyfin: true,
+    jellyseerr: true,
   },
   widgetSizes: {
     nodes: { colSpan: 8, rowSpan: 2 },
@@ -44,6 +56,10 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     speedtest: { colSpan: 2, rowSpan: 1 },
     clock: { colSpan: 2, rowSpan: 1 },
     notes: { colSpan: 2, rowSpan: 1 },
+    pihole: { colSpan: 2, rowSpan: 1 },
+    wireguard: { colSpan: 2, rowSpan: 1 },
+    jellyfin: { colSpan: 2, rowSpan: 1 },
+    jellyseerr: { colSpan: 2, rowSpan: 1 },
   },
   widgetLayouts: {
     nodes: { startCol: 0, startRow: 0, colSpan: 8, rowSpan: 2 },
@@ -51,6 +67,10 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     speedtest: { startCol: 2, startRow: 2, colSpan: 2, rowSpan: 1 },
     clock: { startCol: 4, startRow: 2, colSpan: 2, rowSpan: 1 },
     notes: { startCol: 6, startRow: 2, colSpan: 2, rowSpan: 1 },
+    pihole: { startCol: 0, startRow: 3, colSpan: 2, rowSpan: 1 },
+    wireguard: { startCol: 2, startRow: 3, colSpan: 2, rowSpan: 1 },
+    jellyfin: { startCol: 4, startRow: 3, colSpan: 2, rowSpan: 1 },
+    jellyseerr: { startCol: 6, startRow: 3, colSpan: 2, rowSpan: 1 },
   },
 };
 
@@ -76,6 +96,10 @@ export function getUserPreferences(userId?: number): UserPreferences {
         notes: parsed.widgetVisible.notes !== false,
         qbittorrent: parsed.widgetVisible.qbittorrent !== false,
         speedtest: parsed.widgetVisible.speedtest !== false,
+        pihole: parsed.widgetVisible.pihole !== false,
+        wireguard: parsed.widgetVisible.wireguard !== false,
+        jellyfin: parsed.widgetVisible.jellyfin !== false,
+        jellyseerr: parsed.widgetVisible.jellyseerr !== false,
       } : DEFAULT_PREFERENCES.widgetVisible,
       widgetSizes: typeof parsed.widgetSizes === 'object' && parsed.widgetSizes ? {
         ...DEFAULT_PREFERENCES.widgetSizes,
@@ -85,6 +109,8 @@ export function getUserPreferences(userId?: number): UserPreferences {
         ...DEFAULT_PREFERENCES.widgetLayouts,
         ...parsed.widgetLayouts,
       } : DEFAULT_PREFERENCES.widgetLayouts,
+      syncThemeWithPironman: Boolean(parsed.syncThemeWithPironman),
+      pironmanAccentColor: parsed.pironmanAccentColor || DEFAULT_PREFERENCES.pironmanAccentColor,
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -113,6 +139,10 @@ export async function syncUserPreferencesFromBackend(userId?: number): Promise<U
           notes: remote.widgetVisible.notes !== false,
           qbittorrent: remote.widgetVisible.qbittorrent !== false,
           speedtest: remote.widgetVisible.speedtest !== false,
+          pihole: remote.widgetVisible.pihole !== false,
+          wireguard: remote.widgetVisible.wireguard !== false,
+          jellyfin: remote.widgetVisible.jellyfin !== false,
+          jellyseerr: remote.widgetVisible.jellyseerr !== false,
         } : DEFAULT_PREFERENCES.widgetVisible,
         widgetSizes: typeof remote.widgetSizes === 'object' && remote.widgetSizes ? {
           ...DEFAULT_PREFERENCES.widgetSizes,
@@ -122,6 +152,8 @@ export async function syncUserPreferencesFromBackend(userId?: number): Promise<U
           ...DEFAULT_PREFERENCES.widgetLayouts,
           ...remote.widgetLayouts,
         } : DEFAULT_PREFERENCES.widgetLayouts,
+        syncThemeWithPironman: typeof remote.syncThemeWithPironman === 'boolean' ? remote.syncThemeWithPironman : Boolean(DEFAULT_PREFERENCES.syncThemeWithPironman),
+        pironmanAccentColor: remote.pironmanAccentColor || DEFAULT_PREFERENCES.pironmanAccentColor,
       };
       localStorage.setItem(`mymanager_user_prefs_${userId}`, JSON.stringify(merged));
       window.dispatchEvent(new CustomEvent('mymanager_prefs_changed', { detail: merged }));

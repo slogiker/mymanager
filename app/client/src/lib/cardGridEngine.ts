@@ -25,8 +25,8 @@ export interface FillerCell {
  * Checks if two cards collide in 2D grid space.
  */
 export function hasOverlap(
-  c1: { id?: number; startCol: number; startRow: number; colSpan: number; rowSpan: number },
-  c2: { id?: number; startCol: number; startRow: number; colSpan: number; rowSpan: number }
+  c1: { id?: number | string; startCol: number; startRow: number; colSpan: number; rowSpan: number },
+  c2: { id?: number | string; startCol: number; startRow: number; colSpan: number; rowSpan: number }
 ): boolean {
   if (c1.id !== undefined && c2.id !== undefined && c1.id === c2.id) {
     return false;

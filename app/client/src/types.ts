@@ -90,6 +90,8 @@ export interface WireguardStatus {
   error?: string;
 }
 
+export type WireguardStats = WireguardStatus;
+
 export interface PiholeStats {
   online: boolean;
   version?: string;

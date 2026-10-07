@@ -15,9 +15,10 @@ import {
 } from 'lucide-react';
 import { User } from '../../../../types';
 import { api } from '../../../../lib/api';
-import { Modal, ErrBox, Spinner } from '../../common/DashboardPrimitives';
+import { ErrBox, Spinner } from '../../common/DashboardPrimitives';
 import { ServicePermissionsGrid } from './ServicePermissionsGrid';
 import { FeatureFlagsGrid } from './FeatureFlagsGrid';
+import { CreateUserModal } from './CreateUserModal';
 
 export interface UsersTabProps {
   defaultSubTab?: 'accounts' | 'permissions' | 'features';
@@ -359,145 +360,17 @@ export function UsersTab({ defaultSubTab = 'accounts' }: UsersTabProps) {
           )}
 
           {/* Create User Modal */}
-          <Modal
+          <CreateUserModal
             open={modal}
             onClose={() => { setModal(false); setModalError(''); }}
-            title="Create User"
-            footer={
-              <>
-                <button
-                  onClick={() => { setModal(false); setModalError(''); }}
-                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submit}
-                  disabled={submitting}
-                  className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-semibold shadow-[0_0_15px_-3px_rgba(239,68,68,0.5)] transition-all disabled:opacity-50"
-                >
-                  {submitting ? 'Creating...' : 'Create User'}
-                </button>
-              </>
-            }
-          >
-            <form onSubmit={submit} className="space-y-4 text-xs">
-              <ErrBox msg={modalError} />
-
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-[11px] leading-relaxed">
-                Only <strong className="text-white">Username</strong> is required. Name and email can be left blank to default to the username handle.
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Username <span className="text-red-500 font-bold">*</span>
-                </label>
-                <input
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500 font-mono"
-                  required
-                  placeholder="e.g. johndoe"
-                  value={form.username}
-                  onChange={(e) => setForm(f => ({ ...f, username: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Full Name <span className="text-slate-500 font-normal">(Optional)</span>
-                </label>
-                <input
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
-                  placeholder="e.g. John Doe (defaults to username)"
-                  value={form.name}
-                  onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Email Address <span className="text-slate-500 font-normal">(Optional)</span>
-                </label>
-                <input
-                  type="email"
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
-                  placeholder="e.g. john@local.lan (defaults to username@local.lan)"
-                  value={form.email}
-                  onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Role
-                </label>
-                <select
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
-                  value={form.role}
-                  onChange={(e) => setForm(f => ({ ...f, role: e.target.value }))}
-                >
-                  <option value="user">User (Standard Access)</option>
-                  <option value="owner">Owner (Full Admin Access)</option>
-                </select>
-              </div>
-
-              {/* Password Options */}
-              <div className="pt-2 border-t border-slate-800/80 space-y-3">
-                <label className="block text-xs font-medium text-slate-300">
-                  Password Provisioning
-                </label>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, passwordMode: 'auto' }))}
-                    className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
-                      form.passwordMode === 'auto'
-                        ? 'bg-red-600/10 border-red-500/50 text-white'
-                        : 'bg-slate-900 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    <div className="font-semibold text-[11px]">Auto-Generate OTP</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">Secure one-time temporary password</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, passwordMode: 'custom' }))}
-                    className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
-                      form.passwordMode === 'custom'
-                        ? 'bg-red-600/10 border-red-500/50 text-white'
-                        : 'bg-slate-900 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    <div className="font-semibold text-[11px]">Set Custom Password</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">Define password right now</div>
-                  </button>
-                </div>
-
-                {form.passwordMode === 'custom' ? (
-                  <div className="relative pt-1">
-                    <input
-                      type={showCustomPwd ? 'text' : 'password'}
-                      className="w-full pl-3 pr-9 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-red-500 font-mono"
-                      placeholder="Enter password (minimum 6 characters)"
-                      value={form.password}
-                      onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCustomPwd(v => !v)}
-                      className="absolute right-3 top-3 text-slate-500 hover:text-slate-300"
-                    >
-                      {showCustomPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    A 12-character secure password will be generated and displayed upon creation. The user will be required to change it on their first login.
-                  </p>
-                )}
-              </div>
-            </form>
-          </Modal>
+            form={form}
+            setForm={setForm}
+            showCustomPwd={showCustomPwd}
+            setShowCustomPwd={setShowCustomPwd}
+            submitting={submitting}
+            modalError={modalError}
+            onSubmit={submit}
+          />
         </div>
       )}
     </div>

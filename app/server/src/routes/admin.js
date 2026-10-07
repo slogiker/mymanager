@@ -323,4 +323,83 @@ router.patch('/feature-flags', verifyToken, requireOwner, (req, res) => {
   }
 });
 
+// 6. Pironman 5 RGB & System Configuration
+router.get('/pironman/config', verifyToken, requireOwner, async (req, res) => {
+  try {
+    const response = await fetch('http://192.168.1.136:34001/api/v1.0/get-config', {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch Pironman config' });
+    }
+    const json = await response.json();
+    res.json(json.data?.system || json.data || {});
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Pironman unreachable' });
+  }
+});
+
+router.post('/pironman/rgb', verifyToken, requireOwner, async (req, res) => {
+  const { style, color, brightness, speed, enable } = req.body;
+  const baseUrl = 'http://192.168.1.136:34001/api/v1.0/';
+  const results = {};
+
+  try {
+    if (enable !== undefined) {
+      const r = await fetch(`${baseUrl}set-rgb-enable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enable: Boolean(enable) }),
+        signal: AbortSignal.timeout(3000),
+      });
+      results.enable = r.ok;
+    }
+
+    if (style !== undefined) {
+      const r = await fetch(`${baseUrl}set-rgb-style`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style: String(style) }),
+        signal: AbortSignal.timeout(3000),
+      });
+      results.style = r.ok;
+    }
+
+    if (color !== undefined) {
+      const col = color.startsWith('#') ? color : `#${color}`;
+      const r = await fetch(`${baseUrl}set-rgb-color`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ color: col }),
+        signal: AbortSignal.timeout(3000),
+      });
+      results.color = r.ok;
+    }
+
+    if (brightness !== undefined) {
+      const r = await fetch(`${baseUrl}set-rgb-brightness`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brightness: Math.min(100, Math.max(0, parseInt(brightness, 10))) }),
+        signal: AbortSignal.timeout(3000),
+      });
+      results.brightness = r.ok;
+    }
+
+    if (speed !== undefined) {
+      const r = await fetch(`${baseUrl}set-rgb-speed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ speed: Math.min(100, Math.max(0, parseInt(speed, 10))) }),
+        signal: AbortSignal.timeout(3000),
+      });
+      results.speed = r.ok;
+    }
+
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to update Pironman RGB settings' });
+  }
+});
+
 module.exports = router;

@@ -30,12 +30,11 @@ export function QbittorrentWidget({
   colSpan = 2,
   rowSpan = 1,
 }: QbittorrentWidgetProps) {
-  if (!data?.online) return null;
-
-  const torrents = data.torrents || [];
-  const activeCount = data.activeCount || torrents.length || 0;
-  const dlSpeed = data.downloadSpeed || 0;
-  const upSpeed = data.uploadSpeed || 0;
+  const isOnline = Boolean(data?.online);
+  const torrents = data?.torrents || [];
+  const activeCount = data?.activeCount || torrents.length || 0;
+  const dlSpeed = data?.downloadSpeed || 0;
+  const upSpeed = data?.uploadSpeed || 0;
   const topTorrent = torrents[0];
 
   const isCompact = colSpan === 1 && rowSpan === 1;
@@ -254,18 +253,24 @@ export function QbittorrentWidget({
           <div className="min-w-0">
             <div className="font-bold text-xs text-slate-100 group-hover:text-sky-400 transition-colors truncate flex items-center gap-1.5">
               <span>qBittorrent</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
             </div>
             <span className="text-[10px] font-mono text-slate-500 truncate block">
-              {activeCount} active · {formatBytes(data.downloadTotal || 0)}
+              {isOnline ? `${activeCount} active · ${formatBytes(data?.downloadTotal || 0)}` : 'Client unreachable'}
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-1 text-[11px] font-mono shrink-0">
-          <span className="text-sky-400 font-bold">↓ {formatSpeed(dlSpeed)}</span>
-          <span className="text-slate-600">·</span>
-          <span className="text-cyan-300 font-bold">↑ {formatSpeed(upSpeed)}</span>
+          {isOnline ? (
+            <>
+              <span className="text-sky-400 font-bold">↓ {formatSpeed(dlSpeed)}</span>
+              <span className="text-slate-600">·</span>
+              <span className="text-cyan-300 font-bold">↑ {formatSpeed(upSpeed)}</span>
+            </>
+          ) : (
+            <span className="text-slate-500 text-[10px]">Offline</span>
+          )}
           {onOpenInspector && (
             <button
               type="button"
@@ -295,8 +300,8 @@ export function QbittorrentWidget({
         </div>
       ) : (
         <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
-          <span>Transfer queue idle</span>
-          <span className="text-slate-600">Active</span>
+          <span>{isOnline ? 'Transfer queue idle' : 'No connection'}</span>
+          <span className={isOnline ? 'text-slate-600' : 'text-rose-500/80'}>{isOnline ? 'Active' : 'Offline'}</span>
         </div>
       )}
     </div>

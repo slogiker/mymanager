@@ -1,6 +1,8 @@
 services:
   dashboard:
     build: .
+    ports:
+      - "31847:7293"
     volumes:
       - ./app/server/data:/mymanager/app/server/data
       - ./app/server/uploads:/mymanager/app/server/uploads

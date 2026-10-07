@@ -2,15 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { Upload, FolderOpen, Plus, FilePlus, ArrowUpDown, ArrowUp, ArrowDown, X, Check, FolderUp } from 'lucide-react';
 import FileCard, { type FileItem } from './FileCard';
 import FolderCard, { type FolderItem } from './FolderCard';
-
-const PRESETS = [
-  { label: '.txt', ext: '.txt' },
-  { label: '.md', ext: '.md' },
-  { label: '.js', ext: '.js' },
-  { label: '.ts', ext: '.ts' },
-  { label: '.py', ext: '.py' },
-  { label: '.json', ext: '.json' },
-];
+import { InlineCreateFile } from './InlineCreateFile';
 
 interface Props {
   files: FileItem[];
@@ -201,106 +193,6 @@ export default function FileGrid({
     );
   }
 
-  // Inline Creation Card for Grid View (zero mouse travel!)
-  const InlineCreateCardGrid = (
-    <div className="relative rounded-xl border-2 border-red-500/60 bg-[#17181e] p-3 flex flex-col justify-between shadow-2xl min-h-[168px]">
-      <div className="flex items-center justify-between text-xs text-red-400 font-medium pb-2 border-b border-white/5">
-        <span className="flex items-center gap-1.5"><FilePlus size={14} /> New File</span>
-        <button onClick={handleCancelCreate} className="text-slate-500 hover:text-slate-300 p-0.5"><X size={13} /></button>
-      </div>
-      <div className="my-2">
-        <input
-          ref={inlineInputRef}
-          value={newFileName}
-          onChange={e => setNewFileName(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') handleConfirmCreate();
-            if (e.key === 'Escape') handleCancelCreate();
-          }}
-          placeholder="filename.txt"
-          className="w-full bg-[#111216] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30"
-        />
-        <div className="flex flex-wrap gap-1 mt-2">
-          {PRESETS.map(p => (
-            <button
-              key={p.ext}
-              type="button"
-              onClick={() => {
-                setNewFileName(prev => {
-                  const base = prev.replace(/\.[^.]+$/, '') || 'untitled';
-                  return base + p.ext;
-                });
-                inlineInputRef.current?.focus();
-              }}
-              className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 border border-white/5 transition-colors"
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-white/5">
-        <button
-          onClick={handleCancelCreate}
-          className="px-2.5 py-1 text-[11px] text-slate-400 hover:text-slate-200 rounded hover:bg-white/5"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleConfirmCreate}
-          disabled={!newFileName.trim() || creatingBusy}
-          className="px-2.5 py-1 text-[11px] bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-medium rounded transition-colors flex items-center gap-1"
-        >
-          {creatingBusy ? 'Creating…' : 'Create'}
-        </button>
-      </div>
-    </div>
-  );
-
-  // Inline Creation Row for List View
-  const InlineCreateRowList = (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border-2 border-red-500/60 bg-[#17181e] text-xs shadow-lg mb-1">
-      <FilePlus size={16} className="text-red-400 shrink-0" />
-      <input
-        ref={inlineInputRef}
-        value={newFileName}
-        onChange={e => setNewFileName(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') handleConfirmCreate();
-          if (e.key === 'Escape') handleCancelCreate();
-        }}
-        placeholder="filename.txt"
-        className="flex-1 bg-[#111216] border border-slate-700 rounded px-2.5 py-1 text-xs text-white font-mono outline-none focus:border-red-500"
-      />
-      <div className="hidden sm:flex items-center gap-1">
-        {PRESETS.slice(0, 4).map(p => (
-          <button
-            key={p.ext}
-            type="button"
-            onClick={() => {
-              setNewFileName(prev => {
-                const base = prev.replace(/\.[^.]+$/, '') || 'untitled';
-                return base + p.ext;
-              });
-              inlineInputRef.current?.focus();
-            }}
-            className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-slate-400 hover:text-white"
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-      <button onClick={handleCancelCreate} className="px-2 py-1 text-slate-400 hover:text-white">Cancel</button>
-      <button
-        onClick={handleConfirmCreate}
-        disabled={!newFileName.trim() || creatingBusy}
-        className="px-2.5 py-1 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white rounded font-medium"
-      >
-        {creatingBusy ? 'Creating…' : 'Create'}
-      </button>
-    </div>
-  );
-
   // Ghost card when not currently creating
   const GhostCard = view === 'grid' ? (
     <div className="relative">
@@ -458,14 +350,32 @@ export default function FileGrid({
 
         {listHeader}
 
-        {view === 'list' && showInlineCreate && InlineCreateRowList}
+        {view === 'list' && showInlineCreate && (
+          <InlineCreateFile
+            view="list"
+            fileName={newFileName}
+            setFileName={setNewFileName}
+            busy={creatingBusy}
+            onConfirm={handleConfirmCreate}
+            onCancel={handleCancelCreate}
+          />
+        )}
 
         <div className={
           view === 'grid'
             ? 'grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3'
             : 'flex flex-col gap-0.5'
         }>
-          {showInlineCreate && view === 'grid' ? InlineCreateCardGrid : GhostCard}
+          {showInlineCreate && view === 'grid' ? (
+            <InlineCreateFile
+              view="grid"
+              fileName={newFileName}
+              setFileName={setNewFileName}
+              busy={creatingBusy}
+              onConfirm={handleConfirmCreate}
+              onCancel={handleCancelCreate}
+            />
+          ) : GhostCard}
 
           {folders.map(f => (
             <FolderCard

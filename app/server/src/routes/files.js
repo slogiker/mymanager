@@ -8,6 +8,7 @@ const { optionalAuth, verifyToken } = require('../middleware/auth');
 const { requireOwner } = require('../middleware/owner');
 const { uploadLimiter } = require('../middleware/rateLimit');
 const { parseDocument } = require('../utils/documentParser');
+const { extractZipArchive } = require('../utils/zipExtractor');
 
 const router = express.Router();
 
@@ -394,94 +395,24 @@ router.post('/extract-zip', uploadLimiter, optionalAuth, (req, res) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No zip file uploaded' });
 
-    const AdmZip = require('adm-zip');
     const zipFilePath = path.join(filesDir, req.file.filename);
     const parentFolderId = req.body.folder_id || null;
 
     try {
-      const zip = new AdmZip(zipFilePath);
-      const zipEntries = zip.getEntries();
-      const baseRaw = path.basename(req.file.originalname, path.extname(req.file.originalname));
-      const baseFolderName = baseRaw.replace(/[^a-zA-Z0-9._ -]/g, '').trim() || 'extracted';
-
-      // Create root extracted folder
-      const rootFolderId = uuidv4();
-      const userId = req.user?.id ?? null;
-      db.prepare('INSERT INTO folders (id, user_id, name, parent_id) VALUES (?, ?, ?, ?)').run(rootFolderId, userId, baseFolderName, parentFolderId);
-
-      const folderMap = new Map(); // relative path -> folder id
-      folderMap.set('', rootFolderId);
-
-      // Create any nested subfolders first with strict Zip Slip protection
-      zipEntries.forEach(entry => {
-        // Reject entries with path traversal, null bytes, or absolute paths
-        const normalized = path.normalize(entry.entryName);
-        if (normalized.startsWith('..') || path.isAbsolute(entry.entryName) || entry.entryName.includes('\0')) {
-          return;
-        }
-
-        if (entry.isDirectory) {
-          const cleanPath = entry.entryName.replace(/\/+$/, '');
-          const parts = cleanPath.split('/').filter(p => p && p !== '.' && p !== '..');
-          let currentParent = rootFolderId;
-          let accPath = '';
-
-          for (const part of parts) {
-            const safePart = path.basename(part);
-            if (!safePart || safePart === '.' || safePart === '..') continue;
-            accPath = accPath ? `${accPath}/${safePart}` : safePart;
-            if (!folderMap.has(accPath)) {
-              const newFid = uuidv4();
-              try {
-                db.prepare('INSERT INTO folders (id, user_id, name, parent_id) VALUES (?, ?, ?, ?)').run(newFid, userId, safePart, currentParent);
-                folderMap.set(accPath, newFid);
-              } catch {}
-            }
-            currentParent = folderMap.get(accPath);
-          }
-        }
+      const extracted = extractZipArchive({
+        zipFilePath,
+        originalName: req.file.originalname,
+        parentFolderId,
+        userId: req.user?.id ?? null,
+        sessionId,
+        filesDir,
       });
-
-      // Extract and insert files with Zip Slip validation
-      const insertedFiles = [];
-      zipEntries.forEach(entry => {
-        const normalized = path.normalize(entry.entryName);
-        if (normalized.startsWith('..') || path.isAbsolute(entry.entryName) || entry.entryName.includes('\0')) {
-          return;
-        }
-
-        if (!entry.isDirectory) {
-          const dirName = path.dirname(entry.entryName);
-          const targetFolderId = dirName === '.' ? rootFolderId : (folderMap.get(dirName) || rootFolderId);
-          const fileName = path.basename(entry.entryName);
-          if (!fileName || fileName.startsWith('..') || fileName.includes('\0')) return;
-
-          const ext = path.extname(fileName);
-          const stored = `${uuidv4()}${ext}`;
-          const outPath = path.join(filesDir, stored);
-          if (!path.resolve(outPath).startsWith(filesDir)) return;
-
-          fs.writeFileSync(outPath, entry.getData());
-          const size = entry.header.size;
-          const mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'application/octet-stream';
-
-          const resDb = db.prepare(`
-            INSERT INTO files (user_id, session_id, folder_id, original_name, stored_name, file_path, mime_type, size)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(userId, req.user ? null : sessionId, targetFolderId, fileName, stored, `/uploads/files/${stored}`, mime, size);
-
-          insertedFiles.push(resDb.lastInsertRowid);
-        }
-      });
-
-      // Remove the temporary raw zip if extraction was requested
-      try { fs.unlinkSync(zipFilePath); } catch {}
 
       res.status(201).json({
         message: 'Extracted successfully',
-        folder_id: rootFolderId,
-        folder_name: baseFolderName,
-        files_count: insertedFiles.length,
+        folder_id: extracted.rootFolderId,
+        folder_name: extracted.baseFolderName,
+        files_count: extracted.filesCount,
       });
     } catch (zipErr) {
       res.status(500).json({ error: 'Failed to extract zip archive', details: zipErr.message });
