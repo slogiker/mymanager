@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   User as UserIcon,
@@ -9,7 +9,6 @@ import {
   EyeOff,
   LayoutGrid,
   Layers,
-  RotateCcw,
   Server,
   Wifi,
   DownloadCloud,
@@ -21,6 +20,8 @@ import {
   Clipboard,
   SlidersHorizontal,
   Sparkles,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { Modal, ServiceIcon } from '../common';
 import { UserPreferences, saveUserPreferences } from '../../../lib/userPreferences';
@@ -57,19 +58,15 @@ export function CustomizeGridModal({
   onOpenPironman,
   isOwner = false,
 }: CustomizeGridModalProps) {
-  // Layer accordion states: users can expand/collapse layers one at a time
-  const [openLayers, setOpenLayers] = useState<Record<string, boolean>>({
-    layout: true,
-    widgets: true,
-    categories: false,
-    gauges: false,
-    hardware: false,
-  });
+  // Layer accordion state: only one dropdown can be open at a time
+  const [activeLayer, setActiveLayer] = useState<string | null>('layout');
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   const toggleLayer = (layerKey: string) => {
-    setOpenLayers((prev) => ({ ...prev, [layerKey]: !prev[layerKey] }));
+    setActiveLayer((prev) => (prev === layerKey ? null : layerKey));
   };
 
   const toggleCategoryExpand = (cat: string) => {
@@ -113,13 +110,33 @@ export function CustomizeGridModal({
     saveUserPreferences(userId, updated);
   };
 
-  const handleResetLayoutPositions = () => {
-    const updated: UserPreferences = {
-      ...prefs,
-      widgetLayouts: {},
+  const handleExportLayout = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(prefs, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `mymanager-layout-${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleImportLayout = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (parsed && typeof parsed === 'object') {
+          onUpdatePrefs(parsed);
+          saveUserPreferences(userId, parsed);
+        }
+      } catch (err) {
+        alert('Invalid JSON layout file.');
+      }
     };
-    onUpdatePrefs(updated);
-    saveUserPreferences(userId, updated);
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const widgetsList = [
@@ -165,7 +182,8 @@ export function CustomizeGridModal({
     >
       <div className="space-y-3 text-xs">
         {/* ========================================================= */}
-        {/* LAYER 1: DISPLAY & LAYOUT CANVAS */}
+        {/* ========================================================= */}
+        {/* LAYER 1: BACKUP & RESTORE */}
         {/* ========================================================= */}
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden transition-all">
           <button
@@ -178,17 +196,14 @@ export function CustomizeGridModal({
                 1
               </span>
               <div className="min-w-0">
-                <span className="font-bold text-xs text-white block">Layer 1: Layout & Canvas Mode</span>
+                <span className="font-bold text-xs text-white block">Layer 1: Layout Backup & Restore</span>
                 <p className="text-[11px] text-slate-400 truncate">
-                  {prefs.disableCategories ? 'Unified Flat Grid Canvas' : 'Grouped Categories (Widgets top, Services bottom)'}
+                  Export custom widget sizes & card positions to JSON, or restore a backup
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-slate-700 bg-slate-800 text-slate-300">
-                {prefs.disableCategories ? 'Flat Mode' : 'Category Mode'}
-              </span>
-              {openLayers.layout ? (
+              {activeLayer === 'layout' ? (
                 <ChevronDown className="w-4 h-4 text-slate-400" />
               ) : (
                 <ChevronRight className="w-4 h-4 text-slate-500" />
@@ -196,50 +211,46 @@ export function CustomizeGridModal({
             </div>
           </button>
 
-          {openLayers.layout && (
+          {activeLayer === 'layout' && (
             <div className="p-3.5 space-y-3 bg-slate-950/40">
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-900/60">
-                <div className="pr-4">
+
+              <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px]">
+                <div>
                   <div className="font-semibold text-xs text-white flex items-center gap-2">
-                    <Layers className="w-3.5 h-3.5 text-red-400" />
-                    <span>Grouped Categories Mode</span>
+                    <Download className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Backup & Restore Layout</span>
                   </div>
                   <div className="text-[11px] text-slate-400 mt-0.5">
-                    Keep modular widgets in a dedicated grid at the top, and service categories below.
+                    Export your custom card positions, sizes, and preferences to JSON, or restore a backup.
                   </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={!prefs.disableCategories}
-                  onClick={() => {
-                    const next = !prefs.disableCategories;
-                    const updated = { ...prefs, disableCategories: next };
-                    onUpdatePrefs(updated);
-                    saveUserPreferences(userId, updated);
-                  }}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                    !prefs.disableCategories ? 'bg-red-600' : 'bg-slate-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition duration-200 ease-in-out ${
-                      !prefs.disableCategories ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                <div className="flex items-center gap-2 shrink-0">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportLayout}
+                    className="hidden"
                   />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800/80 bg-slate-900/40 text-[11px]">
-                <span className="text-slate-400">Rearranged cards or custom widget sizes looking messy?</span>
-                <button
-                  type="button"
-                  onClick={handleResetLayoutPositions}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 hover:border-red-500/40 bg-slate-800 hover:bg-red-500/10 text-slate-300 hover:text-red-300 flex items-center gap-1.5 transition-colors font-medium shrink-0"
-                >
-                  <RotateCcw className="w-3 h-3 text-red-400" />
-                  <span>Reset Grid Layout</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleExportLayout}
+                    className="px-3 py-1.5 rounded-lg border border-slate-700 hover:border-sky-500/40 bg-slate-800 hover:bg-sky-500/10 text-slate-300 hover:text-sky-300 flex items-center gap-1.5 transition-colors font-medium"
+                    title="Download JSON layout backup"
+                  >
+                    <Download className="w-3 h-3 text-sky-400" />
+                    <span>Export JSON</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-lg border border-slate-700 hover:border-emerald-500/40 bg-slate-800 hover:bg-emerald-500/10 text-slate-300 hover:text-emerald-300 flex items-center gap-1.5 transition-colors font-medium"
+                    title="Upload JSON layout backup"
+                  >
+                    <Upload className="w-3 h-3 text-emerald-400" />
+                    <span>Import JSON</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -269,7 +280,7 @@ export function CustomizeGridModal({
               <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                 {activeWidgetsCount} of {widgetsList.length} Active
               </span>
-              {openLayers.widgets ? (
+              {activeLayer === 'widgets' ? (
                 <ChevronDown className="w-4 h-4 text-slate-400" />
               ) : (
                 <ChevronRight className="w-4 h-4 text-slate-500" />
@@ -277,7 +288,7 @@ export function CustomizeGridModal({
             </div>
           </button>
 
-          {openLayers.widgets && (
+          {activeLayer === 'widgets' && (
             <div className="p-3.5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 bg-slate-950/40">
               {widgetsList.map((w) => {
                 const IconComponent = w.icon;
@@ -331,10 +342,13 @@ export function CustomizeGridModal({
         {/* ========================================================= */}
         {/* LAYER 3: CATEGORY COLUMNS & SERVICES VISIBILITY */}
         {/* ========================================================= */}
+        {/* ========================================================= */}
+        {/* LAYER 3: SERVICES VISIBILITY */}
+        {/* ========================================================= */}
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden transition-all">
           <button
             type="button"
-            onClick={() => toggleLayer('categories')}
+            onClick={() => toggleLayer('services')}
             className="w-full p-3.5 flex items-center justify-between bg-slate-900/90 hover:bg-slate-850 border-b border-slate-800/80 transition-colors text-left"
           >
             <div className="flex items-center gap-2.5 min-w-0">
@@ -342,17 +356,17 @@ export function CustomizeGridModal({
                 3
               </span>
               <div className="min-w-0">
-                <span className="font-bold text-xs text-white block">Layer 3: Categories & Services Visibility</span>
+                <span className="font-bold text-xs text-white block">Layer 3: Services Visibility</span>
                 <p className="text-[11px] text-slate-400 truncate">
-                  Show or hide entire categories or specific service cards
+                  Show or hide individual service cards from the dashboard
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-[10px] font-mono text-slate-400">
-                {orderedCategories.length} Categories
+                {services.filter(s => !prefs.hiddenServices?.includes(s.id)).length} of {services.length} Active
               </span>
-              {openLayers.categories ? (
+              {activeLayer === 'services' ? (
                 <ChevronDown className="w-4 h-4 text-slate-400" />
               ) : (
                 <ChevronRight className="w-4 h-4 text-slate-500" />
@@ -360,140 +374,60 @@ export function CustomizeGridModal({
             </div>
           </button>
 
-          {openLayers.categories && (
+          {activeLayer === 'services' && (
             <div className="p-3.5 space-y-2 bg-slate-950/40 max-h-80 overflow-y-auto pr-1">
-              {orderedCategories.map((cat) => {
-                const isCatHidden = prefs.hiddenCategories.includes(cat);
-                const catServices = services.filter((s) => (s.category?.trim() || 'Services') === cat);
-                const isExpanded = expandedCategories[cat] ?? false;
-                const visibleCount = catServices.filter(
-                  (s) => !prefs.hiddenServices?.includes(s.id)
-                ).length;
-
-                return (
-                  <div
-                    key={cat}
-                    className="rounded-xl border border-slate-800/80 bg-slate-900/60 overflow-hidden transition-all"
-                  >
-                    <div className="flex items-center justify-between p-2.5 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleCategoryExpand(cat)}
-                        className="flex items-center gap-2 min-w-0 flex-1 text-left group/cat"
-                      >
-                        <div className="p-1 rounded text-slate-500 group-hover/cat:text-slate-300 transition-colors">
-                          {isExpanded ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-red-400" />
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
-                          )}
-                        </div>
+              {services.length === 0 ? (
+                <div className="text-[11px] text-slate-500 py-3 text-center italic">
+                  No services added yet
+                </div>
+              ) : (
+                services.map((s) => {
+                  const isSvcHidden = prefs.hiddenServices?.includes(s.id) ?? false;
+                  return (
+                    <div
+                      key={s.id}
+                      className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${
+                        !isSvcHidden
+                          ? 'bg-slate-900/80 border-slate-800/80 text-slate-200'
+                          : 'bg-slate-950/60 border-slate-800/40 text-slate-500 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <ServiceIcon icon={s.icon} title={s.title} />
                         <div className="min-w-0">
-                          <div
-                            className={`font-semibold text-xs transition-colors ${
-                              !isCatHidden ? 'text-white' : 'text-slate-500 line-through'
-                            }`}
-                          >
-                            {cat}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                            {visibleCount} of {catServices.length} services visible
+                          <div className="text-xs font-semibold text-white truncate">{s.title}</div>
+                          <div className="text-[10px] font-mono text-slate-500 truncate">
+                            {s.url.replace(/^https?:\/\//, '')}
                           </div>
                         </div>
-                      </button>
+                      </div>
 
                       <button
                         type="button"
-                        onClick={() => toggleCategoryHide(cat)}
-                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                          !isCatHidden
-                            ? 'bg-red-600/10 border-red-500/40 text-red-400 hover:bg-red-600/20'
+                        onClick={() => toggleServiceHide(s.id)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono flex items-center gap-1.5 transition-all ${
+                          !isSvcHidden
+                            ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
                             : 'bg-slate-800/40 border-slate-700/60 text-slate-500 hover:text-slate-400'
                         }`}
-                        title={isCatHidden ? `Show entire ${cat} category` : `Hide entire ${cat} category`}
+                        title={!isSvcHidden ? 'Hide service' : 'Show service'}
                       >
-                        <div
-                          className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${
-                            !isCatHidden
-                              ? 'bg-red-600 border-red-500 text-white'
-                              : 'border-slate-600 bg-slate-700/50'
-                          }`}
-                        >
-                          {!isCatHidden && <Check className="w-2.5 h-2.5 stroke-[2.5]" />}
-                        </div>
-                        <span>{!isCatHidden ? 'Shown' : 'Hidden'}</span>
+                        {!isSvcHidden ? (
+                          <>
+                            <Eye className="w-3 h-3 text-emerald-400" />
+                            <span>Visible</span>
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff className="w-3 h-3 text-slate-500" />
+                            <span>Hidden</span>
+                          </>
+                        )}
                       </button>
                     </div>
-
-                    {isExpanded && (
-                      <div className="border-t border-slate-800/80 bg-slate-950/40 p-2 space-y-1.5">
-                        {catServices.length === 0 ? (
-                          <div className="text-[11px] text-slate-600 py-1.5 px-2 italic">
-                            No services in this category
-                          </div>
-                        ) : (
-                          catServices.map((s) => {
-                            const isSvcHidden =
-                              isCatHidden || (prefs.hiddenServices?.includes(s.id) ?? false);
-                            return (
-                              <div
-                                key={s.id}
-                                className={`flex items-center justify-between p-2 rounded-lg border transition-all ${
-                                  !isSvcHidden
-                                    ? 'bg-slate-900/80 border-slate-800/80 text-slate-200'
-                                    : 'bg-slate-950/60 border-slate-800/40 text-slate-500 opacity-60'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2 min-w-0 pr-2">
-                                  <ServiceIcon icon={s.icon} title={s.title} />
-                                  <div className="min-w-0">
-                                    <div className="text-xs font-medium truncate">{s.title}</div>
-                                    <div className="text-[9px] font-mono text-slate-500 truncate">
-                                      {s.url.replace(/^https?:\/\//, '')}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  disabled={isCatHidden}
-                                  onClick={() => toggleServiceHide(s.id)}
-                                  className={`px-2 py-1 rounded-md border text-[10px] font-mono flex items-center gap-1 transition-all ${
-                                    isCatHidden
-                                      ? 'opacity-40 cursor-not-allowed border-slate-800 text-slate-600'
-                                      : !isSvcHidden
-                                      ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20'
-                                      : 'bg-slate-800/40 border-slate-700/60 text-slate-500 hover:text-slate-400'
-                                  }`}
-                                  title={
-                                    isCatHidden
-                                      ? 'Category is hidden'
-                                      : isSvcHidden
-                                      ? 'Show service'
-                                      : 'Hide service'
-                                  }
-                                >
-                                  {!isSvcHidden ? (
-                                    <>
-                                      <Eye className="w-3 h-3 text-emerald-400" />
-                                      <span>Visible</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <EyeOff className="w-3 h-3 text-slate-500" />
-                                      <span>Hidden</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           )}
         </div>
@@ -526,7 +460,7 @@ export function CustomizeGridModal({
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-[10px] font-mono text-slate-400">{nodes.length} Nodes</span>
-                {openLayers.gauges ? (
+                {activeLayer === 'gauges' ? (
                   <ChevronDown className="w-4 h-4 text-slate-400" />
                 ) : (
                   <ChevronRight className="w-4 h-4 text-slate-500" />
@@ -534,7 +468,7 @@ export function CustomizeGridModal({
               </div>
             </button>
 
-            {openLayers.gauges && (
+            {activeLayer === 'gauges' && (
               <div className="p-3.5 space-y-3 bg-slate-950/40">
                 <div className="flex items-center justify-between pb-1">
                   <span className="text-[11px] text-slate-400">Toggle individual metric gauges per machine:</span>
@@ -638,7 +572,7 @@ export function CustomizeGridModal({
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {openLayers.hardware ? (
+                {activeLayer === 'hardware' ? (
                   <ChevronDown className="w-4 h-4 text-slate-400" />
                 ) : (
                   <ChevronRight className="w-4 h-4 text-slate-500" />
@@ -646,7 +580,7 @@ export function CustomizeGridModal({
               </div>
             </button>
 
-            {openLayers.hardware && (
+            {activeLayer === 'hardware' && (
               <div className="p-3.5 flex items-center justify-between bg-slate-950/40">
                 <div className="pr-4">
                   <div className="font-semibold text-xs text-white flex items-center gap-2">

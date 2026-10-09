@@ -16,7 +16,13 @@ export const BOARD = {
 
 /** Number of board columns for the current viewport width */
 export function useBoardCols(): number {
-  const calc = () => (typeof window === 'undefined' ? 6 : window.innerWidth >= 1024 ? 6 : window.innerWidth >= 768 ? 4 : 2);
+  const calc = () => (
+    typeof window === 'undefined' ? 6
+    : window.innerWidth >= 1024 ? 6
+    : window.innerWidth >= 768 ? 4
+    : window.innerWidth >= 640 ? 2
+    : 1
+  );
   const [cols, setCols] = useState(calc);
   useEffect(() => {
     const onResize = () => setCols(calc());
@@ -24,6 +30,25 @@ export function useBoardCols(): number {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   return cols;
+}
+
+/**
+ * Phones, plus touch tablets narrower than 1024px. These get the single-flow
+ * reorderable layout: no free grid placement, no resize handles.
+ */
+const MOBILE_QUERY = '(max-width: 767px), (pointer: coarse) and (max-width: 1023px)';
+
+export function useIsMobile(): boolean {
+  const get = () => typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches;
+  const [isMobile, setIsMobile] = useState(get);
+  useEffect(() => {
+    const mql = window.matchMedia(MOBILE_QUERY);
+    const onChange = () => setIsMobile(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+  return isMobile;
 }
 
 /** Inline grid placement for a board item */

@@ -35,6 +35,8 @@ export function QbittorrentWidget({
   const activeCount = data?.activeCount || torrents.length || 0;
   const dlSpeed = data?.downloadSpeed || 0;
   const upSpeed = data?.uploadSpeed || 0;
+  const downloadTotal = data?.downloadTotal || 0;
+  const uploadTotal = data?.uploadTotal || 0;
   const topTorrent = torrents[0];
 
   const isCompact = colSpan === 1 && rowSpan === 1;
@@ -52,13 +54,17 @@ export function QbittorrentWidget({
             </div>
             <span className="text-[11px] font-bold text-slate-200 truncate">qBit</span>
           </div>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <span
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
+            }`}
+          />
         </div>
 
         <div className="flex items-center justify-between text-[10px] font-mono">
-          <span className="text-slate-500">{activeCount} active</span>
+          <span className="text-slate-500">{isOnline ? `${activeCount} active` : 'Offline'}</span>
           <span className="text-sky-400 font-bold truncate">
-            {dlSpeed > 0 ? `↓ ${formatSpeed(dlSpeed)}` : 'Idle'}
+            {isOnline ? (dlSpeed > 0 ? `↓ ${formatSpeed(dlSpeed)}` : 'Idle') : 'Down'}
           </span>
         </div>
       </div>
@@ -80,29 +86,45 @@ export function QbittorrentWidget({
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
                   qBittorrent
                 </span>
-                <span className="inline-flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Live
+                <span
+                  className={`inline-flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full border ${
+                    isOnline
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
+                    }`}
+                  />
+                  {isOnline ? 'Live' : 'Offline'}
                 </span>
               </div>
               <div className="text-[10px] font-mono text-slate-500">
-                {activeCount} active transfer{activeCount === 1 ? '' : 's'}
+                {isOnline ? `${activeCount} active transfer${activeCount === 1 ? '' : 's'}` : 'Service unavailable'}
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-xs font-mono">
-              <span className="text-sky-400 font-bold flex items-center gap-1">
-                <ArrowDown className="w-3 h-3" />
-                {formatSpeed(dlSpeed)}
+            {isOnline ? (
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-xs font-mono">
+                <span className="text-sky-400 font-bold flex items-center gap-1">
+                  <ArrowDown className="w-3 h-3" />
+                  {formatSpeed(dlSpeed)}
+                </span>
+                <span className="text-slate-600">·</span>
+                <span className="text-cyan-300 font-bold flex items-center gap-1">
+                  <ArrowUp className="w-3 h-3" />
+                  {formatSpeed(upSpeed)}
+                </span>
+              </div>
+            ) : (
+              <span className="text-slate-500 text-xs font-mono px-2.5 py-1 rounded-lg bg-slate-900/50 border border-slate-800">
+                Client Unreachable
               </span>
-              <span className="text-slate-600">·</span>
-              <span className="text-cyan-300 font-bold flex items-center gap-1">
-                <ArrowUp className="w-3 h-3" />
-                {formatSpeed(upSpeed)}
-              </span>
-            </div>
+            )}
 
             {onOpenInspector && (
               <button
@@ -119,7 +141,11 @@ export function QbittorrentWidget({
 
         {/* Multi-torrent active list */}
         <div className="flex-1 space-y-2 overflow-y-auto pr-1 max-h-32">
-          {torrents.length > 0 ? (
+          {!isOnline ? (
+            <div className="py-4 text-center text-xs text-slate-500">
+              qBittorrent client unreachable (VPN or LAN offline)
+            </div>
+          ) : torrents.length > 0 ? (
             torrents.slice(0, 3).map((t, idx) => {
               const pct = Math.round((t.progress || 0) * 100);
               const etaStr =
@@ -165,7 +191,7 @@ export function QbittorrentWidget({
             <HardDrive className="w-3 h-3 text-slate-600" />
             <span>Total Volume</span>
           </span>
-          <span className="text-slate-300 font-semibold">{formatBytes(data.downloadTotal || 0)}</span>
+          <span className="text-slate-300 font-semibold">{formatBytes(downloadTotal)}</span>
         </div>
       </div>
     );
@@ -184,16 +210,24 @@ export function QbittorrentWidget({
             <div className="min-w-0">
               <div className="font-bold text-xs text-slate-200 truncate flex items-center gap-1.5">
                 <span>qBittorrent</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
+                  }`}
+                />
               </div>
               <span className="text-[10px] font-mono text-slate-500">
-                {activeCount} active
+                {isOnline ? `${activeCount} active` : 'Offline'}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-1 text-[11px] font-mono">
-            <span className="text-sky-400 font-bold">↓ {formatSpeed(dlSpeed)}</span>
+            {isOnline ? (
+              <span className="text-sky-400 font-bold">↓ {formatSpeed(dlSpeed)}</span>
+            ) : (
+              <span className="text-slate-500">Offline</span>
+            )}
             {onOpenInspector && (
               <button
                 type="button"
@@ -209,24 +243,29 @@ export function QbittorrentWidget({
 
         {/* Active downloads snippet */}
         <div className="space-y-1.5 flex-1 overflow-hidden">
-          {torrents.slice(0, 2).map((t, idx) => {
-            const pct = Math.round((t.progress || 0) * 100);
-            return (
-              <div key={idx} className="p-1.5 rounded-lg bg-slate-900/50 border border-slate-800/60 space-y-1">
-                <div className="flex items-center justify-between gap-1 text-[11px]">
-                  <span className="truncate text-slate-300 font-medium">{t.name}</span>
-                  <span className="text-sky-400 font-mono font-bold shrink-0">{pct}%</span>
+          {!isOnline ? (
+            <div className="py-4 text-center text-xs text-slate-500">
+              Client unreachable
+            </div>
+          ) : torrents.length > 0 ? (
+            torrents.slice(0, 2).map((t, idx) => {
+              const pct = Math.round((t.progress || 0) * 100);
+              return (
+                <div key={idx} className="p-1.5 rounded-lg bg-slate-900/50 border border-slate-800/60 space-y-1">
+                  <div className="flex items-center justify-between gap-1 text-[11px]">
+                    <span className="truncate text-slate-300 font-medium">{t.name}</span>
+                    <span className="text-sky-400 font-mono font-bold shrink-0">{pct}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-1 overflow-hidden">
+                    <div
+                      className="bg-sky-500 h-full rounded-full transition-all duration-300"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-slate-800 rounded-full h-1 overflow-hidden">
-                  <div
-                    className="bg-sky-500 h-full rounded-full transition-all duration-300"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-          {torrents.length === 0 && (
+              );
+            })
+          ) : (
             <div className="py-2 text-center text-xs text-slate-500 italic">
               All downloads complete
             </div>
@@ -235,7 +274,7 @@ export function QbittorrentWidget({
 
         {/* Footer */}
         <div className="pt-1.5 border-t border-slate-800/40 flex items-center justify-between text-[10px] font-mono text-slate-500">
-          <span>Total: {formatBytes(data.downloadTotal || 0)}</span>
+          <span>Total: {formatBytes(downloadTotal)}</span>
           <span className="text-cyan-400 font-bold">↑ {formatSpeed(upSpeed)}</span>
         </div>
       </div>
@@ -256,7 +295,7 @@ export function QbittorrentWidget({
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
             </div>
             <span className="text-[10px] font-mono text-slate-500 truncate block">
-              {isOnline ? `${activeCount} active · ${formatBytes(data?.downloadTotal || 0)}` : 'Client unreachable'}
+              {isOnline ? `${activeCount} active · ${formatBytes(downloadTotal)}` : 'Client unreachable'}
             </span>
           </div>
         </div>

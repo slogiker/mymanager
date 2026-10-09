@@ -67,10 +67,52 @@
 
 ---
 
-## UI/UX & Polish
+## UI/UX, Self-Healing & Mobile Responsiveness
 - [x] Fast category renaming modal with auto-focus.
 - [x] VPN-locked badge with interactive WireGuard guidance toast.
 - [x] Quick action buttons on card hover (Copy URL, Edit, Delete).
+- [x] Mobile drawer direction alignment: drawer now opens from the right matching button location.
+- [x] Landscape hero padding: prevents navigation bar from overlapping hero title on landscape viewports.
+- [x] Autonomous Error Analysis & Self-Healing Engine:
+  - Error diagnostic analyzer (`selfHealer.ts`) identifying null variables, stale chunks, and network faults.
+  - Automated part quarantine: isolates and disables failing widgets/cards in user preferences to prevent crash loops.
+  - Missing asset auto-recovery: purges CacheStorage, unregisters stale service workers, and forces fresh bundle reload.
+  - Server-side client build & Docker container rebuild trigger (`POST /api/admin/system/rebuild`).
+- [x] Multi-device responsive design across all screen sizes:
+  - Mobile phones (320px - 480px): single-column touch flow, compact VPN badge, responsive toolbars.
+  - Tablets (640px - 1023px): 2-column flow with drag reordering via `@dnd-kit`.
+  - Desktop & Wide displays: full 6-8 column freeform grid with drag-and-drop and resize handles.
 - [ ] Import and Export dashboard layout JSON configurations.
 - [ ] Custom background image / wallpaper selector for dashboard.
-- [ ] Mobile navigation drawer improvements for smaller screens.
+
+---
+
+## Inbox & Communications
+- [x] Stop automated notification spam from clipboard shares into messages table.
+- [x] Multi-select checkboxes on each message item.
+- [x] Batch action operations (Batch Archive and Batch Delete) on server and client.
+- [x] Redesigned inbox cards with clean badges, timestamps, and quick action buttons.
+
+---
+
+## Housekeeping & Repository Structure
+- [x] Clean up root directory:
+  - Moved legacy documentation and handover specs to `docs/archive/`.
+  - Moved verification and test scripts to `scripts/verification/`.
+  - Moved obsolete root prototypes to `docs/archive/legacy/`.
+  - Removed obsolete temporary files (`cookies.txt`).
+  - Created standardized `scripts/deploy.sh` script for pulling changes and restarting Docker stack.
+
+---
+
+## Next Session Priorities & Backlog (*)
+- [ ] **Widget Re-sorting & Landscape Layout Optimization (*)**:
+  - Rearrange and sort widgets differently for mobile landscape and constrained viewport layouts while keeping existing widgets intact.
+- [ ] **Analytics Page Redesign (*)**:
+  - Overhaul the analytics tab and visitor telemetry visualizations.
+- [ ] **Email Service / Cloudflare Worker Integration for Inbox (*)**:
+  - Link contact form and messages to a real email delivery service (SMTP, Resend, or SendGrid) or Cloudflare Worker / webhook instead of relying purely on local SQLite storage.
+- [ ] **Inbox Messages UI/UX Fine-Tuning (*)**:
+  - Continue refining messages inbox visual design and thread inspection workflows.
+- [ ] **Selected Project Deep Linking & Sync (*)**:
+  - Further expand bi-directional linking and synchronization between front-end project cards and the dashboard Projects tab.

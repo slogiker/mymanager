@@ -25,6 +25,17 @@ export interface UserPreferences {
   widgetLayouts?: Record<string, { startCol: number; startRow: number; colSpan: number; rowSpan: number }>;
   syncThemeWithPironman?: boolean;
   pironmanAccentColor?: string;
+  /** Mobile-only item order per list ('widgets', 'flat', 'cat:<name>'), independent of the desktop grid */
+  mobileOrder?: Record<string, string[]>;
+}
+
+function sanitizeMobileOrder(value: unknown): Record<string, string[]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out: Record<string, string[]> = {};
+  for (const [key, list] of Object.entries(value as Record<string, unknown>)) {
+    if (Array.isArray(list)) out[key] = list.filter((id): id is string => typeof id === 'string');
+  }
+  return out;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -32,7 +43,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   hiddenServices: [],
   hiddenGauges: [],
   compactMode: false,
-  disableCategories: false,
+  disableCategories: true,
   syncThemeWithPironman: false,
   pironmanAccentColor: '#ef4444',
   categoryOrder: [],
@@ -111,6 +122,7 @@ export function getUserPreferences(userId?: number): UserPreferences {
       } : DEFAULT_PREFERENCES.widgetLayouts,
       syncThemeWithPironman: Boolean(parsed.syncThemeWithPironman),
       pironmanAccentColor: parsed.pironmanAccentColor || DEFAULT_PREFERENCES.pironmanAccentColor,
+      mobileOrder: sanitizeMobileOrder(parsed.mobileOrder),
     };
   } catch {
     return DEFAULT_PREFERENCES;
@@ -154,6 +166,7 @@ export async function syncUserPreferencesFromBackend(userId?: number): Promise<U
         } : DEFAULT_PREFERENCES.widgetLayouts,
         syncThemeWithPironman: typeof remote.syncThemeWithPironman === 'boolean' ? remote.syncThemeWithPironman : Boolean(DEFAULT_PREFERENCES.syncThemeWithPironman),
         pironmanAccentColor: remote.pironmanAccentColor || DEFAULT_PREFERENCES.pironmanAccentColor,
+        mobileOrder: sanitizeMobileOrder(remote.mobileOrder),
       };
       localStorage.setItem(`mymanager_user_prefs_${userId}`, JSON.stringify(merged));
       window.dispatchEvent(new CustomEvent('mymanager_prefs_changed', { detail: merged }));

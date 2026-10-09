@@ -19,9 +19,9 @@ COPY . .
 # Build React client
 RUN npm run build --workspace=mymanager-client
 
-# Ensure directories exist and chown to node user
+# Ensure runtime data and uploads directories exist and are owned by node user
 RUN mkdir -p /mymanager/app/server/data /mymanager/app/server/uploads && \
-    chown -R node:node /mymanager
+    chown -R node:node /mymanager/app/server/data /mymanager/app/server/uploads
 
 USER node
 

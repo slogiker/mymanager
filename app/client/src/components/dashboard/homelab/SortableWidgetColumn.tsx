@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 import { BOARD, boardSpanStyle } from './boardGrid';
+import { ErrorBoundary } from '../../common/ErrorBoundary';
 
 export interface SortableWidgetColumnProps {
   id: string;
@@ -97,7 +98,11 @@ export function SortableWidgetColumn({
         <GripVertical className="w-3.5 h-3.5" />
       </button>
 
-      <div className="h-full w-full overflow-y-auto scrollbar-thin">{renderContent(c, r)}</div>
+      <div className="h-full w-full overflow-y-auto scrollbar-thin">
+        <ErrorBoundary isInline fallbackTitle={title}>
+          {renderContent(c, r)}
+        </ErrorBoundary>
+      </div>
 
       {/* Bottom-right corner resize handle: identical to service cards */}
       {canResize && onSetSize && (

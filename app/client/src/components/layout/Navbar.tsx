@@ -200,7 +200,7 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* ─── Mobile left sidebar ─── */}
+      {/* ─── Mobile right sidebar ─── */}
       {/* Backdrop */}
       <div
         className={`fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
@@ -211,9 +211,9 @@ export default function Navbar() {
 
       {/* Sidebar panel */}
       <div
-        className={`fixed top-0 left-0 z-[70] h-full w-72 bg-[#111216] border-r border-slate-800/60 flex flex-col
+        className={`fixed top-0 right-0 z-[70] h-full w-72 bg-[#111216] border-l border-slate-800/60 flex flex-col
           transition-transform duration-300 ease-in-out md:hidden
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* Sidebar header */}
         <div className="flex items-center justify-between px-6 h-16 border-b border-slate-800/50 shrink-0">

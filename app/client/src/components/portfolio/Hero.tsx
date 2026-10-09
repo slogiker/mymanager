@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { api } from '../../lib/api';
 import type { Profile } from '../../types';
 import { useTranslation } from '../../context/LanguageContext';
+import { RadioTower } from 'lucide-react';
 
 export default function Hero() {
   const [resumeExists, setResumeExists] = useState<boolean>(false);
@@ -20,7 +21,7 @@ export default function Hero() {
     <section
       ref={sectionRef}
       id="hero"
-      className="min-h-screen flex flex-col justify-center relative overflow-hidden"
+      className="min-h-screen flex flex-col justify-center relative overflow-hidden pt-20 sm:pt-24 landscape:pt-28 pb-12 sm:pb-16"
     >
       {/* Ambient background glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-500/[0.04] rounded-full blur-[200px] pointer-events-none" />
@@ -111,10 +112,8 @@ export default function Hero() {
               </svg>
             </a>
             <a href="https://www.qrz.com/db/S54DP" target="_blank" rel="noopener noreferrer"
-              className="p-3 text-slate-600 hover:text-slate-300 transition-colors duration-300" aria-label="Amateur Radio">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21V11M12 7a2 2 0 100-4 2 2 0 000 4zm0 0v4m0 0H8m4 0h4" />
-              </svg>
+              className="p-3 text-slate-600 hover:text-slate-300 transition-colors duration-300" aria-label="Amateur Radio (QRZ - S54DP)" title="Amateur Radio (S54DP)">
+              <RadioTower className="w-5 h-5" />
             </a>
             <a href="mailto:plibersek.daniel@gmail.com"
               className="p-3 text-slate-600 hover:text-slate-300 transition-colors duration-300" aria-label="Email">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Lock,
   Shield,
@@ -9,9 +9,11 @@ import {
   Trash2,
   Activity,
   Film,
+  MoreVertical,
 } from 'lucide-react';
 import { Service, JellyfinStats } from '../../../types';
 import { ServiceIcon } from '../common';
+import { useIsMobile } from '../homelab/boardGrid';
 
 export interface ServiceCardItemProps {
   service: Service;
@@ -40,7 +42,56 @@ export function ServiceCardItem({
   jellyfinStats,
   noFrame = false,
 }: ServiceCardItemProps) {
+  const isMobile = useIsMobile();
   const [copied, setCopied] = useState<boolean>(false);
+
+  // Long-press detection (450ms hold to open settings, tap to launch)
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef<boolean>(false);
+  const startPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPressing, setIsPressing] = useState<boolean>(false);
+
+  const startPress = (clientX: number, clientY: number) => {
+    if (!isOwner || !onEdit) return;
+    isLongPressRef.current = false;
+    startPosRef.current = { x: clientX, y: clientY };
+    setIsPressing(true);
+    timerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setIsPressing(false);
+      try {
+        if ('vibrate' in navigator) navigator.vibrate?.([30, 20, 30]);
+      } catch {}
+      onEdit?.(s);
+    }, 450);
+  };
+
+  const cancelPress = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsPressing(false);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!timerRef.current) return;
+    const t = e.touches[0];
+    const dist = Math.hypot(t.clientX - startPosRef.current.x, t.clientY - startPosRef.current.y);
+    if (dist > 10) {
+      cancelPress();
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isLongPressRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      isLongPressRef.current = false;
+      return;
+    }
+    onCardClick?.(s, e);
+  };
 
   const isOnline = s.status === 'online';
   const isOffline = s.status === 'offline' || s.status === 'timeout';
@@ -65,21 +116,117 @@ export function ServiceCardItem({
 
   const frameClasses = noFrame
     ? 'w-full h-full'
-    : `w-full h-full rounded-xl border transition-all duration-150 select-none overflow-hidden ${
+    : `w-full h-full rounded-2xl border transition-all duration-150 select-none overflow-hidden ${
         locked
-          ? 'border-amber-500/30 bg-[#16181f]/60 opacity-60 hover:opacity-85 hover:border-amber-500/50 hover:shadow-lg'
-          : 'border-slate-800/80 bg-[#16181f]/80 hover:bg-[#1c1f2b] hover:border-slate-700/80 hover:shadow-lg'
+          ? 'border-amber-500/30 bg-[#16181f]/80 opacity-70 hover:opacity-90 hover:border-amber-500/50 hover:shadow-lg'
+          : 'border-slate-800/80 bg-gradient-to-b from-[#181a24] to-[#12141c] hover:from-[#1e2230] hover:to-[#161822] hover:border-slate-700/80 hover:shadow-xl'
       }`;
+
+  // Dedicated high-density, touch-optimized layout for mobile view
+  if (isMobile) {
+    return (
+      <div
+        onClick={handleClick}
+        onTouchStart={(e) => startPress(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchEnd={cancelPress}
+        onTouchMove={handleTouchMove}
+        onMouseDown={(e) => {
+          if (e.button === 0) startPress(e.clientX, e.clientY);
+        }}
+        onMouseUp={cancelPress}
+        onMouseLeave={cancelPress}
+        onContextMenu={(e) => {
+          if (isOwner && onEdit) {
+            e.preventDefault();
+            onEdit(s);
+          }
+        }}
+        role="link"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onCardClick?.(s);
+        }}
+        className={`group relative flex flex-col justify-between h-full p-3 cursor-pointer select-none overflow-hidden touch-manipulation transition-all duration-150 rounded-2xl border ${
+          isPressing
+            ? 'scale-[0.96] ring-2 ring-red-500/50 shadow-[0_0_25px_rgba(239,68,68,0.25)] border-red-500/50'
+            : locked
+            ? 'border-amber-500/30 bg-[#16181f]/80 active:scale-[0.98]'
+            : 'border-slate-800/80 bg-gradient-to-b from-[#181a24] to-[#12141c] hover:border-slate-700/80 active:scale-[0.98] shadow-md'
+        }`}
+      >
+        {/* Top Row: Squircle Icon with attached Status Pip on left, VPN/Lock badge on right (pr-6 preserves space for top-right drag handle) */}
+        <div className="flex items-center justify-between gap-1.5 w-full min-w-0 pr-6">
+          <div className="relative shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-slate-800/90 border border-slate-700/60 shadow-inner flex items-center justify-center">
+              <ServiceIcon icon={s.icon} title={s.title} />
+            </div>
+            {/* Attached glowing status pip */}
+            <span
+              className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ring-2 ring-[#141620] ${
+                isOnline
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse'
+                  : isOffline
+                  ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]'
+                  : 'bg-slate-500'
+              }`}
+              title={s.status || 'unknown'}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {locked ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30 font-semibold">
+                <Lock className="w-2.5 h-2.5 text-amber-400" />
+                <span>VPN</span>
+              </span>
+            ) : s.requires_vpn ? (
+              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                <Shield className="w-2.5 h-2.5 text-purple-400" />
+                <span>VPN</span>
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Bottom Area: Service Title and Subtitle / Live Stat */}
+        <div className="min-w-0 mt-2">
+          <div className="font-bold text-xs sm:text-sm text-slate-100 truncate leading-snug group-hover:text-red-400 transition-colors">
+            {s.title || 'Untitled'}
+          </div>
+          <div className="text-[10px] font-mono truncate mt-0.5 leading-none">
+            {s.liveStat ? (
+              <span className="text-red-400 font-semibold">{s.liveStat}</span>
+            ) : (
+              <span className="text-slate-400">{cleanUrl}</span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-      onClick={(e) => onCardClick?.(s, e)}
+      onClick={handleClick}
+      onMouseDown={(e) => {
+        if (e.button === 0) startPress(e.clientX, e.clientY);
+      }}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+      onContextMenu={(e) => {
+        if (isOwner && onEdit) {
+          e.preventDefault();
+          onEdit(s);
+        }
+      }}
       role="link"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter') onCardClick?.(s);
       }}
-      className={`group relative flex flex-col justify-between cursor-pointer select-none overflow-hidden ${frameClasses} ${
+      className={`group relative flex flex-col justify-between cursor-pointer select-none overflow-hidden transition-all duration-150 ${frameClasses} ${
+        isPressing ? 'scale-[0.97] ring-2 ring-red-500/50' : ''
+      } ${
         isCompact ? 'p-2.5' : isTall ? 'p-3' : isExpanded ? 'p-3.5' : 'p-3'
       }`}
     >

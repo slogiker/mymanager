@@ -13,6 +13,10 @@ import {
 } from '../../../types';
 import { useWidgetRegistry } from './useWidgetRegistry';
 import { useWidgetGridInteractions } from './useWidgetGridInteractions';
+import { MobileSortableList, MobileSortableItem } from './MobileSortableList';
+import { useIsMobile } from '../homelab/boardGrid';
+import { saveUserPreferences } from '../../../lib/userPreferences';
+import { ErrorBoundary } from '../../common/ErrorBoundary';
 
 export interface TopWidgetsGridProps {
   prefs: UserPreferences;
@@ -80,6 +84,7 @@ export function TopWidgetsGrid({
   isAdmin = false,
   serverGauges = {},
 }: TopWidgetsGridProps) {
+  const isMobile = useIsMobile();
   const { placedWidgets } = useWidgetRegistry({
     prefs,
     nodes,
@@ -132,6 +137,43 @@ export function TopWidgetsGrid({
     return getFillerCells(activeWidgets, GRID_CONSTANTS.FLAT_COLS, isInteracting ? 4 : 2);
   }, [activeWidgets, resizing, cardDragging]);
 
+  // Mobile: one reorderable flow, natural order follows the desktop placement (top-left first)
+  const mobileOrderKey = flatMode ? 'flat' : 'widgets';
+  const mobileItems: MobileSortableItem[] = useMemo(
+    () =>
+      [...placedWidgets]
+        .sort((a, b) => {
+          if (flatMode) {
+            const aIsSvc = a.id.startsWith('svc-');
+            const bIsSvc = b.id.startsWith('svc-');
+            if (aIsSvc !== bIsSvc) {
+              return aIsSvc ? -1 : 1;
+            }
+          }
+          return a.startRow - b.startRow || a.startCol - b.startCol;
+        })
+        .map((w) => {
+          const isService = w.id.startsWith('svc-');
+          return {
+            id: w.id,
+            span: isService ? 1 : 2,
+            height: GRID_CONSTANTS.CELL_HEIGHT + 8,
+            render: () => (
+              <ErrorBoundary isInline fallbackTitle={w.title}>
+                {w.render(isService ? 1 : 2, 1)}
+              </ErrorBoundary>
+            ),
+          };
+        }),
+    [placedWidgets, flatMode]
+  );
+
+  const saveMobileOrder = (order: string[]) => {
+    const updated = { ...prefs, mobileOrder: { ...(prefs.mobileOrder || {}), [mobileOrderKey]: order } };
+    onUpdatePrefs(updated);
+    saveUserPreferences(userId, updated);
+  };
+
   if (activeWidgets.length === 0) {
     if (flatMode) {
       return (
@@ -167,11 +209,23 @@ export function TopWidgetsGrid({
     );
   }
 
+  if (isMobile) {
+    return (
+      <MobileSortableList
+        items={mobileItems}
+        savedOrder={prefs.mobileOrder?.[mobileOrderKey]}
+        onReorder={userId ? saveMobileOrder : undefined}
+        columns={flatMode ? 2 : 1}
+        canReorder={!searchQuery?.trim()}
+      />
+    );
+  }
+
   return (
-    <div className="w-full overflow-x-auto pb-2">
+    <div className="w-full min-w-0">
       <div
         ref={gridRef}
-        className="grid gap-2.5 relative select-none min-w-[700px] xl:min-w-0"
+        className="grid gap-2.5 relative select-none"
         style={{
           gridTemplateColumns: `repeat(${GRID_CONSTANTS.FLAT_COLS}, minmax(0, 1fr))`,
           gridAutoRows: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
@@ -217,7 +271,9 @@ export function TopWidgetsGrid({
               }`}
             >
               {/* Content representation */}
-              {widget.render(currentColSpan, currentRowSpan)}
+              <ErrorBoundary isInline fallbackTitle={widget.title}>
+                {widget.render(currentColSpan, currentRowSpan)}
+              </ErrorBoundary>
 
               {/* Size preset toggle pill (Hover top-right) */}
               <button

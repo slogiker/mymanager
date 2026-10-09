@@ -402,4 +402,29 @@ router.post('/pironman/rgb', verifyToken, requireOwner, async (req, res) => {
   }
 });
 
+// 7. System Self-Heal: Rebuild Frontend Assets
+const { exec } = require('child_process');
+const path = require('path');
+
+router.post('/system/rebuild', verifyToken, requireOwner, (req, res) => {
+  const rootDir = path.resolve(__dirname, '../../../..');
+  exec('npm run build --workspace=mymanager-client', { cwd: rootDir, timeout: 60000 }, (err, stdout, stderr) => {
+    if (err) {
+      console.error('[Admin System Rebuild Error]:', err, stderr);
+      return res.status(500).json({
+        success: false,
+        message: 'Build process failed',
+        details: err.message,
+        stderr: stderr?.slice(0, 500),
+      });
+    }
+    console.log('[Admin System Rebuild Success]:\n', stdout);
+    res.json({
+      success: true,
+      message: 'Frontend assets rebuilt successfully',
+      output: stdout?.slice(0, 300),
+    });
+  });
+});
+
 module.exports = router;

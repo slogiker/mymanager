@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { LayoutDashboard } from 'lucide-react';
 import type { Project } from '../../types';
 
 interface TagColors {
@@ -50,6 +52,14 @@ export default function ProjectCard({ project }: ProjectCardProps) {
               </svg>
             </a>
           )}
+          <Link
+            to={`/dashboard?tab=projects&project=${project.id}`}
+            className="text-slate-500 hover:text-red-400 transition-colors"
+            aria-label="View in dashboard"
+            title="View in dashboard"
+          >
+            <LayoutDashboard className="w-4 h-4" />
+          </Link>
           {live_url && (
             <a href={live_url} target="_blank" rel="noopener noreferrer"
               className="text-slate-500 hover:text-slate-200 transition-colors" aria-label="Live demo">

@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Search,
-  FolderPlus,
   SlidersHorizontal,
   RefreshCw,
   Plus,
@@ -11,10 +10,10 @@ export interface DashboardToolbarProps {
   search: string;
   onSearchChange: (value: string) => void;
   user: any;
-  disableCategories: boolean;
-  onToggleDisableCategories: () => void;
-  hiddenCategoriesCount: number;
-  onOpenAddCategory: () => void;
+  disableCategories?: boolean;
+  onToggleDisableCategories?: () => void;
+  hiddenCategoriesCount?: number;
+  onOpenAddCategory?: () => void;
   onOpenCustomize: () => void;
   onOpenServerGauges?: () => void;
   onOpenPironman?: () => void;
@@ -26,10 +25,7 @@ export function DashboardToolbar({
   search,
   onSearchChange,
   user,
-  disableCategories,
-  onToggleDisableCategories,
-  hiddenCategoriesCount,
-  onOpenAddCategory,
+  hiddenCategoriesCount = 0,
   onOpenCustomize,
   onOpenServerGauges,
   onOpenPironman,
@@ -39,8 +35,8 @@ export function DashboardToolbar({
   const isOwner = user?.role === 'owner';
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/60">
-      <div className="relative flex-1 max-w-sm">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800/60 w-full min-w-0">
+      <div className="relative w-full sm:max-w-sm min-w-0">
         <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
         <input
           type="text"
@@ -51,18 +47,7 @@ export function DashboardToolbar({
         />
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        {user && !disableCategories && (
-          <button
-            type="button"
-            onClick={onOpenAddCategory}
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:border-slate-700 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors"
-            title="Create a new custom category box"
-          >
-            <FolderPlus className="w-3.5 h-3.5 text-red-400" />
-            <span>Add Category</span>
-          </button>
-        )}
+      <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
 
         <button
           type="button"

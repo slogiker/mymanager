@@ -1,14 +1,6 @@
 import React from 'react';
 import { ErrorBoundary } from '../../common/ErrorBoundary';
 import {
-  DndContext,
-  closestCenter,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  rectSortingStrategy,
-} from '@dnd-kit/sortable';
-import {
   Service,
   ServerNode,
   SpeedtestResult,
@@ -21,12 +13,11 @@ import {
 import { TopWidgetsGrid } from '../widgets';
 import { ErrBox } from '../common';
 import {
-  SortableCategoryColumn,
   DashboardToolbar,
   BoardModalsContainer,
   useHomelabBoardState,
 } from './index';
-import { BOARD, useBoardCols } from './boardGrid';
+import { useIsMobile } from './boardGrid';
 import { saveUserPreferences } from '../../../lib/userPreferences';
 
 export interface HomelabBoardProps {
@@ -116,7 +107,7 @@ export function HomelabBoard({
     onOpenInspector,
   });
 
-  const boardCols = useBoardCols();
+  const isMobile = useIsMobile();
 
   return (
     <div className="space-y-6">
@@ -125,15 +116,6 @@ export function HomelabBoard({
         search={search}
         onSearchChange={setSearch}
         user={user}
-        disableCategories={Boolean(prefs.disableCategories)}
-        onToggleDisableCategories={() => {
-          const next = !prefs.disableCategories;
-          const updated = { ...prefs, disableCategories: next };
-          setPrefs(updated);
-          saveUserPreferences(user?.id, updated);
-        }}
-        hiddenCategoriesCount={prefs.hiddenCategories.length}
-        onOpenAddCategory={() => setCategoryModal(true)}
         onOpenCustomize={() => setViewModal(true)}
         onOpenServerGauges={user?.role === 'owner' ? () => setServerGaugesModal(true) : undefined}
         onOpenPironman={user?.role === 'owner' ? () => setPironmanModal(true) : undefined}
@@ -143,8 +125,8 @@ export function HomelabBoard({
 
       <ErrBox msg={error} />
 
-      {/* Mode A: Flat Grid Mode (Everything unified in 8-column canvas) */}
-      {prefs.disableCategories ? (
+      {/* Unified Canvas Dashboard (All services and modular widgets unified) */}
+      <ErrorBoundary fallbackTitle="Dashboard Grid" onReset={onRefresh}>
         <TopWidgetsGrid
           prefs={prefs}
           onUpdatePrefs={setPrefs}
@@ -179,85 +161,7 @@ export function HomelabBoard({
           onUpdateCardLayout={onUpdateCardLayout}
           isServiceVpnLocked={isServiceVpnLocked}
         />
-      ) : (
-        /* Mode B: Category Mode (Widgets on Top Grid, Service Categories on Bottom) */
-        <div className="space-y-6">
-          {/* Top Widgets Grid (Dedicated modular widgets canvas) */}
-          <TopWidgetsGrid
-            prefs={prefs}
-            onUpdatePrefs={setPrefs}
-            userId={user?.id}
-            uptime={hostNode?.uptime}
-            speedtest={speedtest}
-            onRunSpeedtest={onRunSpeedtest}
-            isRunningSpeedtest={isRunningSpeedtest}
-            qbitStats={qbitStats}
-            piholeStats={piholeStats}
-            wgStats={wgStats}
-            jellyfinStats={jellyfinStats}
-            jellyseerrStats={jellyseerrStats}
-            onOpenInspector={onOpenInspector}
-            nodes={nodes}
-            loadingNodes={loadingNodes}
-            isAdmin={user?.role === 'owner'}
-            serverGauges={prefs.serverGauges}
-            onOpenPironman={() => setPironmanModal(true)}
-            onOpenCustomize={() => setViewModal(true)}
-            onUpdateServerGauges={(updated) => {
-              const next = { ...prefs, serverGauges: updated };
-              setPrefs(next);
-              saveUserPreferences(user?.id, next);
-            }}
-            searchQuery={search}
-            flatMode={false}
-            onUpdateCardLayout={onUpdateCardLayout}
-            isServiceVpnLocked={isServiceVpnLocked}
-          />
-
-          {/* Service Categories Board (Categories containing services only) */}
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={unifiedBoardItems} strategy={rectSortingStrategy}>
-              <div
-                className="grid grid-flow-row-dense"
-                style={{
-                  gridTemplateColumns: `repeat(${boardCols}, minmax(0, 1fr))`,
-                  gridAutoRows: `${BOARD.CELL_HEIGHT}px`,
-                  gap: `${BOARD.GAP}px`,
-                }}
-              >
-                {unifiedBoardItems.map((itemKey) => {
-                  const cat = itemKey.replace('cat:', '');
-                  if (prefs.hiddenCategories.includes(cat)) return null;
-                  const items = filteredServices.filter(s => (s.category?.trim() || 'Services') === cat);
-                  if (!user && items.length === 0) return null;
-
-                  return (
-                    <ErrorBoundary key={itemKey} isInline fallbackTitle={`Category: ${cat}`}>
-                      <SortableCategoryColumn
-                        id={itemKey}
-                        category={cat}
-                        items={items}
-                        boardCols={boardCols}
-                        vpnConnected={vpnConnected}
-                        onVpnLockedClick={handleVpnLockedClick}
-                        isOwner={Boolean(user)}
-                        onRename={(old) => setRenameModal({ open: true, oldName: old, newName: old })}
-                        onAddService={(c) => openNew(c)}
-                        onEditService={openEdit}
-                        onDeleteService={removeService}
-                        onUpdateCardLayout={onUpdateCardLayout}
-                        onOpenInspector={onOpenInspector}
-                        onMoveCardCategory={onMoveCardCategory}
-                        jellyfinStats={jellyfinStats}
-                      />
-                    </ErrorBoundary>
-                  );
-                })}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
-      )}
+      </ErrorBoundary>
 
       {/* Modals and Notifications Container */}
       <BoardModalsContainer

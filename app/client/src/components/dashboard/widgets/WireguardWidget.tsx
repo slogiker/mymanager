@@ -130,9 +130,9 @@ export function WireguardWidget({
                   {peer.allowedIps || 'IP Managed'}
                 </div>
                 <div className="text-[9px] font-mono text-slate-500 truncate flex items-center gap-1">
-                  <span>Rx: {(peer.transferRx / (1024 * 1024)).toFixed(1)}MB</span>
+                  <span>Rx: {((peer.transferRx || 0) / (1024 * 1024)).toFixed(1)}MB</span>
                   <span>·</span>
-                  <span>Tx: {(peer.transferTx / (1024 * 1024)).toFixed(1)}MB</span>
+                  <span>Tx: {((peer.transferTx || 0) / (1024 * 1024)).toFixed(1)}MB</span>
                 </div>
               </div>
             ))

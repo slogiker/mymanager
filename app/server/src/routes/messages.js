@@ -92,4 +92,34 @@ router.delete('/:id', verifyToken, requireOwner, (req, res) => {
   res.json({ message: 'Deleted' });
 });
 
+router.post('/batch-archive', verifyToken, requireOwner, (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'IDs array required' });
+  }
+  const stmt = db.prepare('UPDATE messages SET archived = 1 WHERE id = ?');
+  const runBatch = db.transaction((idList) => {
+    for (const id of idList) {
+      stmt.run(id);
+    }
+  });
+  runBatch(ids);
+  res.json({ success: true, count: ids.length, message: `Archived ${ids.length} message(s)` });
+});
+
+router.post('/batch-delete', verifyToken, requireOwner, (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'IDs array required' });
+  }
+  const stmt = db.prepare('DELETE FROM messages WHERE id = ?');
+  const runBatch = db.transaction((idList) => {
+    for (const id of idList) {
+      stmt.run(id);
+    }
+  });
+  runBatch(ids);
+  res.json({ success: true, count: ids.length, message: `Deleted ${ids.length} message(s)` });
+});
+
 module.exports = router;

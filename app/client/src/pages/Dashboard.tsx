@@ -151,7 +151,7 @@ export default function DashboardPage() {
             {/* VPN / Network Status Badge */}
             {vpnStatus && (
               <div
-                className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-colors ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-mono transition-colors ${
                   vpnStatus.connected
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                     : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
@@ -164,13 +164,15 @@ export default function DashboardPage() {
               >
                 {vpnStatus.connected ? (
                   <>
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{vpnStatus.isVpn ? 'VPN Active' : 'LAN Active'}</span>
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="hidden sm:inline">{vpnStatus.isVpn ? 'VPN Active' : 'LAN Active'}</span>
+                    <span className="sm:hidden">{vpnStatus.isVpn ? 'VPN' : 'LAN'}</span>
                   </>
                 ) : (
                   <>
-                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-                    <span>External (No VPN)</span>
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="hidden sm:inline">External (No VPN)</span>
+                    <span className="sm:hidden">No VPN</span>
                   </>
                 )}
               </div>

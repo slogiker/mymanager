@@ -169,16 +169,16 @@ export function WireguardInspectorModal({
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-slate-400 font-medium">Server Key:</span>
                 <span className="font-mono text-slate-300 truncate">
-                  {data.interface.publicKey}
+                  {data?.interface?.publicKey}
                 </span>
               </div>
               <button
                 type="button"
-                onClick={() => handleCopy(data.interface!.publicKey)}
+                onClick={() => data?.interface?.publicKey && handleCopy(data.interface.publicKey)}
                 className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors ml-2 shrink-0"
                 title="Copy public key"
               >
-                {copiedKey === data.interface.publicKey ? (
+                {copiedKey === data?.interface?.publicKey ? (
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" />

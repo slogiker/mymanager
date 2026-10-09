@@ -127,21 +127,6 @@ router.post('/:id/share-to-users', (req, res) => {
     );
   }
 
-  // Insert notification in messages table
-  try {
-    const itemLabel = clip.title || (clip.content ? (clip.content.length > 30 ? clip.content.slice(0, 30) + '…' : clip.content) : 'Clipboard Item');
-    db.prepare(`
-      INSERT INTO messages (name, email, subject, content, ip_address)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(
-      senderName,
-      req.user.email || 'system@slogiker.si',
-      `Shared Note from ${senderName}`,
-      `"${itemLabel}" was shared to your clipboard and notes by ${senderName}.`,
-      req.ip || '127.0.0.1'
-    );
-  } catch {}
-
   res.json({ success: true, count: users.length, message: `Shared with ${users.length} user(s)` });
 });
 

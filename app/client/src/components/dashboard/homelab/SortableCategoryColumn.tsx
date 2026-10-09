@@ -12,10 +12,13 @@ import {
   layoutCategoryCards,
   getFillerCells,
 } from '../../../lib/cardGridEngine';
+import { UserPreferences, saveUserPreferences } from '../../../lib/userPreferences';
 import { ServiceIcon } from '../common/ServiceIcon';
 import { ServiceCardItem } from '../widgets/ServiceCardItem';
+import { MobileSortableList, MobileSortableItem } from '../widgets/MobileSortableList';
 import { useCategoryCardInteraction } from './useCategoryCardInteraction';
-import { BOARD, boardSpanStyle } from './boardGrid';
+import { BOARD, boardSpanStyle, useIsMobile } from './boardGrid';
+import { ErrorBoundary } from '../../common/ErrorBoundary';
 
 export interface SortableCategoryColumnProps {
   id: string;
@@ -33,6 +36,9 @@ export interface SortableCategoryColumnProps {
   onOpenInspector?: (type: 'wireguard' | 'pihole' | 'qbittorrent' | 'jellyfin' | 'jellyseerr') => void;
   onMoveCardCategory?: (serviceId: number, fromCategory: string, toCategory: string) => void;
   jellyfinStats?: JellyfinStats | null;
+  prefs?: UserPreferences;
+  onUpdatePrefs?: (updated: UserPreferences) => void;
+  userId?: number;
 }
 
 export function SortableCategoryColumn({
@@ -51,7 +57,11 @@ export function SortableCategoryColumn({
   onOpenInspector,
   onMoveCardCategory,
   jellyfinStats,
+  prefs,
+  onUpdatePrefs,
+  userId,
 }: SortableCategoryColumnProps) {
+  const isMobile = useIsMobile();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
   const [isDropTargetHovered, setIsDropTargetHovered] = useState<boolean>(false);
@@ -105,10 +115,69 @@ export function SortableCategoryColumn({
   const contentRows = activeCards.reduce((m, c) => Math.max(m, c.startRow + c.rowSpan), 1);
   const boardRows = 1 + (isInteracting ? Math.max(contentRows + 1, 3) : contentRows);
 
+  const mobileOrderKey = `cat:${category}`;
+  const mobileServiceItems: MobileSortableItem[] = useMemo(() => {
+    return items.map((s) => {
+      const isVpnRequired = Boolean(
+        s.requires_vpn ||
+        (s.url && (s.url.includes('.home.arpa') || s.url.includes('192.168.1.') || s.url.includes('10.7.235.')))
+      );
+      const isVpnLocked = isVpnRequired && vpnConnected === false;
+      return {
+        id: String(s.id),
+        span: 1,
+        height: GRID_CONSTANTS.CELL_HEIGHT + 8,
+        frameClassName: isVpnLocked ? 'border-amber-500/30 bg-[#16181f]/60 opacity-60' : undefined,
+        render: () => (
+          <ErrorBoundary isInline fallbackTitle={s.title}>
+            <ServiceCardItem
+              service={s}
+              colSpan={1}
+              rowSpan={1}
+              isOwner={isOwner}
+              noFrame={true}
+              locked={isVpnLocked}
+              jellyfinStats={jellyfinStats}
+              onCardClick={(svc) => {
+                if (isVpnLocked) {
+                  onVpnLockedClick?.(svc.title, svc.url);
+                  return;
+                }
+                if (svc.url === '#' || !svc.url) {
+                  if (svc.telemetryType && onOpenInspector) {
+                    onOpenInspector(svc.telemetryType);
+                  }
+                } else {
+                  window.open(svc.url, '_blank', 'noopener,noreferrer');
+                }
+              }}
+              onEdit={onEditService}
+              onDelete={onDeleteService}
+              onInspect={onOpenInspector}
+            />
+          </ErrorBoundary>
+        ),
+      };
+    });
+  }, [items, vpnConnected, isOwner, jellyfinStats, onVpnLockedClick, onOpenInspector, onEditService, onDeleteService]);
+
+  const handleMobileReorder = (order: string[]) => {
+    if (!prefs || !onUpdatePrefs) return;
+    const updated = {
+      ...prefs,
+      mobileOrder: {
+        ...(prefs.mobileOrder || {}),
+        [mobileOrderKey]: order,
+      },
+    };
+    onUpdatePrefs(updated);
+    saveUserPreferences(userId, updated);
+  };
+
   return (
     <div
       ref={setNodeRef}
-      style={{ ...style, ...boardSpanStyle(BOARD.CATEGORY_COLS, boardRows, boardCols) }}
+      style={isMobile ? style : { ...style, ...boardSpanStyle(BOARD.CATEGORY_COLS, boardRows, boardCols) }}
       data-category-column={category}
       className={`group/col relative min-w-0 p-3 transition-colors duration-200 flex flex-col gap-2.5 rounded-2xl bg-[#12141c]/90 border border-slate-800/80 hover:border-slate-700/80 shadow-md ${
         isDropTargetHovered
@@ -130,7 +199,7 @@ export function SortableCategoryColumn({
           <button
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 text-slate-600 hover:text-slate-300 rounded transition-colors"
+            className="cursor-grab active:cursor-grabbing p-1 text-slate-600 hover:text-slate-300 rounded transition-colors touch-none"
             title="Drag category to rearrange"
           >
             <GripVertical className="w-4 h-4" />
@@ -165,132 +234,161 @@ export function SortableCategoryColumn({
         )}
       </div>
 
-      {/* Freeform Category Mini-Grid */}
-      <div
-        ref={gridRef}
-        className="grid grid-cols-2 gap-2.5 relative select-none"
-        style={{
-          gridAutoRows: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
-        }}
-      >
-        {/* Grid Slots Outline (Shown when user is actively resizing or dragging) */}
-        {(resizing !== null || cardDragging !== null || isDropTargetHovered) && fillerCells.map((filler) => (
-          <div
-            key={`filler-${filler.col}-${filler.row}`}
-            style={{
-              gridColumn: `${filler.col + 1} / span 1`,
-              gridRow: `${filler.row + 1} / span 1`,
-              minHeight: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
-            }}
-            className="rounded-xl border border-dashed border-red-500/30 bg-red-500/[0.03] pointer-events-none transition-all"
+      {/* Category Content: Mobile Sortable List vs Desktop Freeform Mini-Grid */}
+      {isMobile ? (
+        <div className="w-full min-w-0">
+          <MobileSortableList
+            items={mobileServiceItems}
+            savedOrder={prefs?.mobileOrder?.[mobileOrderKey]}
+            onReorder={isOwner ? handleMobileReorder : undefined}
+            columns={2}
+            canReorder={isOwner}
           />
-        ))}
-
-        {/* Placed Service Cards */}
-        {activeCards.map((s) => {
-          const isCurrentDragging = cardDragging?.id === s.id;
-          const isCurrentResizing = resizing?.id === s.id;
-          const currentColSpan = isCurrentResizing && resizing ? resizing.colSpan : s.colSpan;
-          const currentRowSpan = isCurrentResizing && resizing ? resizing.rowSpan : s.rowSpan;
-          const startCol = s.startCol;
-          const startRow = s.startRow;
-
-          const isVpnRequired = Boolean(
-            s.requires_vpn ||
-            (s.url && (s.url.includes('.home.arpa') || s.url.includes('192.168.1.') || s.url.includes('10.7.235.')))
-          );
-          const isVpnLocked = isVpnRequired && vpnConnected === false;
-
-          return (
-            <div
-              key={s.id}
-              onMouseDown={(e) => isOwner && handleStartCardDrag(e, s)}
-              style={{
-                gridColumn: `${startCol + 1} / span ${currentColSpan}`,
-                gridRow: `${startRow + 1} / span ${currentRowSpan}`,
-              }}
-              className={`group relative rounded-xl border transition-colors duration-150 select-none overflow-hidden ${
-                isCurrentDragging || dragFloating?.card.id === s.id
-                  ? 'border-red-500/80 shadow-2xl scale-[0.98] bg-[#1a1d28]/60 z-20 cursor-grabbing ring-2 ring-red-500/30 opacity-40 border-dashed'
-                  : isCurrentResizing
-                  ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] bg-[#1c1f2b] z-30 cursor-se-resize'
-                  : isVpnLocked
-                  ? 'border-amber-500/30 bg-[#16181f]/60 opacity-60 hover:opacity-85 hover:border-amber-500/50 hover:shadow-lg cursor-pointer'
-                  : 'border-slate-800/80 bg-[#16181f]/80 hover:bg-[#1c1f2b] hover:border-slate-700/80 hover:shadow-lg cursor-pointer'
-              } p-3`}
-            >
-              <ServiceCardItem
-                service={s}
-                colSpan={currentColSpan}
-                rowSpan={currentRowSpan}
-                isOwner={isOwner}
-                noFrame={true}
-                locked={isVpnLocked}
-                jellyfinStats={jellyfinStats}
-                onCardClick={(svc) => {
-                  if (preventClickRef.current) return;
-                  if (isVpnLocked) {
-                    onVpnLockedClick?.(svc.title, svc.url);
-                    return;
-                  }
-                  if (svc.url === '#' || !svc.url) {
-                    if (svc.telemetryType && onOpenInspector) {
-                      onOpenInspector(svc.telemetryType);
-                    }
-                  } else {
-                    window.open(svc.url, '_blank', 'noopener,noreferrer');
-                  }
-                }}
-                onEdit={onEditService}
-                onDelete={onDeleteService}
-                onInspect={onOpenInspector}
-              />
-
-              {/* Top edge resize handle: expand upward */}
-              {isOwner && startRow > 0 && currentRowSpan < 3 && (
-                <div
-                  onMouseDown={(e) => handleStartResize(e, s, 'top')}
-                  className="resize-handle absolute top-0 left-0 right-0 h-2 bg-transparent hover:bg-red-500/30 cursor-n-resize opacity-0 group-hover:opacity-100 transition-opacity z-20"
-                  title="Drag up to expand height"
-                />
-              )}
-
-              {/* Bottom-right corner resize handle: expand width & height */}
+          {items.length === 0 && (
+            <div className="flex flex-col items-center justify-center text-center border border-dashed border-slate-800/80 rounded-xl py-6">
+              <p className="text-xs text-slate-600">No services in this category</p>
               {isOwner && (
-                <div
-                  onMouseDown={(e) => handleStartResize(e, s, 'se')}
-                  className="resize-handle absolute bottom-1 right-1 w-4 h-4 text-slate-600 hover:text-red-400 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
-                  title="Drag to resize card width and height"
+                <button
+                  type="button"
+                  onClick={() => onAddService(category)}
+                  className="mt-1 text-xs text-red-400 hover:underline"
                 >
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="text-current">
-                    <circle cx="7" cy="7" r="1" fill="currentColor" />
-                    <circle cx="7" cy="4" r="1" fill="currentColor" />
-                    <circle cx="7" cy="1" r="1" fill="currentColor" />
-                    <circle cx="4" cy="7" r="1" fill="currentColor" />
-                    <circle cx="4" cy="4" r="1" fill="currentColor" />
-                    <circle cx="1" cy="7" r="1" fill="currentColor" />
-                  </svg>
-                </div>
+                  Add service
+                </button>
               )}
             </div>
-          );
-        })}
+          )}
+        </div>
+      ) : (
+        <div
+          ref={gridRef}
+          className="grid grid-cols-2 gap-2.5 relative select-none"
+          style={{
+            gridAutoRows: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
+          }}
+        >
+          {/* Grid Slots Outline (Shown when user is actively resizing or dragging) */}
+          {(resizing !== null || cardDragging !== null || isDropTargetHovered) && fillerCells.map((filler) => (
+            <div
+              key={`filler-${filler.col}-${filler.row}`}
+              style={{
+                gridColumn: `${filler.col + 1} / span 1`,
+                gridRow: `${filler.row + 1} / span 1`,
+                minHeight: `${GRID_CONSTANTS.CELL_HEIGHT}px`,
+              }}
+              className="rounded-xl border border-dashed border-red-500/30 bg-red-500/[0.03] pointer-events-none transition-all"
+            />
+          ))}
 
-        {items.length === 0 && (
-          <div className="col-span-2 flex flex-col items-center justify-center text-center border border-dashed border-slate-800/80 rounded-xl">
-            <p className="text-xs text-slate-600">No services in this category</p>
-            <button
-              onClick={() => onAddService(category)}
-              className="mt-1 text-xs text-red-400 hover:underline"
-            >
-              Add service
-            </button>
-          </div>
-        )}
-      </div>
+          {/* Placed Service Cards */}
+          {activeCards.map((s) => {
+            const isCurrentDragging = cardDragging?.id === s.id;
+            const isCurrentResizing = resizing?.id === s.id;
+            const currentColSpan = isCurrentResizing && resizing ? resizing.colSpan : s.colSpan;
+            const currentRowSpan = isCurrentResizing && resizing ? resizing.rowSpan : s.rowSpan;
+            const startCol = s.startCol;
+            const startRow = s.startRow;
+
+            const isVpnRequired = Boolean(
+              s.requires_vpn ||
+              (s.url && (s.url.includes('.home.arpa') || s.url.includes('192.168.1.') || s.url.includes('10.7.235.')))
+            );
+            const isVpnLocked = isVpnRequired && vpnConnected === false;
+
+            return (
+              <div
+                key={s.id}
+                onMouseDown={(e) => isOwner && handleStartCardDrag(e, s)}
+                style={{
+                  gridColumn: `${startCol + 1} / span ${currentColSpan}`,
+                  gridRow: `${startRow + 1} / span ${currentRowSpan}`,
+                }}
+                className={`group relative rounded-xl border transition-colors duration-150 select-none overflow-hidden ${
+                  isCurrentDragging || dragFloating?.card.id === s.id
+                    ? 'border-red-500/80 shadow-2xl scale-[0.98] bg-[#1a1d28]/60 z-20 cursor-grabbing ring-2 ring-red-500/30 opacity-40 border-dashed'
+                    : isCurrentResizing
+                    ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] bg-[#1c1f2b] z-30 cursor-se-resize'
+                    : isVpnLocked
+                    ? 'border-amber-500/30 bg-[#16181f]/60 opacity-60 hover:opacity-85 hover:border-amber-500/50 hover:shadow-lg cursor-pointer'
+                    : 'border-slate-800/80 bg-[#16181f]/80 hover:bg-[#1c1f2b] hover:border-slate-700/80 hover:shadow-lg cursor-pointer'
+                } p-3`}
+              >
+                <ErrorBoundary isInline fallbackTitle={s.title}>
+                  <ServiceCardItem
+                    service={s}
+                    colSpan={currentColSpan}
+                    rowSpan={currentRowSpan}
+                    isOwner={isOwner}
+                    noFrame={true}
+                    locked={isVpnLocked}
+                    jellyfinStats={jellyfinStats}
+                    onCardClick={(svc) => {
+                      if (preventClickRef.current) return;
+                      if (isVpnLocked) {
+                        onVpnLockedClick?.(svc.title, svc.url);
+                        return;
+                      }
+                      if (svc.url === '#' || !svc.url) {
+                        if (svc.telemetryType && onOpenInspector) {
+                          onOpenInspector(svc.telemetryType);
+                        }
+                      } else {
+                        window.open(svc.url, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                    onEdit={onEditService}
+                    onDelete={onDeleteService}
+                    onInspect={onOpenInspector}
+                  />
+                </ErrorBoundary>
+
+                {/* Top edge resize handle: expand upward */}
+                {isOwner && startRow > 0 && currentRowSpan < 3 && (
+                  <div
+                    onMouseDown={(e) => handleStartResize(e, s, 'top')}
+                    className="resize-handle absolute top-0 left-0 right-0 h-2 bg-transparent hover:bg-red-500/30 cursor-n-resize opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                    title="Drag up to expand height"
+                  />
+                )}
+
+                {/* Bottom-right corner resize handle: expand width & height */}
+                {isOwner && (
+                  <div
+                    onMouseDown={(e) => handleStartResize(e, s, 'se')}
+                    className="resize-handle absolute bottom-1 right-1 w-4 h-4 text-slate-600 hover:text-red-400 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
+                    title="Drag to resize card width and height"
+                  >
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" className="text-current">
+                      <circle cx="7" cy="7" r="1" fill="currentColor" />
+                      <circle cx="7" cy="4" r="1" fill="currentColor" />
+                      <circle cx="7" cy="1" r="1" fill="currentColor" />
+                      <circle cx="4" cy="7" r="1" fill="currentColor" />
+                      <circle cx="4" cy="4" r="1" fill="currentColor" />
+                      <circle cx="1" cy="7" r="1" fill="currentColor" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {items.length === 0 && (
+            <div className="col-span-2 flex flex-col items-center justify-center text-center border border-dashed border-slate-800/80 rounded-xl">
+              <p className="text-xs text-slate-600">No services in this category</p>
+              <button
+                type="button"
+                onClick={() => onAddService(category)}
+                className="mt-1 text-xs text-red-400 hover:underline"
+              >
+                Add service
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Floating Drag Overlay */}
-      {dragFloating && (
+      {!isMobile && dragFloating && (
         <div
           style={{
             position: 'fixed',

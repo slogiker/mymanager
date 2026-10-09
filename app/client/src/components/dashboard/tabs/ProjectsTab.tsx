@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { Project } from '../../../types';
 import { api } from '../../../lib/api';
@@ -29,6 +30,8 @@ const PROJ_EMPTY: ProjectForm = {
 };
 
 export function ProjectsTab() {
+  const [searchParams] = useSearchParams();
+  const selectedProjectParam = searchParams.get('project') || searchParams.get('id');
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -49,6 +52,20 @@ export function ProjectsTab() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (projects.length > 0 && selectedProjectParam) {
+      const match = projects.find(
+        (p) =>
+          String(p.id) === selectedProjectParam ||
+          p.title.toLowerCase() === selectedProjectParam.toLowerCase() ||
+          p.title.toLowerCase().replace(/\s+/g, '-').includes(selectedProjectParam.toLowerCase())
+      );
+      if (match && searchParams.get('edit') === 'true') {
+        openEdit(match);
+      }
+    }
+  }, [projects, selectedProjectParam]);
 
   const set = (k: keyof ProjectForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value }));
@@ -120,8 +137,22 @@ export function ProjectsTab() {
 
       {loading ? <Spinner /> : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {projects.map((p) => (
-            <div key={p.id} className="flex flex-col justify-between p-4 rounded-xl border border-slate-800 bg-[#16181f] hover:border-slate-700 transition-colors">
+          {projects.map((p) => {
+            const isSelected = selectedProjectParam && (
+              String(p.id) === selectedProjectParam ||
+              p.title.toLowerCase() === selectedProjectParam.toLowerCase() ||
+              p.title.toLowerCase().replace(/\s+/g, '-').includes(selectedProjectParam.toLowerCase())
+            );
+            return (
+              <div
+                key={p.id}
+                id={`project-card-${p.id}`}
+                className={`flex flex-col justify-between p-4 rounded-xl border transition-all ${
+                  isSelected
+                    ? 'border-red-500/80 bg-[#1e151a] shadow-[0_0_20px_rgba(239,68,68,0.25)] ring-1 ring-red-500/50'
+                    : 'border-slate-800 bg-[#16181f] hover:border-slate-700'
+                }`}
+              >
               <div>
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-sm text-slate-100">{p.title}</h3>
@@ -145,7 +176,8 @@ export function ProjectsTab() {
                 </div>
               </div>
             </div>
-          ))}
+          );
+        })}
         </div>
       )}
 

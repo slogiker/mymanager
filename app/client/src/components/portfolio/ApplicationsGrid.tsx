@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from '../../context/LanguageContext';
-import { ExternalLink, Github, X, Timer, Server, Sparkles, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, Github, X, Timer, Server, Sparkles, Image as ImageIcon, CheckCircle2, LayoutDashboard } from 'lucide-react';
 
 interface ProjectItem {
   id: string;
@@ -281,6 +282,14 @@ export default function ApplicationsGrid() {
                   GitHub Repository
                 </a>
               )}
+              <Link
+                to={`/dashboard?tab=projects&project=${selectedProject.id}`}
+                className="px-4 py-2.5 rounded-xl border border-slate-700/60 hover:border-slate-500 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-colors bg-white/[0.02]"
+                title="View and configure in Dashboard"
+              >
+                <LayoutDashboard className="w-4 h-4 text-red-400" />
+                Dashboard Project
+              </Link>
               {selectedProject.liveUrl && (
                 <a
                   href={selectedProject.liveUrl}
