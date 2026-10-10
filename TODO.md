@@ -84,6 +84,8 @@
   - Desktop & Wide displays: full 6-8 column freeform grid with drag-and-drop and resize handles.
 - [ ] Import and Export dashboard layout JSON configurations.
 - [ ] Custom background image / wallpaper selector for dashboard.
+- [ ] Mobile View Categories: Categories are missing in mobile view while desktop/PC view still has them.
+- [ ] Service Cards Height & Text Visibility: Make service cards taller or adjust sizing so all text is visible without truncation.
 
 ---
 
@@ -105,7 +107,17 @@
 
 ---
 
-## Next Session Priorities & Backlog (*)
+- [ ] **Cloudflare DDNS & Cert Status Dashboard Integration (Phase 2) (*)**:
+  - Locate myManager deployment on rpi5 (Docker container behind NPM, bridge IP 172.18.0.2:3000, host port 3005) and compose file; inspect user and mount paths before changing.
+  - Mount `~/server/apps/cf-ddns/status.json` as read-only bind mount into the myManager container.
+  - Create Express endpoint `GET /api/admin/ddns-status` protected behind existing admin-only auth middleware (never public), handling missing/unparsable status file with clean JSON errors.
+  - Add admin dashboard telemetry panel: current IP, last success age, per-host OK/FAIL list, and SSL cert days left, with alert styling if an ALERT condition holds.
+  - Never commit `status.json` or secrets; do not touch `/files` or Terminal page.
+  - Provide RAW git diff --stat, docker-compose diff, and `curl -i` testing unauthenticated (401/403) vs authenticated admin session.
+- [ ] **Mobile View Categories Missing (*)**:
+  - Bring categories to mobile view (currently missing in mobile view while PC view still has them).
+- [ ] **Service Cards Height & Text Visibility (*)**:
+  - Make service cards taller or adjust spacing/sizing so that all text can be fully seen.
 - [ ] **Widget Re-sorting & Landscape Layout Optimization (*)**:
   - Rearrange and sort widgets differently for mobile landscape and constrained viewport layouts while keeping existing widgets intact.
 - [ ] **Analytics Page Redesign (*)**:
