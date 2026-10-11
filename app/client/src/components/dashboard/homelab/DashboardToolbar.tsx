@@ -4,6 +4,9 @@ import {
   SlidersHorizontal,
   RefreshCw,
   Plus,
+  Layers,
+  LayoutGrid,
+  FolderPlus,
 } from 'lucide-react';
 
 export interface DashboardToolbarProps {
@@ -25,7 +28,10 @@ export function DashboardToolbar({
   search,
   onSearchChange,
   user,
+  disableCategories = false,
+  onToggleDisableCategories,
   hiddenCategoriesCount = 0,
+  onOpenAddCategory,
   onOpenCustomize,
   onOpenServerGauges,
   onOpenPironman,
@@ -48,6 +54,46 @@ export function DashboardToolbar({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+        {onToggleDisableCategories && (
+          <button
+            type="button"
+            onClick={onToggleDisableCategories}
+            className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold transition-all ${
+              disableCategories
+                ? 'border-slate-800 hover:border-slate-700 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 hover:text-white'
+                : 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20'
+            }`}
+            title={
+              disableCategories
+                ? 'Current: Flat Grid. Click to switch to Category Mode (widgets top, categories bottom)'
+                : 'Current: Category Mode. Click to switch to Flat Grid Mode (unified canvas)'
+            }
+          >
+            {disableCategories ? (
+              <>
+                <LayoutGrid className="w-3.5 h-3.5 text-slate-400" />
+                <span>Flat Mode</span>
+              </>
+            ) : (
+              <>
+                <Layers className="w-3.5 h-3.5 text-red-400" />
+                <span>Category Mode</span>
+              </>
+            )}
+          </button>
+        )}
+
+        {user && !disableCategories && onOpenAddCategory && (
+          <button
+            type="button"
+            onClick={onOpenAddCategory}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 border border-slate-800 hover:border-slate-700 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors"
+            title="Create a new custom category box"
+          >
+            <FolderPlus className="w-3.5 h-3.5 text-red-400" />
+            <span>Add Category</span>
+          </button>
+        )}
 
         <button
           type="button"

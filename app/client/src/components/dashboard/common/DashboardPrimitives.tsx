@@ -7,13 +7,14 @@ export interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  maxWidth?: string;
 }
 
-export function Modal({ open, onClose, title, children, footer }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, maxWidth = 'max-w-lg' }: ModalProps) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700/60 bg-[#16181f] p-6 shadow-2xl text-slate-100" onClick={(e) => e.stopPropagation()}>
+      <div className={`w-full ${maxWidth} max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700/60 bg-[#16181f] p-6 shadow-2xl text-slate-100`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <h3 className="text-base font-bold tracking-tight text-slate-100">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-100 text-xl leading-none">&times;</button>

@@ -43,7 +43,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   hiddenServices: [],
   hiddenGauges: [],
   compactMode: false,
-  disableCategories: true,
+  disableCategories: false,
   syncThemeWithPironman: false,
   pironmanAccentColor: '#ef4444',
   categoryOrder: [],

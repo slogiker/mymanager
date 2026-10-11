@@ -82,9 +82,10 @@
   - Mobile phones (320px - 480px): single-column touch flow, compact VPN badge, responsive toolbars.
   - Tablets (640px - 1023px): 2-column flow with drag reordering via `@dnd-kit`.
   - Desktop & Wide displays: full 6-8 column freeform grid with drag-and-drop and resize handles.
-- [ ] Import and Export dashboard layout JSON configurations.
+- [x] Import and Export dashboard layout JSON configurations.
+- [x] PC Category Mode & Mobile Flat Mode: PC displays widgets on top and separate categories below by default, with instant Category/Flat Mode switching on toolbar and in settings. Mobile viewports automatically use clean unified flow without category columns.
+- [x] Redesigned Dashboard Settings Modal: Spacious tabbed interface (Layout & Mode, Widgets, Services, Server Gauges, Hardware) replacing cramped accordion layout.
 - [ ] Custom background image / wallpaper selector for dashboard.
-- [ ] Mobile View Categories: Categories are missing in mobile view while desktop/PC view still has them.
 - [ ] Service Cards Height & Text Visibility: Make service cards taller or adjust sizing so all text is visible without truncation.
 
 ---
