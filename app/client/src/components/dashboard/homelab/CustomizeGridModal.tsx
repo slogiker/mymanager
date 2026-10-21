@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   User as UserIcon,
@@ -17,8 +17,8 @@ import {
   Clock,
   Clipboard,
   Sparkles,
-  Download,
-  Upload,
+  Copy,
+  ClipboardPaste,
   RotateCcw,
   Search,
   SlidersHorizontal,
@@ -64,8 +64,10 @@ export function CustomizeGridModal({
   const [activeTab, setActiveTab] = useState<TabType>('layout');
   const [serviceSearch, setServiceSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showJsonPanel, setShowJsonPanel] = useState(false);
+  const [jsonText, setJsonText] = useState('');
+  const [copiedJson, setCopiedJson] = useState(false);
+  const [jsonStatus, setJsonStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const toggleWidget = (widgetKey: string) => {
     const currentVis = (prefs.widgetVisible as any) || {};
@@ -130,33 +132,73 @@ export function CustomizeGridModal({
     saveUserPreferences(userId, updated);
   };
 
-  const handleExportLayout = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(prefs, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `mymanager-layout-${new Date().toISOString().slice(0, 10)}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+  const handleCopyJson = async () => {
+    const serialized = JSON.stringify(prefs, null, 2);
+    setJsonText(serialized);
+    setJsonStatus(null);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(serialized);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = serialized;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopiedJson(true);
+      setJsonStatus({ type: 'success', message: 'Layout JSON copied to clipboard!' });
+      setTimeout(() => setCopiedJson(false), 2000);
+    } catch {
+      setShowJsonPanel(true);
+      setJsonStatus({ type: 'error', message: 'Could not auto-copy. Select and copy the JSON below.' });
+    }
   };
 
-  const handleImportLayout = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
+  const handleOpenPastePanel = async () => {
+    setJsonStatus(null);
+    if (!showJsonPanel) {
+      setShowJsonPanel(true);
       try {
-        const parsed = JSON.parse(event.target?.result as string);
-        if (parsed && typeof parsed === 'object') {
-          onUpdatePrefs(parsed);
-          saveUserPreferences(userId, parsed);
+        if (navigator.clipboard && window.isSecureContext) {
+          const clip = await navigator.clipboard.readText();
+          if (clip && clip.trim().startsWith('{')) {
+            setJsonText(clip);
+            return;
+          }
         }
       } catch {
-        alert('Invalid JSON layout file.');
+        // Fallback to manual paste in textarea
       }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+      if (!jsonText) {
+        setJsonText(JSON.stringify(prefs, null, 2));
+      }
+    } else {
+      setShowJsonPanel(false);
+    }
+  };
+
+  const handleApplyJson = () => {
+    if (!jsonText.trim()) {
+      setJsonStatus({ type: 'error', message: 'Please paste your layout JSON first.' });
+      return;
+    }
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        onUpdatePrefs(parsed);
+        saveUserPreferences(userId, parsed);
+        setJsonStatus({ type: 'success', message: 'Layout configuration imported and saved!' });
+      } else {
+        setJsonStatus({ type: 'error', message: 'Invalid layout JSON object.' });
+      }
+    } catch {
+      setJsonStatus({ type: 'error', message: 'Invalid JSON syntax. Please check the pasted text.' });
+    }
   };
 
   const widgetsList = [
@@ -449,40 +491,126 @@ export function CustomizeGridModal({
 
               <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-semibold text-xs text-white">Backup & Restore</div>
+                  <div className="font-semibold text-xs text-white">JSON Copy & Paste</div>
                   <div className="text-[10px] text-slate-400 mt-0.5">
-                    Save layout to JSON or load backup
+                    Copy layout JSON or paste a saved config
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportLayout}
-                    className="hidden"
-                  />
                   <button
                     type="button"
-                    onClick={handleExportLayout}
-                    className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:border-sky-500/40 bg-slate-800 hover:bg-sky-500/10 text-slate-300 hover:text-sky-300 flex items-center gap-1 transition-colors text-[11px] font-medium"
-                    title="Export layout configuration"
+                    onClick={handleCopyJson}
+                    className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-1.5 transition-colors text-[11px] font-medium ${
+                      copiedJson
+                        ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                        : 'border-slate-700 hover:border-sky-500/40 bg-slate-800 hover:bg-sky-500/10 text-slate-300 hover:text-sky-300'
+                    }`}
+                    title="Copy layout JSON to clipboard"
                   >
-                    <Download className="w-3 h-3 text-sky-400" />
-                    <span>Export</span>
+                    {copiedJson ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 text-sky-400" />
+                        <span>Copy JSON</span>
+                      </>
+                    )}
                   </button>
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:border-emerald-500/40 bg-slate-800 hover:bg-emerald-500/10 text-slate-300 hover:text-emerald-300 flex items-center gap-1 transition-colors text-[11px] font-medium"
-                    title="Import layout configuration"
+                    onClick={handleOpenPastePanel}
+                    className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-1.5 transition-colors text-[11px] font-medium ${
+                      showJsonPanel
+                        ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                        : 'border-slate-700 hover:border-emerald-500/40 bg-slate-800 hover:bg-emerald-500/10 text-slate-300 hover:text-emerald-300'
+                    }`}
+                    title="Paste or edit layout JSON"
                   >
-                    <Upload className="w-3 h-3 text-emerald-400" />
-                    <span>Import</span>
+                    <ClipboardPaste className="w-3 h-3 text-emerald-400" />
+                    <span>{showJsonPanel ? 'Hide Paste' : 'Paste JSON'}</span>
                   </button>
                 </div>
               </div>
             </div>
+
+            {showJsonPanel && (
+              <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/80 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-300">
+                    Paste or Edit Layout JSON Configuration
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setJsonText(JSON.stringify(prefs, null, 2));
+                        setJsonStatus(null);
+                      }}
+                      className="text-[10px] font-mono text-sky-400 hover:text-sky-300 transition-colors"
+                    >
+                      Load Current
+                    </button>
+                    <span className="text-slate-700">&bull;</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setJsonText('');
+                        setJsonStatus(null);
+                      }}
+                      className="text-[10px] font-mono text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <textarea
+                  value={jsonText}
+                  onChange={(e) => {
+                    setJsonText(e.target.value);
+                    if (jsonStatus) setJsonStatus(null);
+                  }}
+                  placeholder="Paste your layout JSON here (Ctrl+V)..."
+                  rows={6}
+                  spellCheck={false}
+                  className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 resize-y"
+                />
+
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[11px]">
+                    {jsonStatus && (
+                      <span
+                        className={
+                          jsonStatus.type === 'success' ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium'
+                        }
+                      >
+                        {jsonStatus.message}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowJsonPanel(false)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-[11px] font-medium transition-colors"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApplyJson}
+                      className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Apply JSON</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
