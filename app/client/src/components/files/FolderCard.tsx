@@ -5,7 +5,7 @@ import { useDroppable, useDndMonitor } from '@dnd-kit/core';
 export interface FolderItem {
   id: string;
   name: string;
-  parent_id: string | null;
+  parent_id?: string | null;
   pinned?: number;
   created_at: string;
 }

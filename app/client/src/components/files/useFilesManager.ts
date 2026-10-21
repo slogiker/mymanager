@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { FileItem } from './FileCard';
 import { FolderItem } from './FolderSidebar';
 import { useUpload } from '../../context/UploadContext';
@@ -331,6 +330,14 @@ export function useFilesManager() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  }
+
+  function handlePreviewSaved(id: number, size: number) {
+    const update = (prev: FileItem[]) =>
+      prev.map((f) => (f.id === id ? { ...f, size } : f));
+    setFiles(update);
+    setAllFiles(update);
+    setPinnedFiles(update);
   }
 
   const {

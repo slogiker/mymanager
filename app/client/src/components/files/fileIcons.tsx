@@ -25,7 +25,7 @@ import {
 export interface FileFormatMeta {
   category: string;
   label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
   color: string;
   bg: string;
   accent: string;
