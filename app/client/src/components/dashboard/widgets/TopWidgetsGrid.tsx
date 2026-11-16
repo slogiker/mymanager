@@ -18,6 +18,16 @@ import { useIsMobile } from '../homelab/boardGrid';
 import { saveUserPreferences } from '../../../lib/userPreferences';
 import { ErrorBoundary } from '../../common/ErrorBoundary';
 
+/** Comfortable minimum height for a 2-column service card on a phone */
+const MOBILE_SERVICE_MIN_HEIGHT = 112;
+
+/** Row heights for full-width widgets: enough for a label row plus one value row */
+function mobileWidgetHeight(id: string): number {
+  if (id === 'notes') return 132;      // needs room to type
+  if (id.startsWith('node-')) return 92;
+  return 96;
+}
+
 export interface TopWidgetsGridProps {
   prefs: UserPreferences;
   onUpdatePrefs: (updated: UserPreferences) => void;
@@ -157,7 +167,11 @@ export function TopWidgetsGrid({
           return {
             id: w.id,
             span: isService ? 1 : 2,
-            height: GRID_CONSTANTS.CELL_HEIGHT + 8,
+            // Service cards draw their own frame and grow with their title;
+            // widgets keep their designed proportions inside a shared frame.
+            framed: !isService,
+            minHeight: isService ? MOBILE_SERVICE_MIN_HEIGHT : undefined,
+            height: isService ? undefined : mobileWidgetHeight(w.id),
             render: () => (
               <ErrorBoundary isInline fallbackTitle={w.title}>
                 {w.render(isService ? 1 : 2, 1)}

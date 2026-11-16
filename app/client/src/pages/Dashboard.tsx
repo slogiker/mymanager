@@ -82,34 +82,47 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#111216] text-slate-200">
       <Navbar />
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-24 pb-16">
+      <main className="mx-auto max-w-7xl px-4 pb-24 pt-20 sm:px-6 sm:pb-16 sm:pt-24 lg:px-8">
         {/* Navigation & View Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-800/80">
-          <div className="flex items-center gap-2">
+        <div className="mb-4 flex items-center justify-between gap-2 border-b border-slate-800/80 pb-3 sm:mb-6 sm:gap-3 sm:pb-4">
+          <div className="no-scrollbar flex min-w-0 items-center gap-2 overflow-x-auto">
             <button
               onClick={() => selectTab('board')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all sm:px-4 ${
                 tab === 'board'
                   ? 'bg-red-600 text-white shadow-[0_0_20px_-4px_rgba(239,68,68,0.5)]'
                   : 'bg-[#16181f] text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
               <LayoutGrid className="w-4 h-4" />
-              <span>Homelab Board</span>
+              <span className="sm:hidden">Board</span>
+              <span className="hidden sm:inline">Homelab Board</span>
             </button>
 
             {user?.role === 'owner' && (
-              <div className="relative">
+              <div className="relative shrink-0">
                 <button
                   onClick={() => setAdminMenuOpen(v => !v)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all sm:px-3.5 ${
                     tab !== 'board'
                       ? 'bg-slate-800 text-red-400 border-red-500/40'
                       : 'bg-[#16181f] text-slate-400 hover:text-slate-200 border-slate-800'
                   }`}
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5 text-red-500" />
-                  <span>{tab !== 'board' ? `Manage: ${tab.charAt(0).toUpperCase() + tab.slice(1)}` : 'Management Hub'}</span>
+                  <span className="whitespace-nowrap">
+                    {tab !== 'board' ? (
+                      <>
+                        <span className="sm:hidden">Manage</span>
+                        <span className="hidden sm:inline">Manage: {tab.charAt(0).toUpperCase() + tab.slice(1)}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="sm:hidden">Manage</span>
+                        <span className="hidden sm:inline">Management Hub</span>
+                      </>
+                    )}
+                  </span>
                   {unread > 0 && (
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                   )}
@@ -147,7 +160,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick Hub Tools */}
-          <div className="flex items-center gap-2 text-xs font-mono">
+          <div className="flex shrink-0 items-center gap-1.5 text-xs font-mono sm:gap-2">
             {/* VPN / Network Status Badge */}
             {vpnStatus && (
               <div
@@ -189,7 +202,7 @@ export default function DashboardPage() {
             {Boolean(user?.flags?.terminal_enabled) && (
               <Link
                 to="/terminal"
-                className="p-2 text-slate-400 hover:text-white rounded-xl bg-[#16181f] border border-slate-800 transition-colors"
+                className="hidden rounded-xl border border-slate-800 bg-[#16181f] p-2 text-slate-400 transition-colors hover:text-white sm:inline-flex"
                 title="SSH Web Terminal"
               >
                 <TermIcon className="w-4 h-4" />
@@ -198,7 +211,7 @@ export default function DashboardPage() {
             {Boolean(user?.flags?.files_enabled) && (
               <Link
                 to="/files"
-                className="p-2 text-slate-400 hover:text-white rounded-xl bg-[#16181f] border border-slate-800 transition-colors"
+                className="hidden rounded-xl border border-slate-800 bg-[#16181f] p-2 text-slate-400 transition-colors hover:text-white sm:inline-flex"
                 title="File Browser"
               >
                 <Folder className="w-4 h-4" />
@@ -206,7 +219,7 @@ export default function DashboardPage() {
             )}
             <Link
               to="/profile"
-              className="p-2 text-slate-400 hover:text-white rounded-xl bg-[#16181f] border border-slate-800 transition-colors"
+              className="inline-flex rounded-xl border border-slate-800 bg-[#16181f] p-2 text-slate-400 transition-colors hover:text-white"
               title="User Account & Visibility Settings"
             >
               <UserIcon className="w-4 h-4 text-red-400" />

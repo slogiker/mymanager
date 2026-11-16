@@ -124,6 +124,12 @@ export function ServiceCardItem({
 
   // Dedicated high-density, touch-optimized layout for mobile view
   if (isMobile) {
+    const statusGlow = isOnline
+      ? 'bg-emerald-500/25'
+      : isOffline
+      ? 'bg-rose-500/20'
+      : 'bg-slate-500/10';
+
     return (
       <div
         onClick={handleClick}
@@ -146,25 +152,28 @@ export function ServiceCardItem({
         onKeyDown={(e) => {
           if (e.key === 'Enter') onCardClick?.(s);
         }}
-        className={`group relative flex flex-col justify-between h-full p-3 cursor-pointer select-none overflow-hidden touch-manipulation transition-all duration-150 rounded-2xl border ${
+        className={`group relative flex h-full w-full flex-col justify-between gap-3 overflow-hidden rounded-2xl border p-3 transition-all duration-150 select-none touch-manipulation ${
           isPressing
-            ? 'scale-[0.96] ring-2 ring-red-500/50 shadow-[0_0_25px_rgba(239,68,68,0.25)] border-red-500/50'
+            ? 'scale-[0.97] border-red-500/50 ring-2 ring-red-500/40 shadow-[0_0_25px_rgba(239,68,68,0.25)]'
             : locked
-            ? 'border-amber-500/30 bg-[#16181f]/80 active:scale-[0.98]'
-            : 'border-slate-800/80 bg-gradient-to-b from-[#181a24] to-[#12141c] hover:border-slate-700/80 active:scale-[0.98] shadow-md'
+            ? 'border-amber-500/30 bg-[#16181f]/80 opacity-80 active:scale-[0.98]'
+            : 'border-slate-800/80 bg-gradient-to-br from-[#1a1c26] via-[#151720] to-[#111319] active:scale-[0.98] shadow-[0_2px_14px_-6px_rgba(0,0,0,0.9)]'
         }`}
       >
-        {/* Top Row: Squircle Icon with attached Status Pip on left, VPN/Lock badge on right (pr-6 preserves space for top-right drag handle) */}
-        <div className="flex items-center justify-between gap-1.5 w-full min-w-0 pr-6">
+        {/* Ambient status glow keeps card state readable at a glance */}
+        <div className={`pointer-events-none absolute -left-8 -top-10 h-24 w-24 rounded-full blur-2xl ${statusGlow}`} />
+
+        {/* Top Row: squircle icon with status pip, VPN / locked badge on the right */}
+        <div className="relative flex items-start justify-between gap-2">
           <div className="relative shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-slate-800/90 border border-slate-700/60 shadow-inner flex items-center justify-center">
+            <div className={isOffline ? 'opacity-50 grayscale transition-all' : ''}>
               <ServiceIcon icon={s.icon} title={s.title} />
             </div>
             {/* Attached glowing status pip */}
             <span
-              className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ring-2 ring-[#141620] ${
+              className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[#141620] ${
                 isOnline
-                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse'
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]'
                   : isOffline
                   ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]'
                   : 'bg-slate-500'
@@ -173,31 +182,33 @@ export function ServiceCardItem({
             />
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex shrink-0 items-center gap-1.5">
             {locked ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30 font-semibold">
-                <Lock className="w-2.5 h-2.5 text-amber-400" />
-                <span>VPN</span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-mono font-semibold uppercase tracking-wide text-amber-300">
+                <Lock className="h-2.5 w-2.5" />
+                VPN
               </span>
             ) : s.requires_vpn ? (
-              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                <Shield className="w-2.5 h-2.5 text-purple-400" />
-                <span>VPN</span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wide text-purple-300">
+                <Shield className="h-2.5 w-2.5" />
+                VPN
               </span>
             ) : null}
           </div>
         </div>
 
-        {/* Bottom Area: Service Title and Subtitle / Live Stat */}
-        <div className="min-w-0 mt-2">
-          <div className="font-bold text-xs sm:text-sm text-slate-100 truncate leading-snug group-hover:text-red-400 transition-colors">
+        {/* Bottom Area: title (up to 2 lines) and one live detail line */}
+        <div className="relative min-w-0">
+          <div className="line-clamp-2 text-[13px] font-semibold leading-snug text-slate-100">
             {s.title || 'Untitled'}
           </div>
-          <div className="text-[10px] font-mono truncate mt-0.5 leading-none">
+          <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] leading-none">
             {s.liveStat ? (
-              <span className="text-red-400 font-semibold">{s.liveStat}</span>
+              <span className="truncate font-semibold text-red-400">{s.liveStat}</span>
+            ) : isOffline ? (
+              <span className="truncate text-rose-400/80">Unreachable</span>
             ) : (
-              <span className="text-slate-400">{cleanUrl}</span>
+              <span className="truncate text-slate-500">{cleanUrl}</span>
             )}
           </div>
         </div>

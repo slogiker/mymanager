@@ -66,6 +66,14 @@
 }
 
 @layer components {
+  /* Horizontal chip rails on phones: scrollable but without a visible scrollbar */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
   .card {
     @apply bg-[#2d3039]/40 rounded-2xl border border-slate-700/40 backdrop-blur-xl shadow-lg transition-all duration-300 ease-out;
   }

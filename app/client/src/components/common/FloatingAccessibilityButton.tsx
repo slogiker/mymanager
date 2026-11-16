@@ -9,12 +9,12 @@ export default function FloatingAccessibilityButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed right-6 bottom-6 z-40 p-3.5 rounded-full bg-red-600 hover:bg-red-500 border border-red-500/80 shadow-[0_0_25px_-5px_rgba(239,68,68,0.5)] text-white hover:scale-105 active:scale-95 transition-all duration-300 group focus:outline-none focus:ring-4 focus:ring-red-500/30"
+        className="fixed right-4 bottom-4 z-40 rounded-full border border-red-500/80 bg-red-600 p-3 text-white shadow-[0_0_25px_-5px_rgba(239,68,68,0.5)] transition-all duration-300 group hover:scale-105 hover:bg-red-500 active:scale-95 focus:outline-none focus:ring-4 focus:ring-red-500/30 sm:right-6 sm:bottom-6 sm:p-3.5"
         aria-label="Open accessibility settings"
         title="Accessibility Settings"
       >
         <svg
-          className="w-6 h-6 transition-transform duration-300 group-hover:rotate-6"
+          className="h-5 w-5 transition-transform duration-300 group-hover:rotate-6 sm:h-6 sm:w-6"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

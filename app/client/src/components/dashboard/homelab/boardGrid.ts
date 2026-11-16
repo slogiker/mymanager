@@ -33,10 +33,10 @@ export function useBoardCols(): number {
 }
 
 /**
- * Phones, plus touch tablets narrower than 1024px. These get the single-flow
- * reorderable layout: no free grid placement, no resize handles.
+ * Phones and tablets. Everything narrower than the desktop 8-column canvas gets the
+ * single-flow reorderable layout: no free grid placement, no resize handles.
  */
-const MOBILE_QUERY = '(max-width: 767px), (pointer: coarse) and (max-width: 1023px)';
+const MOBILE_QUERY = '(max-width: 1023px)';
 
 export function useIsMobile(): boolean {
   const get = () => typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches;
