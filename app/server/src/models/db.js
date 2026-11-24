@@ -349,31 +349,11 @@ function seed() {
     }
   }
 
-  // Ensure gasper user exists with password 123456
-  try {
-    const gasperUser = db.prepare("SELECT id FROM users WHERE username = 'gasper'").get();
-    const gasperHash = bcrypt.hashSync('123456', 12);
-    if (!gasperUser) {
-      const gasperRes = db.prepare(`
-        INSERT INTO users (name, username, email, password_hash, role, must_change_password)
-        VALUES (?, ?, ?, ?, 'user', 0)
-      `).run('Gasper', 'gasper', 'gasper@local.lan', gasperHash);
-
-      const gasperId = gasperRes.lastInsertRowid;
-      const allServices = db.prepare("SELECT id, title FROM services").all();
-      const allowedTitles = ['jellyfin', 'jellyseerr', 'nas', 'nextcloud'];
-      const insertPerm = db.prepare("INSERT OR IGNORE INTO service_permissions (service_id, user_id, allowed) VALUES (?, ?, ?)");
-      for (const svc of allServices) {
-        const isAllowed = allowedTitles.some(t => svc.title.toLowerCase().includes(t));
-        insertPerm.run(svc.id, gasperId, isAllowed ? 1 : 0);
-      }
-      console.log('[Auth] Gasper user profile created with default permissions.');
-    } else {
-      db.prepare("UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = datetime('now') WHERE id = ?").run(gasperHash, gasperUser.id);
-    }
-  } catch (e) {
-    console.error('[Auth] Failed to seed/update gasper user:', e);
-  }
+  // No shared/default accounts are seeded here. Accounts are created by the
+  // owner through /api/users, which hands back a one-time password, and every
+  // boot-time password write was removed: a seed that re-hashes a fixed
+  // password on startup makes any password change temporary and puts the
+  // credential in the public repository.
 
   const servicesCount = db.prepare('SELECT COUNT(*) as c FROM services').get();
   if (servicesCount.c === 0) {

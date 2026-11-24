@@ -4,6 +4,7 @@ const https = require('https');
 const db = require('../models/db');
 const { verifyToken } = require('../middleware/auth');
 const { requireOwner } = require('../middleware/owner');
+const { assertProbeUrl } = require('../utils/netGuard');
 
 const router = express.Router();
 
@@ -173,7 +174,11 @@ router.get('/', verifyToken, async (req, res) => {
   res.json(withStatus);
 });
 
-router.post('/', verifyToken, (req, res) => {
+// Every mutation below is owner-only. A plain user editing or deleting service
+// rows was the dashboard takeover path: `is_private` URLs are read back from
+// these same rows, so write access to them is equivalent to read access to the
+// whole hidden service list.
+router.post('/', verifyToken, requireOwner, (req, res) => {
   const { title, url, description, icon, category, is_private, requires_vpn } = req.body;
   if (!title) return res.status(400).json({ error: 'Title required' });
 
@@ -186,7 +191,7 @@ router.post('/', verifyToken, (req, res) => {
   res.status(201).json(db.prepare('SELECT * FROM services WHERE id = ?').get(result.lastInsertRowid));
 });
 
-router.put('/:id', verifyToken, (req, res) => {
+router.put('/:id', verifyToken, requireOwner, (req, res) => {
   const row = db.prepare('SELECT * FROM services WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Service not found' });
 
@@ -205,17 +210,22 @@ router.put('/:id', verifyToken, (req, res) => {
   res.json(db.prepare('SELECT * FROM services WHERE id = ?').get(req.params.id));
 });
 
-router.delete('/:id', verifyToken, (req, res) => {
+router.delete('/:id', verifyToken, requireOwner, (req, res) => {
   const row = db.prepare('SELECT id FROM services WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Service not found' });
   db.prepare('DELETE FROM services WHERE id = ?').run(req.params.id);
   res.json({ message: 'Deleted' });
 });
 
-router.post('/test', verifyToken, async (req, res) => {
+router.post('/test', verifyToken, requireOwner, async (req, res) => {
   const { url } = req.body;
   if (!url || url === '#' || !url.startsWith('http')) {
     return res.status(400).json({ error: 'Valid HTTP/HTTPS URL required (e.g. http://192.168.1.50:8080)' });
+  }
+
+  const verdict = await assertProbeUrl(url);
+  if (!verdict.ok) {
+    return res.status(400).json({ error: verdict.reason });
   }
 
   const start = Date.now();

@@ -34,15 +34,41 @@ function purgeOldLogs(retentionDays = 30) {
   }
 }
 
+/**
+ * Bound the analytics table. Every non-/api GET writes a row, so without a
+ * retention job the table is an unbounded-growth target (disk fill + slow
+ * dashboard queries). Retention is configurable, defaulting to one year.
+ */
+function purgeOldAnalytics(retentionDays) {
+  const days = Number(retentionDays || process.env.ANALYTICS_RETENTION_DAYS || 365);
+  if (!Number.isFinite(days) || days <= 0) return;
+  try {
+    const db = require('../models/db');
+    const result = db.prepare(
+      "DELETE FROM analytics WHERE created_at < datetime('now', ?)"
+    ).run(`-${days} days`);
+    if (result.changes > 0) {
+      logger.info(`Purged ${result.changes} analytics rows older than ${days} days`);
+    }
+  } catch (err) {
+    logger.warn(`Analytics retention purge failed: ${err.message}`);
+  }
+}
+
 function startLogPurgeJob() {
   purgeOldLogs();
+  purgeOldAnalytics();
   // Run once every 24 hours
-  const interval = setInterval(() => purgeOldLogs(), 24 * 60 * 60 * 1000);
+  const interval = setInterval(() => {
+    purgeOldLogs();
+    purgeOldAnalytics();
+  }, 24 * 60 * 60 * 1000);
   interval.unref?.();
 }
 
 module.exports = {
   purgeOldLogs,
+  purgeOldAnalytics,
   startLogPurgeJob,
   LOGS_DIR,
 };
